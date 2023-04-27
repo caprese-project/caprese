@@ -16,6 +16,10 @@ ENTRY( _start )
 
 SECTIONS
 {
+  . = 0x80000000;
+
+  PROVIDE(begin_of_kernel = .);
+
   . = 0x80200000;
   .text :
   {
@@ -45,4 +49,12 @@ SECTIONS
     *(.bss)
     *(.bss.*)
   }
+  . = ALIGN(16);
+  .stack :
+  {
+    *(.stack)
+  }
+
+  . = ALIGN(16);
+  PROVIDE(end_of_kernel = .);
 }

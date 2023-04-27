@@ -11,12 +11,14 @@
  * @see https://github.com/cosocaf/caprese/LICENSE
  */
 
+#include <caprese/arch/riscv/panic.h>
 #include <caprese/kernel/panic.h>
 #include <caprese/lib/console.h>
 
 namespace caprese {
   [[noreturn]] void panic(const char* msg) {
     println("Kernel panic! %s", msg);
+    arch::dump_context();
     arch::halt();
   }
-}
+} // namespace caprese

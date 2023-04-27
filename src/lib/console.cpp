@@ -11,16 +11,26 @@
  * @see https://github.com/cosocaf/caprese/LICENSE
  */
 
-#include <caprese/lib/console.h>
-#include <caprese/kernel/panic.h>
-
 #include <cstdarg>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
+
+#include <caprese/arch/riscv/sbi.h>
+#include <caprese/kernel/panic.h>
+#include <caprese/lib/console.h>
 
 namespace caprese {
   namespace {
+    inline void putc(int ch) {
+#if defined(CONFIG_ARCH_RISCV)
+      arch::sbi_putc(ch);
+#endif // defined(CONFIG_ARCH_RISCV)
+    }
+  } // namespace
+
+  namespace {
     constexpr auto digits = "0123456789ABCDEF";
+
     void print_int(int n, int base, bool sign) {
       char buf[16];
       if (sign && n < 0) {
@@ -40,15 +50,15 @@ namespace caprese {
       }
 
       while (--i >= 0) {
-        arch::console_put(buf[i]);
+        putc(buf[i]);
       }
     }
 
     void print_ptr(uint64_t ptr) {
-      arch::console_put('0');
-      arch::console_put('x');
+      putc('0');
+      putc('x');
       for (size_t i = 0; i < sizeof(uint64_t) * 2; i++, ptr <<= 4) {
-        arch::console_put(digits[ptr >> (sizeof(uint64_t) * 8 - 4)]);
+        putc(digits[ptr >> (sizeof(uint64_t) * 8 - 4)]);
       }
     }
 
@@ -57,18 +67,18 @@ namespace caprese {
         str = "null";
       }
       do {
-        arch::console_put(*str);
-      } while(*++str);
+        putc(*str);
+      } while (*++str);
     }
 
     void vprintf(const char* fmt, va_list ap) {
-      for(auto p = fmt; *p != '\0'; ++p) {
-        if(*p != '%') [[likely]] {
-          arch::console_put(*p);
+      for (auto p = fmt; *p != '\0'; ++p) {
+        if (*p != '%') [[likely]] {
+          putc(*p);
           continue;
         }
 
-        switch(*++p) {
+        switch (*++p) {
           case 'd':
             print_int(va_arg(ap, int32_t), 10, true);
             break;
@@ -79,7 +89,7 @@ namespace caprese {
             print_int(va_arg(ap, int32_t), 16, true);
             break;
           case 'c':
-            arch::console_put(va_arg(ap, int));
+            putc(va_arg(ap, int));
             break;
           case 'p':
             print_ptr(va_arg(ap, uint64_t));
@@ -89,16 +99,16 @@ namespace caprese {
             break;
           case '%':
           case '\0':
-            arch::console_put('%');
+            putc('%');
             break;
           default:
-            arch::console_put('%');
-            arch::console_put(*p);
+            putc('%');
+            putc(*p);
             break;
         }
       }
     }
-  }
+  } // namespace
 
   void print(const char* fmt, ...) {
     va_list ap;
@@ -106,6 +116,7 @@ namespace caprese {
     vprintf(fmt, ap);
     va_end(ap);
   }
+
   void println(const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -127,6 +138,7 @@ namespace caprese {
 
     panic("A fatal error has occurred.");
   }
+
   void log_error(const char* tag, const char* fmt, ...) {
     print("[ERROR] %s: ", tag);
 
@@ -137,8 +149,9 @@ namespace caprese {
 
     print("\n");
   }
+
   void log_warn(const char* tag, const char* fmt, ...) {
-    print("[WARN] %s: ", tag);
+    print("[WARN]  %s: ", tag);
 
     va_list ap;
     va_start(ap, fmt);
@@ -147,8 +160,9 @@ namespace caprese {
 
     print("\n");
   }
+
   void log_info(const char* tag, const char* fmt, ...) {
-    print("[INFO] %s: ", tag);
+    print("[INFO]  %s: ", tag);
 
     va_list ap;
     va_start(ap, fmt);
@@ -157,6 +171,7 @@ namespace caprese {
 
     print("\n");
   }
+
   void log_debug(const char* tag, const char* fmt, ...) {
     print("[DEBUG] %s: ", tag);
 
@@ -167,4 +182,19 @@ namespace caprese {
 
     print("\n");
   }
-}
+
+  void log_assert(const char* tag, bool condition, const char* fmt, ...) {
+#ifndef NDEBUG
+    if (!condition) {
+      print("[ASSERT] %s: ", tag);
+
+      va_list ap;
+      va_start(ap, fmt);
+      vprintf(fmt, ap);
+      va_end(ap);
+
+      panic("Assertion failed.");
+    }
+#endif
+  }
+} // namespace caprese

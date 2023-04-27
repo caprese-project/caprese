@@ -40,8 +40,6 @@ macro(declare_arch arch)
     )
 
     add_compile_definitions(
-      $<$<COMPILE_LANGUAGE:C>:CONFIG_ARCH_RISCV>
-      $<$<COMPILE_LANGUAGE:C>:CONFIG_ARCH_RISCV64>
       $<$<COMPILE_LANGUAGE:CXX>:CONFIG_ARCH_RISCV>
       $<$<COMPILE_LANGUAGE:CXX>:CONFIG_ARCH_RISCV64>
     )

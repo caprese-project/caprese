@@ -14,18 +14,15 @@
 #define CAPRESE_LIB_CONSOLE_H_
 
 namespace caprese {
-  namespace arch {
-    void console_put(char c);
-  }
-
   void print(const char* fmt, ...);
   void println(const char* fmt, ...);
 
   [[noreturn]] void log_fatal(const char* tag, const char* fmt, ...);
-  void log_error(const char* tag, const char* fmt, ...);
-  void log_warn(const char* tag, const char* fmt, ...);
-  void log_info(const char* tag, const char* fmt, ...);
-  void log_debug(const char* tag, const char* fmt, ...);
-}
+  void              log_error(const char* tag, const char* fmt, ...);
+  void              log_warn(const char* tag, const char* fmt, ...);
+  void              log_info(const char* tag, const char* fmt, ...);
+  void              log_debug(const char* tag, const char* fmt, ...);
+  void              log_assert(const char* tag, bool condition, const char* fmt, ...);
+} // namespace caprese
 
 #endif // CAPRESE_LIB_CONSOLE_H_

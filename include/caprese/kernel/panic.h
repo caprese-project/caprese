@@ -15,10 +15,7 @@
 #define CAPRESE_KERNEL_PANIC_H_
 
 namespace caprese {
-  namespace arch {
-    [[noreturn]] void halt();
-  }
   [[noreturn]] void panic(const char* msg);
-}
+} // namespace caprese
 
 #endif // CAPRESE_KERNEL_PANIC_H_

@@ -14,7 +14,12 @@ target_sources(
   PRIVATE
     kernel/main.cpp
     kernel/panic.cpp
+    kernel/device.cpp
+    kernel/page.cpp
+    kernel/capability.cpp
+    kernel/thread_control_block.cpp
     lib/console.cpp
+    lib/string.cpp
 )
 target_compile_options(
   kernel PRIVATE
@@ -30,9 +35,10 @@ if(${CONFIG_ARCH} STREQUAL rv64)
     kernel
     PRIVATE
       arch/riscv/head.S
+      arch/riscv/trap.S
       arch/riscv/arch_main.cpp
-      arch/riscv/halt.cpp
-      arch/riscv/console.cpp
+      arch/riscv/sbi.cpp
+      arch/riscv/panic.cpp
   )
   target_link_options(
     kernel PRIVATE

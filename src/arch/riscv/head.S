@@ -35,7 +35,7 @@ spin:
   wfi
   j spin
 
-.section .data.stack
+.section .stack
 .align 16
 stack:
   .space 4096

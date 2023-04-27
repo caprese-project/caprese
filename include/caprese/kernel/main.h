@@ -14,8 +14,10 @@
 #ifndef CAPRESE_KERNEL_MAIN_H_
 #define CAPRESE_KERNEL_MAIN_H_
 
+#include <cstdint>
+
 namespace caprese {
-  [[noreturn]] void main();
-}
+  [[noreturn]] void main(uintptr_t hartid, const void* dtb);
+} // namespace caprese
 
 #endif // CAPRESE_KERNEL_MAIN_H_

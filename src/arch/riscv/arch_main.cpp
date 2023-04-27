@@ -12,8 +12,7 @@
  */
 
 #include <caprese/kernel/main.h>
-#include <cstdint>
 
-extern "C" [[noreturn]] void arch_main(uintptr_t hartid, void* dtb) {
-  caprese::main();
+extern "C" [[noreturn]] void arch_main(uintptr_t hartid, const void* dtb) {
+  caprese::main(hartid, dtb);
 }
