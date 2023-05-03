@@ -39,3 +39,6 @@ spin:
 .align 16
 stack:
   .space 4096
+
+.section .root_server
+.incbin CONFIG_ROOT_SERVER_BIN

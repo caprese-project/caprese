@@ -14,19 +14,29 @@ project(
   LANGUAGES CXX ASM
 )
 
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(configs/helpers/declare_arch.cmake)
 include(configs/helpers/check_config.cmake)
 include(configs/helpers/declare_deps.cmake)
+include(configs/helpers/declare_root.cmake)
 
-if (DEFINED PLATFORM)
+if(DEFINED PLATFORM)
   include(configs/platforms/${PLATFORM}/config.cmake)
   check_config()
-else ()
+else()
   message(FATAL_ERROR "PLATFORM is not defined.")
 endif(DEFINED PLATFORM)
 
 declare_deps()
+
+if(DEFINED ROOT)
+  add_subdirectory(${ROOT})
+else()
+  message(FATAL_ERROR "ROOT is not defined.")
+endif(DEFINED ROOT)
 
 add_subdirectory(${ROOT_DIR}/src)

@@ -15,15 +15,16 @@
 #include <cstddef>
 #include <cstdint>
 
-#include <caprese/arch/riscv/sbi.h>
 #include <caprese/kernel/panic.h>
 #include <caprese/lib/console.h>
+
+#include <caprese/arch/riscv/sbi.h>
 
 namespace caprese {
   namespace {
     inline void putc(int ch) {
 #if defined(CONFIG_ARCH_RISCV)
-      arch::sbi_putc(ch);
+      arch::sbi_console_putchar(ch);
 #endif // defined(CONFIG_ARCH_RISCV)
     }
   } // namespace
@@ -185,13 +186,15 @@ namespace caprese {
 
   void log_assert(const char* tag, bool condition, const char* fmt, ...) {
 #ifndef NDEBUG
-    if (!condition) {
+    if (!condition) [[unlikely]] {
       print("[ASSERT] %s: ", tag);
 
       va_list ap;
       va_start(ap, fmt);
       vprintf(fmt, ap);
       va_end(ap);
+
+      print("\n");
 
       panic("Assertion failed.");
     }

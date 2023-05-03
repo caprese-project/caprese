@@ -1,6 +1,20 @@
-#include <caprese/lib/string.h>
+/**
+ * @file string.cpp
+ * @author cosocaf (cosocaf@gmail.com)
+ * @brief string.h
+ * @since 0.0.1
+ * @version 0.0.1
+ *
+ * @copyright (c) 2023 cosocaf
+ *
+ * This project is released under the MIT License.
+ * @see https://github.com/cosocaf/caprese/LICENSE
+ *
+ */
 
-namespace caprese {
+#include "string.h"
+
+extern "C" {
   int strcmp(const char* str1, const char* str2) {
     while (*str1 != '\0' && *str1 == *str2) {
       ++str1;
@@ -43,4 +57,13 @@ namespace caprese {
       ++p;
     }
   }
-} // namespace caprese
+
+  void* memset(void* src, int ch, size_t n) {
+    unsigned char  c = ch;
+    unsigned char* p = reinterpret_cast<unsigned char*>(src);
+    while (n-- > 0) {
+      *p++ = c;
+    }
+    return src;
+  }
+}

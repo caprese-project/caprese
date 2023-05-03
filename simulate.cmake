@@ -15,7 +15,7 @@ execute_process(
       -M virt
       -cpu rv64
       -smp 1
-      -m 2048
+      -m 1024
       -nographic
       -bios build/image.elf
       # -gdb tcp::1234

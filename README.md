@@ -15,7 +15,7 @@ cd caprese
 2. Configure CMake
 ```sh
 # <YOUR_PLATFORM> is the target platform, see cmake/platforms.
-cmake -B build -G Ninja -DPLATFORM=<YOUR_PLATFORM>
+cmake -B build -G Ninja -DPLATFORM=<YOUR_PLATFORM> -DROOT=<YOUR_ROOT_TARGET_DIR>
 ```
 
 3. Build

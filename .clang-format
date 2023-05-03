@@ -1,3 +1,10 @@
+# Caprese
+#
+# (c) 2023 cosocaf
+#
+# This project is released under the MIT License.
+# See https://github.com/cosocaf/caprese/LICENSE
+
 AccessModifierOffset: -2
 AlignAfterOpenBracket: Align
 AlignArrayOfStructures: Right
@@ -42,6 +49,9 @@ IfMacros: []
 IncludeBlocks: Regroup
 IncludeCategories:
   - Regex: ^<.*(?!\.h)>$
+    Priority: 4
+    SortPriority: 4
+  - Regex: ^<caprese/arch/
     Priority: 3
     SortPriority: 3
   - Regex: ^<caprese/

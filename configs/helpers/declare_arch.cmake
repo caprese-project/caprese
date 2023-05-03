@@ -14,11 +14,9 @@ macro(declare_arch arch)
     set(TOOLCHAIN_PREFIX "riscv64-unknown-elf-")
     set(CMAKE_EXECUTABLE_SUFFIX .elf)
 
-    set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}g++)
-    set(CMAKE_CXX_STANDARD 23)
-    set(CMAKE_CXX_EXTENSIONS OFF)
-
-    set(CMAKE_ASM_COMPILER ${TOOLCHAIN_PREFIX}gcc)
+    set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}g++ CACHE FILEPATH "C++ compiler")
+    set(CMAKE_ASM_COMPILER ${TOOLCHAIN_PREFIX}gcc CACHE FILEPATH "C compiler")
+    set(CMAKE_OBJCOPY ${TOOLCHAIN_PREFIX}objcopy CACHE STRING "objcopy")
 
     set(
       CONFIG_CXX_OPTIONS
