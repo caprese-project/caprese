@@ -92,7 +92,7 @@ namespace {
      .user                      = false,
      },
     {
-     .base_virtual_address      = trap_frame_base_address,
+     .base_virtual_address      = TRAP_FRAME_BASE_ADDRESS,
      .begin_of_physical_address = reinterpret_cast<physical_address_t>(&begin_of_root_server_trap_frame),
      .end_of_physical_address   = reinterpret_cast<physical_address_t>(&end_of_root_server_trap_frame),
      .readable                  = true,
@@ -101,7 +101,7 @@ namespace {
      .user                      = false,
      },
     {
-     .base_virtual_address      = trampoline_base_address,
+     .base_virtual_address      = TRAMPOLINE_BASE_ADDRESS,
      .begin_of_physical_address = reinterpret_cast<physical_address_t>(&begin_of_trampoline),
      .end_of_physical_address   = reinterpret_cast<physical_address_t>(&end_of_trampoline),
      .readable                  = true,

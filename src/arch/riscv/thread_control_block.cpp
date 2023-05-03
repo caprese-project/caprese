@@ -30,7 +30,7 @@ namespace caprese::arch {
        .user                      = true,
        },
       {
-       .base_virtual_address      = trap_frame_base_address,
+       .base_virtual_address      = TRAP_FRAME_BASE_ADDRESS,
        .begin_of_physical_address = reinterpret_cast<physical_address_t>(&begin_of_root_server_trap_frame),
        .end_of_physical_address   = reinterpret_cast<physical_address_t>(&end_of_root_server_trap_frame),
        .readable                  = true,
@@ -39,7 +39,7 @@ namespace caprese::arch {
        .user                      = false,
        },
       {
-       .base_virtual_address      = trampoline_base_address,
+       .base_virtual_address      = TRAMPOLINE_BASE_ADDRESS,
        .begin_of_physical_address = reinterpret_cast<physical_address_t>(&begin_of_trampoline),
        .end_of_physical_address   = reinterpret_cast<physical_address_t>(&end_of_trampoline),
        .readable                  = true,
@@ -53,7 +53,7 @@ namespace caprese::arch {
   thread_control_block root_server_thread_control_block = {};
 
   bool inited = false;
-  char root_server_kernel_trap_stack[page_size];
+  char root_server_kernel_trap_stack[PAGE_SIZE];
 
   thread_control_block* thread_control_block::current() {
     // TODO: impl
@@ -68,8 +68,8 @@ namespace caprese::arch {
       root_server_thread_control_block.satp              = page_table.get_satp_value();
       root_server_thread_control_block.kernel_trap_stack = root_server_kernel_trap_stack;
       root_server_thread_control_block.context.ra        = reinterpret_cast<uintptr_t>(return_to_user_mode);
-      root_server_thread_control_block.context.sp        = reinterpret_cast<uintptr_t>(root_server_thread_control_block.kernel_trap_stack) + page_size;
-      root_server_thread_control_block.trap_frame        = reinterpret_cast<thread_trap_frame*>(trap_frame_base_address);
+      root_server_thread_control_block.context.sp        = reinterpret_cast<uintptr_t>(root_server_thread_control_block.kernel_trap_stack) + PAGE_SIZE;
+      root_server_thread_control_block.trap_frame        = reinterpret_cast<thread_trap_frame*>(TRAP_FRAME_BASE_ADDRESS);
       root_server_thread_control_block.trap_frame->epc   = CONFIG_ROOT_SERVER_BASE_ADDRESS;
       inited                                             = true;
     }

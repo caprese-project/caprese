@@ -33,24 +33,24 @@ namespace caprese::arch {
   using trampoline_user_vector_t         = void (*)(uintptr_t);
   using trampoline_return_to_user_mode_t = void (*)(uintptr_t);
 
-  constexpr uintptr_t trampoline_base_address = max_virtual_address - page_size;
-  constexpr uintptr_t trap_frame_base_address = trampoline_base_address - page_size;
+  constexpr uintptr_t TRAMPOLINE_BASE_ADDRESS = MAX_VIRTUAL_ADDRESS - PAGE_SIZE;
+  constexpr uintptr_t TRAP_FRAME_BASE_ADDRESS = TRAMPOLINE_BASE_ADDRESS - PAGE_SIZE;
 
   enum struct riscv_trap_code : uintptr_t {
-    instruction_address_misaligned = 0,
-    instruction_access_fault       = 1,
-    illegal_instruction            = 2,
-    breakpoint                     = 3,
-    load_address_misaligned        = 4,
-    load_access_fault              = 5,
-    store_amo_address_misaligned   = 6,
-    store_amo_access_fault         = 7,
-    environment_call_from_u_mode   = 8,
-    environment_call_from_s_mode   = 9,
-    environment_call_from_m_mode   = 11,
-    instruction_page_fault         = 12,
-    load_page_fault                = 13,
-    store_amo_page_fault           = 15,
+    INSTRUCTION_ADDRESS_MISALIGNED = 0,
+    INSTRUCTION_ACCESS_FAULT       = 1,
+    ILLEGAL_INSTRUCTION            = 2,
+    BREAKPOINT                     = 3,
+    LOAD_ADDRESS_MISALIGNED        = 4,
+    LOAD_ACCESS_FAULT              = 5,
+    STORE_AMO_ADDRESS_MISALIGNED   = 6,
+    STORE_AMO_ACCESS_FAULT         = 7,
+    ENVIRONMENT_CALL_FROM_U_MODE   = 8,
+    ENVIRONMENT_CALL_FROM_S_MODE   = 9,
+    ENVIRONMENT_CALL_FROM_M_MODE   = 11,
+    INSTRUCTION_PAGE_FAULT         = 12,
+    LOAD_PAGE_FAULT                = 13,
+    STORE_AMO_PAGE_FAULT           = 15,
   };
 
   void return_to_user_mode();

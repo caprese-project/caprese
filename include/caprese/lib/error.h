@@ -3,9 +3,9 @@
 
 namespace caprese {
   enum struct error_t {
-    ok               = 0,
-    invalid_argument = -1,
-    not_found        = -2,
+    OK               = 0,
+    INVALID_ARGUMENT = -1,
+    NOT_FOUND        = -2,
   };
 
   inline bool succeeded(error_t err) {

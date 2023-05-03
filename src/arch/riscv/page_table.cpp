@@ -24,7 +24,7 @@ namespace caprese::arch {
 
     log_info("early_page_table", "MMU enabled.");
 
-    return error_t::ok;
+    return error_t::OK;
   }
 
   uintptr_t early_page_table::get_satp_value() {

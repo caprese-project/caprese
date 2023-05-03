@@ -28,8 +28,8 @@
 #include <caprese/lib/error.h>
 
 namespace caprese::arch {
-  constexpr uintptr_t page_size           = 4096;
-  constexpr uintptr_t max_virtual_address = 1ull << (9 + 9 + 9 + 12 - 1);
+  constexpr uintptr_t PAGE_SIZE           = 4096;
+  constexpr uintptr_t MAX_VIRTUAL_ADDRESS = 1ull << (9 + 9 + 9 + 12 - 1);
 
   struct sv39_page_table_entry {
     uint64_t v       : 1;  // valid
@@ -96,15 +96,15 @@ namespace caprese::arch {
 
     template<size_t N>
     error_t create(physical_address_t begin_of_page_table, physical_address_t end_of_page_table, const page_region_info (&regions)[N]) {
-      assert(begin_of_page_table % page_size == 0);
-      assert(end_of_page_table % page_size == 0);
+      assert(begin_of_page_table % PAGE_SIZE == 0);
+      assert(end_of_page_table % PAGE_SIZE == 0);
 
 #ifndef NDEBUG
       {
         virtual_address_t prev_virtual_address = 0;
         for (const page_region_info& region : regions) {
-          assert(region.base_virtual_address % page_size == 0);
-          assert(region.begin_of_physical_address % page_size == 0);
+          assert(region.base_virtual_address % PAGE_SIZE == 0);
+          assert(region.begin_of_physical_address % PAGE_SIZE == 0);
           assert(prev_virtual_address < region.base_virtual_address);
           prev_virtual_address = region.base_virtual_address + (region.end_of_physical_address - region.begin_of_physical_address) - 1;
         }
@@ -118,7 +118,7 @@ namespace caprese::arch {
         for (const page_region_info& region : regions) {
           const size_t size_of_address_space = region.end_of_physical_address - region.begin_of_physical_address;
 
-          for (virtual_address_t offset = 0; offset < size_of_address_space; offset += page_size) {
+          for (virtual_address_t offset = 0; offset < size_of_address_space; offset += PAGE_SIZE) {
             vpn2[std::bit_cast<sv39_virtual_address>(region.base_virtual_address + offset).vpn2] = true;
           }
         }
@@ -140,7 +140,7 @@ namespace caprese::arch {
         for (const page_region_info& region : regions) {
           const size_t size_of_address_space = region.end_of_physical_address - region.begin_of_physical_address;
 
-          for (virtual_address_t offset = 0; offset < size_of_address_space; offset += page_size) {
+          for (virtual_address_t offset = 0; offset < size_of_address_space; offset += PAGE_SIZE) {
             const auto             virtual_address    = std::bit_cast<sv39_virtual_address>(region.base_virtual_address + offset);
             const auto             physical_address   = region.begin_of_physical_address + offset;
             sv39_page_table_entry* page_table_entry_2 = nullptr;
@@ -184,7 +184,7 @@ namespace caprese::arch {
 
             if (page_table_entry_0->v == 1) [[unlikely]] {
               log_error("early_page_table", "Already mapped. virtual_address: %p, physical_address: %p", virtual_address, physical_address);
-              return error_t::invalid_argument;
+              return error_t::INVALID_ARGUMENT;
             }
 
             *page_table_entry_0   = physical_address_to_page_table_entry(physical_address);
@@ -206,7 +206,7 @@ namespace caprese::arch {
         }
       }
 
-      return error_t::ok;
+      return error_t::OK;
     }
   };
 } // namespace caprese::arch

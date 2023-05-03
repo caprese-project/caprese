@@ -46,51 +46,49 @@ namespace caprese::arch {
       // TODO: handle trap
       switch (scause) {
         using enum riscv_trap_code;
-        case instruction_address_misaligned:
-          log_info("trap", "instruction_address_misaligned, %p");
+        case INSTRUCTION_ADDRESS_MISALIGNED:
+          log_info("trap", "INSTRUCTION_ADDRESS_MISALIGNED, %p");
           break;
-        case instruction_access_fault:
-          log_info("trap", "instruction_access_fault");
+        case INSTRUCTION_ACCESS_FAULT:
+          log_info("trap", "INSTRUCTION_ACCESS_FAULT");
           break;
-        case illegal_instruction:
-          log_info("trap", "illegal_instruction");
+        case ILLEGAL_INSTRUCTION:
+          log_info("trap", "ILLEGAL_INSTRUCTION");
           break;
-        case breakpoint:
-          log_info("trap", "breakpoint");
+        case BREAKPOINT:
+          log_info("trap", "BREAKPOINT");
           break;
-        case load_address_misaligned:
-          log_info("trap", "load_address_misaligned");
+        case LOAD_ADDRESS_MISALIGNED:
+          log_info("trap", "LOAD_ADDRESS_MISALIGNED");
           break;
-        case load_access_fault:
-          log_info("trap", "load_access_fault");
+        case LOAD_ACCESS_FAULT:
+          log_info("trap", "LOAD_ACCESS_FAULT");
           break;
-        case store_amo_address_misaligned:
-          log_info("trap", "store_amo_address_misaligned");
+        case STORE_AMO_ADDRESS_MISALIGNED:
+          log_info("trap", "STORE_AMO_ADDRESS_MISALIGNED");
           break;
-        case store_amo_access_fault:
-          log_info("trap", "store_amo_access_fault");
+        case STORE_AMO_ACCESS_FAULT:
+          log_info("trap", "STORE_AMO_ACCESS_FAULT");
           break;
-        case environment_call_from_u_mode:
-          {
-            auto tcb = thread_control_block::current();
-            print("%c", tcb->trap_frame->a0);
-            tcb->trap_frame->epc += 4;
-          }
+        case ENVIRONMENT_CALL_FROM_U_MODE: {
+          auto tcb = thread_control_block::current();
+          print("%c", tcb->trap_frame->a0);
+          tcb->trap_frame->epc += 4;
+        } break;
+        case ENVIRONMENT_CALL_FROM_S_MODE:
+          log_info("trap", "ENVIRONMENT_CALL_FROM_S_MODE");
           break;
-        case environment_call_from_s_mode:
-          log_info("trap", "environment_call_from_s_mode");
+        case ENVIRONMENT_CALL_FROM_M_MODE:
+          log_info("trap", "ENVIRONMENT_CALL_FROM_M_MODE");
           break;
-        case environment_call_from_m_mode:
-          log_info("trap", "environment_call_from_m_mode");
+        case INSTRUCTION_PAGE_FAULT:
+          log_info("trap", "INSTRUCTION_PAGE_FAULT");
           break;
-        case instruction_page_fault:
-          log_info("trap", "instruction_page_fault");
+        case LOAD_PAGE_FAULT:
+          log_info("trap", "LOAD_PAGE_FAULT");
           break;
-        case load_page_fault:
-          log_info("trap", "load_page_fault");
-          break;
-        case store_amo_page_fault:
-          log_info("trap", "store_amo_page_fault");
+        case STORE_AMO_PAGE_FAULT:
+          log_info("trap", "STORE_AMO_PAGE_FAULT");
           break;
         default:
           log_error("trap", "Unknown scause: %p", scause);
@@ -104,16 +102,16 @@ namespace caprese::arch {
     auto tcb = thread_control_block::current();
 
     const auto user_vector = reinterpret_cast<trampoline_user_vector_t>(
-        trampoline_base_address + (reinterpret_cast<uintptr_t>(&trampoline_user_vector) - reinterpret_cast<uintptr_t>(&begin_of_trampoline)));
+        TRAMPOLINE_BASE_ADDRESS + (reinterpret_cast<uintptr_t>(&trampoline_user_vector) - reinterpret_cast<uintptr_t>(&begin_of_trampoline)));
     const auto return_to_user_mode = reinterpret_cast<trampoline_return_to_user_mode_t>(
-        trampoline_base_address + (reinterpret_cast<uintptr_t>(&trampoline_return_to_user_mode) - reinterpret_cast<uintptr_t>(&begin_of_trampoline)));
+        TRAMPOLINE_BASE_ADDRESS + (reinterpret_cast<uintptr_t>(&trampoline_return_to_user_mode) - reinterpret_cast<uintptr_t>(&begin_of_trampoline)));
 
     uintptr_t sstatus;
     asm volatile("csrr %0, sstatus" : "=r"(sstatus));
     asm volatile("csrw sstatus, %0" : : "r"(sstatus));
     asm volatile("csrw stvec, %0" : : "r"(user_vector));
     asm volatile("csrr %0, satp" : "=r"(tcb->trap_frame->kernel_satp));
-    tcb->trap_frame->kernel_sp   = reinterpret_cast<uintptr_t>(tcb->kernel_trap_stack) + page_size;
+    tcb->trap_frame->kernel_sp   = reinterpret_cast<uintptr_t>(tcb->kernel_trap_stack) + PAGE_SIZE;
     tcb->trap_frame->kernel_trap = reinterpret_cast<uintptr_t>(user_trap);
 
     sstatus &= ~(1 << 8);
