@@ -3,7 +3,7 @@
 # (c) 2023 cosocaf
 #
 # This project is released under the MIT License.
-# See https://github.com/cosocaf/caprese/LICENSE
+# See https://github.com/cosocaf/caprese/blob/master/LICENSE
 
 AccessModifierOffset: -2
 AlignAfterOpenBracket: Align
@@ -48,18 +48,14 @@ ForEachMacros: []
 IfMacros: []
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: ^<.*(?!\.h)>$
-    Priority: 4
-    SortPriority: 4
-  - Regex: ^<caprese/arch/
-    Priority: 3
-    SortPriority: 3
-  - Regex: ^<caprese/
-    Priority: 2
-    SortPriority: 2
-  - Regex: .*
+  - Regex: ^<[^/]+(\.h)?>$
     Priority: 1
-    SortPriority: 1
+  - Regex: ^<caprese/.*\.h>$
+    Priority: 2
+  - Regex: ^<caprese/arch/.*\.h>$
+    Priority: 3
+  - Regex: ^<.*>$
+    Priority: 4
 IndentAccessModifiers: false
 IndentCaseBlocks: false
 IndentCaseLabels: true
