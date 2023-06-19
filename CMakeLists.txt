@@ -3,7 +3,7 @@
 # (c) 2023 cosocaf
 #
 # This project is released under the MIT License.
-# See https://github.com/cosocaf/caprese/LICENSE
+# See https://github.com/cosocaf/caprese/blob/master/LICENSE
 
 cmake_minimum_required(VERSION 3.12)
 
@@ -14,7 +14,6 @@ project(
   LANGUAGES CXX ASM
 )
 
-set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -22,7 +21,6 @@ set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 include(configs/helpers/declare_arch.cmake)
 include(configs/helpers/check_config.cmake)
 include(configs/helpers/declare_deps.cmake)
-include(configs/helpers/declare_root.cmake)
 
 if(DEFINED PLATFORM)
   include(configs/platforms/${PLATFORM}/config.cmake)
@@ -33,10 +31,13 @@ endif(DEFINED PLATFORM)
 
 declare_deps()
 
-if(DEFINED ROOT)
-  add_subdirectory(${ROOT})
-else()
-  message(FATAL_ERROR "ROOT is not defined.")
-endif(DEFINED ROOT)
+if(NOT DEFINED CONFIG_ROOT_SERVER_BIN)
+  message(FATAL_ERROR "CONFIG_ROOT_SERVER_BIN is not defined.")
+endif(NOT DEFINED CONFIG_ROOT_SERVER_BIN)
 
-add_subdirectory(${ROOT_DIR}/src)
+if(NOT DEFINED CONFIG_ROOT_SERVER_BASE_ADDRESS)
+  message(FATAL_ERROR "CONFIG_ROOT_SERVER_BASE_ADDRESS is not defined.")
+endif(NOT DEFINED CONFIG_ROOT_SERVER_BASE_ADDRESS)
+
+add_subdirectory(${ROOT_DIR}/kernel)
+add_subdirectory(${ROOT_DIR}/boot_loader)
