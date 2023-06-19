@@ -25,7 +25,7 @@ cmake --build build
 
 If the target is qemu-riscv-virt, you can run the kernel with the following command.
 ```sh
-./simulate.cmake
+./scripts/simulate
 ```
 
 ## Lisence
