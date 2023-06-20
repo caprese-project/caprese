@@ -18,16 +18,18 @@
 #include <cstdint>
 
 namespace caprese::boot_loader {
+  struct region {
+    uint64_t begin;
+    uint64_t end;
+  };
+
   struct boot_info_t {
     uint64_t  hartid;
     uintptr_t device_tree_blob;
     uintptr_t root_page_table;
-    uintptr_t boot_loader_begin;
-    uintptr_t boot_loader_end;
-    uintptr_t kernel_begin;
-    uintptr_t kernel_end;
-    uintptr_t fw_begin;
-    uintptr_t fw_end;
+    size_t    nhart;
+    size_t    total_memory_size;
+    region    used_regions[];
   };
 } // namespace caprese::boot_loader
 

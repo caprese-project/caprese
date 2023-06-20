@@ -15,19 +15,19 @@
 #ifndef BOOT_LOADER_CAPABILITY_H_
 #define BOOT_LOADER_CAPABILITY_H_
 
-#include <caprese/capability.h>
+#include <caprese/capability/capability.h>
 
 #include <libcaprese/device/device_tree.h>
 
 namespace caprese::boot_loader {
   struct capability_table_wrapper {
     capability_table_wrapper* prev;
-    capability_table_t*       table;
+    capability::capability_table_t*       table;
   };
 
   const capability_table_wrapper* get_current_capability_table();
 
-  void insert_capability(capability_t cap);
+  void insert_capability(capability::capability_t cap);
 
   void create_memory_capabilities(const device_tree_node_t& node);
   void create_irq_capabilities(const device_tree_node_t& node);

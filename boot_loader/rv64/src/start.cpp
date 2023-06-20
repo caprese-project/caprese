@@ -12,10 +12,13 @@
  *
  */
 
+#include <bit>
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 
-#include <caprese/memory.h>
+#include <caprese/memory/page.h>
 
 #include <libcaprese/device/device_tree.h>
 #include <libcaprese/util/align.h>
@@ -33,9 +36,9 @@ extern "C" char _kernel_end;
 namespace caprese::boot_loader {
   void map_kernel_space() {
     auto phys_base = reinterpret_cast<uintptr_t>(&_kernel_start);
-    auto virt_base = arch::begin_of_kernel_code_space;
+    auto virt_base = arch::memory::begin_of_kernel_code_space;
     auto size      = &_kernel_end - &_kernel_start;
-    for (decltype(size) i = 0; i < size; i += page_size()) {
+    for (decltype(size) i = 0; i < size; i += memory::page_size()) {
       map_page(virt_base + i, phys_base + i, PF_R | PF_W | PF_X | PF_G);
     }
   }
@@ -44,10 +47,10 @@ namespace caprese::boot_loader {
     auto cap_table = get_current_capability_table();
     while (cap_table) {
       for (uint8_t i = 0; i < cap_table->table->used; ++i) {
-        if (cap_table->table->slots[i].type() == capability_type::memory) [[likely]] {
-          auto phys_addr = cap_table->table->slots[i].memory.phys_page_number << page_size_bit();
-          auto virt_addr = arch::begin_of_phys_map_space + phys_addr;
-          if (virt_addr > arch::end_of_phys_map_space) [[unlikely]] {
+        if (cap_table->table->slots[i].type() == capability::capability_type::memory) [[likely]] {
+          auto phys_addr = cap_table->table->slots[i].memory.phys_page_number << memory::page_size_bit();
+          auto virt_addr = arch::memory::begin_of_phys_map_space + phys_addr;
+          if (virt_addr > arch::memory::end_of_phys_map_space) [[unlikely]] {
             continue;
           }
           map_page(virt_addr, phys_addr, PF_R | PF_W | PF_G);
@@ -61,7 +64,7 @@ namespace caprese::boot_loader {
     auto phys_base = reinterpret_cast<uintptr_t>(&_boot_loader_start);
     auto virt_base = phys_base;
     auto size      = &_boot_loader_end - &_boot_loader_start;
-    for (decltype(size) i = 0; i < size; i += page_size()) {
+    for (decltype(size) i = 0; i < size; i += memory::page_size()) {
       map_page(virt_base + i, phys_base + i, PF_R | PF_W | PF_X);
     }
   }
@@ -157,7 +160,7 @@ extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob
     panic("Failed to get root device tree node.");
   }
 
-  auto free_page_start = libcaprese::util::round_up(reinterpret_cast<uintptr_t>(device_tree_blob) + dev_tree.total_size, caprese::page_size());
+  auto free_page_start = libcaprese::util::round_up(reinterpret_cast<uintptr_t>(device_tree_blob) + dev_tree.total_size, caprese::memory::page_size());
   caprese::boot_loader::init_free_page(root_node, free_page_start);
   caprese::boot_loader::create_root_page_table();
 
@@ -172,19 +175,35 @@ extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob
 
   auto boot_info               = reinterpret_cast<caprese::boot_loader::boot_info_t*>(caprese::boot_loader::alloc_page());
   boot_info->hartid            = hartid;
-  boot_info->device_tree_blob  = caprese::arch::begin_of_phys_map_space + reinterpret_cast<uintptr_t>(device_tree_blob);
-  boot_info->root_page_table   = caprese::arch::begin_of_phys_map_space + caprese::boot_loader::get_root_page_table();
-  boot_info->boot_loader_begin = reinterpret_cast<uintptr_t>(&_boot_loader_start);
-  boot_info->boot_loader_end   = reinterpret_cast<uintptr_t>(&_boot_loader_end);
-  boot_info->kernel_begin      = reinterpret_cast<uintptr_t>(&_kernel_start);
-  boot_info->kernel_end        = reinterpret_cast<uintptr_t>(&_kernel_end);
-  boot_info->fw_begin          = mmode_resv.begin;
-  boot_info->fw_end            = mmode_resv.end;
+  boot_info->device_tree_blob  = caprese::arch::memory::begin_of_phys_map_space + reinterpret_cast<uintptr_t>(device_tree_blob);
+  boot_info->root_page_table   = caprese::arch::memory::begin_of_phys_map_space + caprese::boot_loader::get_root_page_table();
+  boot_info->nhart             = 1; // TODO: impl
+  boot_info->total_memory_size = caprese::boot_loader::get_total_memory_size();
+
+  size_t     used_regions_count = 0;
+  const auto insert_region      = [boot_info, &used_regions_count](uintptr_t begin, uintptr_t end) {
+    boot_info->used_regions[used_regions_count].begin = begin;
+    boot_info->used_regions[used_regions_count].end   = end;
+    ++used_regions_count;
+    boot_info->used_regions[used_regions_count].begin = 0;
+    boot_info->used_regions[used_regions_count].end   = 0;
+  };
+
+  insert_region(reinterpret_cast<uintptr_t>(&_boot_loader_start), reinterpret_cast<uintptr_t>(&_boot_loader_end));
+  insert_region(reinterpret_cast<uintptr_t>(&_kernel_start), reinterpret_cast<uintptr_t>(&_kernel_end));
+  insert_region(mmode_resv.begin, mmode_resv.end);
+  auto arena = caprese::boot_loader::root_arena;
+  while (arena) {
+    if (arena->allocated > 0) {
+      insert_region(arena->region.begin, arena->region.begin + arena->allocated);
+    }
+    arena = arena->next_arena;
+  }
 
   caprese::boot_loader::enable_mmu();
 
-  asm volatile("mv a0, %0" : : "r"(caprese::arch::begin_of_phys_map_space + reinterpret_cast<uintptr_t>(boot_info)));
-  asm volatile("jr %0" : : "r"(caprese::arch::begin_of_kernel_code_space));
+  asm volatile("mv a0, %0" : : "r"(caprese::arch::memory::begin_of_phys_map_space + reinterpret_cast<uintptr_t>(boot_info)));
+  asm volatile("jr %0" : : "r"(caprese::arch::memory::begin_of_kernel_code_space));
 
   panic("UNREACHABLE");
 }

@@ -19,8 +19,8 @@
 #include <cerrno>
 #include <cstring>
 
-#include <caprese/arch/riscv/kernel_layout.h>
-#include <caprese/memory.h>
+#include <caprese/arch/rv64/memory/layout.h>
+#include <caprese/memory/page.h>
 
 #include <libcaprese/util/align.h>
 #include <libcaprese/util/array_size.h>
@@ -35,7 +35,7 @@ namespace caprese::boot_loader {
     void create_new_capability_table() {
       assert(current_table == nullptr || current_table->table->used >= libcaprese::util::array_size_of(current_table->table->slots));
 
-      auto new_table = reinterpret_cast<capability_table_t*>(alloc_page());
+      auto new_table = reinterpret_cast<capability::capability_table_t*>(alloc_page());
       *new_table     = {};
 
       if (current_table == nullptr) [[unlikely]] {
@@ -54,7 +54,7 @@ namespace caprese::boot_loader {
 
       current_table->table = new_table;
 
-      map_page(caprese::arch::begin_of_capability_space + page_size() * new_table->this_cap_space_id,
+      map_page(arch::memory::begin_of_capability_space + memory::page_size() * new_table->this_cap_space_id,
                reinterpret_cast<uintptr_t>(new_table),
                PF_R | PF_W | PF_G);
     }
@@ -79,6 +79,8 @@ namespace caprese::boot_loader {
             continue;
           }
 
+          bool device = strncmp(node.name, "memory", 6) != 0;
+
           auto ptr = reinterpret_cast<const uint32_t*>(prop.data);
           auto end = reinterpret_cast<const uint32_t*>(prop.data + prop.size_of_data);
           while (ptr < end) {
@@ -98,19 +100,20 @@ namespace caprese::boot_loader {
               ++ptr;
             }
 
-            address = libcaprese::util::round_up(address, page_size());
-            size    = libcaprese::util::round_up(size, page_size());
+            address = libcaprese::util::round_up(address, memory::page_size());
+            size    = libcaprese::util::round_up(size, memory::page_size());
 
-            for (size_t i = 0; i < size; i += page_size()) {
-              auto cap = capability_memory_type {
+            for (size_t i = 0; i < size; i += memory::page_size()) {
+              auto cap = capability::capability_memory_type {
                 .valid            = 1,
-                .type             = static_cast<uint64_t>(capability_type::memory),
+                .type             = static_cast<uint64_t>(capability::capability_type::memory),
                 .readable         = 1,
                 .writable         = 1,
                 .executable       = 1,
+                .device           = device,
                 .phys_page_number = (address + i) >> 12,
               };
-              insert_capability(capability_t { .memory = cap });
+              insert_capability(capability::capability_t { .memory = cap });
             }
           }
         } else if (strcmp(prop.name, "#address-cells") == 0) [[unlikely]] {
@@ -156,12 +159,12 @@ namespace caprese::boot_loader {
         if (strcmp(prop.name, "riscv,ndev") == 0) {
           uint32_t ndev = std::byteswap(*reinterpret_cast<const uint32_t*>(prop.data));
           for (uint32_t i = 0; i < ndev; ++i) {
-            auto cap = capability_irq_type {
+            auto cap = capability::capability_irq_type {
               .valid      = 1,
-              .type       = static_cast<uint64_t>(capability_type::irq),
+              .type       = static_cast<uint64_t>(capability::capability_type::irq),
               .irq_number = i,
             };
-            insert_capability(capability_t { .irq = cap });
+            insert_capability(capability::capability_t { .irq = cap });
           }
         }
       } while (get_next_device_tree_node_property(&prop, &prop) == 0);
@@ -172,7 +175,7 @@ namespace caprese::boot_loader {
     return current_table;
   }
 
-  void insert_capability(capability_t cap) {
+  void insert_capability(capability::capability_t cap) {
     if (current_table == nullptr) [[unlikely]] {
       create_new_capability_table();
     }

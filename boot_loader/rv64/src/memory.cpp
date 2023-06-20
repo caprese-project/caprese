@@ -24,14 +24,7 @@
 namespace caprese::boot_loader {
   namespace {
     page_table_t root_page_table;
-
-    struct arena {
-      arena*        next_arena;
-      memory_region region;
-      uintptr_t     allocated;
-    };
-
-    arena* root_arena;
+    size_t       total_memory_size;
 
     arena*
         create_arena(const device_tree_node_t& node, uintptr_t free_page_start, arena* current = nullptr, uint32_t address_cells = 2, uint32_t size_cells = 1) {
@@ -63,6 +56,8 @@ namespace caprese::boot_loader {
                   size |= cell;
                   ++ptr;
                 }
+
+                total_memory_size += size;
 
                 memory_region region { .begin = address, .end = address + size };
 
@@ -128,7 +123,10 @@ namespace caprese::boot_loader {
     }
   } // namespace
 
+  arena* root_arena;
+
   void init_free_page(const device_tree_node_t& node, uintptr_t free_page_start) {
+    total_memory_size = 0;
     create_arena(node, free_page_start);
   }
 
@@ -193,6 +191,10 @@ namespace caprese::boot_loader {
     asm volatile("sfence.vma zero, zero");
     asm volatile("csrw satp, %0" : : "r"(satp));
     asm volatile("sfence.vma zero, zero");
+  }
+
+  size_t get_total_memory_size() {
+    return total_memory_size;
   }
 } // namespace caprese::boot_loader
 

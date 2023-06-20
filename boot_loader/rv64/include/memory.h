@@ -47,6 +47,14 @@ namespace caprese::boot_loader {
     uintptr_t end;
   };
 
+  struct arena {
+    arena*        next_arena;
+    memory_region region;
+    uintptr_t     allocated;
+  };
+
+  extern arena* root_arena;
+
   void      init_free_page(const device_tree_node_t& node, uintptr_t free_page_start);
   uintptr_t alloc_page();
 
@@ -55,6 +63,8 @@ namespace caprese::boot_loader {
   void      map_page(uintptr_t virtual_address, uintptr_t physical_address, uint64_t flags);
 
   void enable_mmu();
+
+  size_t get_total_memory_size();
 } // namespace caprese::boot_loader
 
 extern "C" void* malloc(size_t size);
