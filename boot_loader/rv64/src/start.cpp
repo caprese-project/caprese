@@ -28,16 +28,18 @@
 #include "memory.h"
 #include "panic.h"
 
-extern "C" char _boot_loader_start;
-extern "C" char _boot_loader_end;
-extern "C" char _kernel_start;
-extern "C" char _kernel_end;
+extern "C" {
+  extern char _boot_loader_start[];
+  extern char _boot_loader_end[];
+  extern char _kernel_start[];
+  extern char _kernel_end[];
+}
 
 namespace caprese::boot_loader {
   void map_kernel_space() {
-    auto phys_base = reinterpret_cast<uintptr_t>(&_kernel_start);
+    auto phys_base = reinterpret_cast<uintptr_t>(_kernel_start);
     auto virt_base = arch::memory::begin_of_kernel_code_space;
-    auto size      = &_kernel_end - &_kernel_start;
+    auto size      = _kernel_end - _kernel_start;
     for (decltype(size) i = 0; i < size; i += memory::page_size()) {
       map_page(virt_base + i, phys_base + i, PF_R | PF_W | PF_X | PF_G);
     }
@@ -61,9 +63,9 @@ namespace caprese::boot_loader {
   }
 
   void map_boot_loader_space() {
-    auto phys_base = reinterpret_cast<uintptr_t>(&_boot_loader_start);
+    auto phys_base = reinterpret_cast<uintptr_t>(_boot_loader_start);
     auto virt_base = phys_base;
-    auto size      = &_boot_loader_end - &_boot_loader_start;
+    auto size      = _boot_loader_end - _boot_loader_start;
     for (decltype(size) i = 0; i < size; i += memory::page_size()) {
       map_page(virt_base + i, phys_base + i, PF_R | PF_W | PF_X);
     }
@@ -189,8 +191,8 @@ extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob
     boot_info->used_regions[used_regions_count].end   = 0;
   };
 
-  insert_region(reinterpret_cast<uintptr_t>(&_boot_loader_start), reinterpret_cast<uintptr_t>(&_boot_loader_end));
-  insert_region(reinterpret_cast<uintptr_t>(&_kernel_start), reinterpret_cast<uintptr_t>(&_kernel_end));
+  insert_region(reinterpret_cast<uintptr_t>(_boot_loader_start), reinterpret_cast<uintptr_t>(_boot_loader_end));
+  insert_region(reinterpret_cast<uintptr_t>(_kernel_start), reinterpret_cast<uintptr_t>(_kernel_end));
   insert_region(mmode_resv.begin, mmode_resv.end);
   auto arena = caprese::boot_loader::root_arena;
   while (arena) {
