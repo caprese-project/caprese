@@ -8,7 +8,7 @@ Caprese is a microkernel that protects resources with capability-based security.
 
 1. Install libcaprese
 
-See <https://github.com/cosocaf/libcaprese>
+    See <https://github.com/cosocaf/libcaprese>
 
 2. Clone Caprese from GitHub
 ```sh
