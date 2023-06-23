@@ -4,21 +4,25 @@
 
 Caprese is a microkernel that protects resources with capability-based security.
 
-## Fetching, Configuring and Building Caprese
+## Fetching, Configuring and Building
 
-1. Clone Caprese from GitHub
+1. Install libcaprese
+
+See <https://github.com/cosocaf/libcaprese>
+
+2. Clone Caprese from GitHub
 ```sh
 git clone https://github.com/cosocaf/caprese
 cd caprese
 ```
 
-2. Configure CMake
+3. Configure CMake
 ```sh
 # <YOUR_PLATFORM> is the target platform, see cmake/platforms.
-cmake -B build -G Ninja -DPLATFORM=<YOUR_PLATFORM> -DROOT=<YOUR_ROOT_TARGET_DIR>
+cmake -B build -G Ninja -DPLATFORM=<YOUR_PLATFORM> -DCONFIG_ROOT_SERVER_BIN=<YOUR_ROOT_SERVER_BIN> -DCONFIG_ROOT_SERVER_BASE_ADDRESS=<0x00000000>
 ```
 
-3. Build
+4. Build
 ```sh
 cmake --build build
 ```
