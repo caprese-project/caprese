@@ -60,6 +60,7 @@ namespace caprese::boot_loader {
 
   void      create_root_page_table();
   uintptr_t get_root_page_table();
+  void      shallow_map_huge_page();
   void      map_page(uintptr_t virtual_address, uintptr_t physical_address, uint64_t flags);
 
   void enable_mmu();

@@ -8,7 +8,7 @@
  * @copyright (c) 2023 cosocaf
  *
  * This project is released under the MIT License.
- * @see https://github.com/cosocaf/caprese/LICENSE
+ * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  *
  */
 

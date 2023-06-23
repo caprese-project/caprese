@@ -19,6 +19,8 @@
 #include <cerrno>
 #include <cstring>
 
+#include <caprese/arch/rv64/memory/layout.h>
+
 #include "panic.h"
 
 namespace caprese::boot_loader {
@@ -150,6 +152,22 @@ namespace caprese::boot_loader {
 
   uintptr_t get_root_page_table() {
     return reinterpret_cast<uintptr_t>(root_page_table);
+  }
+
+  void shallow_map_huge_page() {
+    page_table_t page_table = root_page_table;
+
+    constexpr auto begin = (arch::memory::begin_of_kernel_mode_address_space >> (9 * 3 + 12)) & 0x1FF;
+    constexpr auto end   = (arch::memory::end_of_kernel_mode_address_space >> (9 * 3 + 12)) & 0x1FF;
+
+    for (auto index = begin; index <= end; ++index) {
+      auto& pte = page_table[index];
+      if (pte.v == 0) [[likely]] {
+        *reinterpret_cast<uint64_t*>(&pte) = 0;
+        pte.v                              = 1;
+        pte.next_page_number               = alloc_page() >> 12;
+      }
+    }
   }
 
   void map_page(uintptr_t virtual_address, uintptr_t physical_address, uint64_t flags) {

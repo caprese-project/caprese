@@ -169,6 +169,8 @@ extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob
   caprese::boot_loader::create_memory_capabilities(root_node);
   caprese::boot_loader::create_irq_capabilities(root_node);
 
+  caprese::boot_loader::shallow_map_huge_page();
+
   caprese::boot_loader::map_kernel_space();
   caprese::boot_loader::map_phys_space();
   caprese::boot_loader::map_boot_loader_space();

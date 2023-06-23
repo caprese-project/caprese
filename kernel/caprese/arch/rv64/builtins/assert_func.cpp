@@ -8,12 +8,15 @@
  * @copyright (c) 2023 cosocaf
  *
  * This project is released under the MIT License.
- * @see https://github.com/cosocaf/caprese/LICENSE
+ * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  *
  */
 
-#include <caprese/lib/console.h>
+#include <cstdio>
+
+#include <caprese/panic.h>
 
 extern "C" [[noreturn]] void __assert_func(const char* file, int line, const char* function, const char* condition) {
-  caprese::log_fatal("assert", "Assertion failed: %s, %s at %s:%d", condition, function, file, line);
+  printf("Assertion failed: %s, %s at %s:%d\n", condition, function, file, line);
+  caprese::panic("ASSERTION FAILED");
 }

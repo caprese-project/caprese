@@ -8,11 +8,11 @@
  * @copyright (c) 2023 cosocaf
  *
  * This project is released under the MIT License.
- * @see https://github.com/cosocaf/caprese/LICENSE
+ * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  *
  */
 
-#include "string.h"
+#include <cstring>
 
 extern "C" {
   int strcmp(const char* str1, const char* str2) {

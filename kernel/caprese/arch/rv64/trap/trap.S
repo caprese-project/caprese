@@ -8,48 +8,15 @@
  * @copyright (c) 2023 cosocaf
  *
  * This project is released under the MIT License.
- * @see https://github.com/cosocaf/caprese/LICENSE
+ * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  */
 
 .section .text
 
-.global switch_context
-# void switch_context(const caprese::arch::thread_context* old_context, const caprese::arch::thread_context* new_context);
-switch_context:
-  sd ra, 0(a0)
-  sd sp, 8(a0)
-  sd s0, 16(a0)
-  sd s1, 24(a0)
-  sd s2, 32(a0)
-  sd s3, 40(a0)
-  sd s4, 48(a0)
-  sd s5, 56(a0)
-  sd s6, 64(a0)
-  sd s7, 72(a0)
-  sd s8, 80(a0)
-  sd s9, 88(a0)
-  sd s10, 96(a0)
-  sd s11, 104(a0)
-
-  ld ra, 0(a1)
-  ld sp, 8(a1)
-  ld s0, 16(a1)
-  ld s1, 24(a1)
-  ld s2, 32(a1)
-  ld s3, 40(a1)
-  ld s4, 48(a1)
-  ld s5, 56(a1)
-  ld s6, 64(a1)
-  ld s7, 72(a1)
-  ld s8, 80(a1)
-  ld s9, 88(a1)
-  ld s10, 96(a1)
-  ld s11, 104(a1)
-
-  ret
-
 .global kernel_vector
-.global kernel_trap
+.type kernel_vector, @function
+.extern kernel_trap
+.type kernel_trap, @function
 kernel_vector:
   addi sp, sp, -256
 
@@ -125,19 +92,22 @@ kernel_vector:
 .section .text.trampoline
 .global begin_of_trampoline
 .global end_of_trampoline
-# void trampoline_user_vector(uintptr_t sscratch);
+# void trampoline_user_vector();
 .global trampoline_user_vector
-# void trampoline_return_to_user_mode(uintptr_t satp);
+.type trampoline_user_vector, @function
+# void trampoline_return_to_user_mode(uintptr_t trapframe, uintptr_t satp);
 .global trampoline_return_to_user_mode
-
-#define TRAPFRAME ((1ull << (9 + 9 + 9 + 12 - 1)) - (4096 * 2))
+.type trampoline_return_to_user_mode, @function
 
 begin_of_trampoline:
 
 trampoline_user_vector:
   csrw sscratch, a0
 
-  li a0, TRAPFRAME
+  auipc a0, 0
+  srli a0, a0, 12
+  slli a0, a0, 12
+  addi a0, a0, 16
 
   sd ra, 40(a0)
   sd sp, 48(a0)
@@ -190,10 +160,8 @@ trampoline_user_vector:
 
 trampoline_return_to_user_mode:
   sfence.vma zero, zero
-  csrw satp, a0
+  csrw satp, a1
   sfence.vma zero, zero
-
-  li a0, TRAPFRAME
 
   ld ra, 40(a0)
   ld sp, 48(a0)

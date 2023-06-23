@@ -8,16 +8,29 @@
  * @copyright (c) 2023 cosocaf
  *
  * This project is released under the MIT License.
- * @see https://github.com/cosocaf/caprese/LICENSE
+ * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  */
 
-#include <caprese/arch/riscv/panic.h>
-#include <caprese/kernel/panic.h>
-#include <caprese/lib/console.h>
+#include <cstdarg>
+#include <cstdio>
+
+#include <caprese/panic.h>
+
+#ifdef CONFIG_ARCH_RISCV
+#include <caprese/arch/rv64/panic.h>
+#endif
 
 namespace caprese {
-  [[noreturn]] void panic(const char* msg) {
-    println("Kernel panic! %s", msg);
+  [[noreturn]] void panic(const char* fmt, ...) {
+    printf("KERNEL PANIC: ");
+
+    va_list arg;
+    va_start(arg, fmt);
+    vprintf(fmt, arg);
+    va_end(arg);
+
+    printf("\n");
+
     arch::dump_context();
     arch::halt();
   }

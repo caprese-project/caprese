@@ -8,33 +8,28 @@
  * @copyright (c) 2023 cosocaf
  *
  * This project is released under the MIT License.
- * @see https://github.com/cosocaf/caprese/LICENSE
+ * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  *
  */
 
-#ifndef CAPRESE_ARCH_RISCV_TRAP_H_
-#define CAPRESE_ARCH_RISCV_TRAP_H_
+#ifndef CAPRESE_ARCH_RV64_TRAP_H_
+#define CAPRESE_ARCH_RV64_TRAP_H_
 
 #include <cstdint>
 
-#include <caprese/arch/riscv/page_table.h>
-
 extern "C" {
-  extern void* begin_of_trampoline;
-  extern void* end_of_trampoline;
+  extern char begin_of_trampoline[];
+  extern char end_of_trampoline[];
 
-  extern void* trampoline_user_vector;
-  extern void* trampoline_return_to_user_mode;
+  extern void trampoline_user_vector();
+  extern void trampoline_return_to_user_mode(void* trapframe, uintptr_t satp);
 
   extern void kernel_vector();
 }
 
-namespace caprese::arch {
-  using trampoline_user_vector_t         = void (*)(uintptr_t);
-  using trampoline_return_to_user_mode_t = void (*)(uintptr_t);
-
-  constexpr uintptr_t TRAMPOLINE_BASE_ADDRESS = MAX_VIRTUAL_ADDRESS - PAGE_SIZE;
-  constexpr uintptr_t TRAP_FRAME_BASE_ADDRESS = TRAMPOLINE_BASE_ADDRESS - PAGE_SIZE;
+namespace caprese::arch::trap {
+  using trampoline_user_vector_t         = void (*)();
+  using trampoline_return_to_user_mode_t = void (*)(void* trapframe, uintptr_t satp);
 
   enum struct riscv_trap_code : uintptr_t {
     INSTRUCTION_ADDRESS_MISALIGNED = 0,
@@ -52,8 +47,6 @@ namespace caprese::arch {
     LOAD_PAGE_FAULT                = 13,
     STORE_AMO_PAGE_FAULT           = 15,
   };
+} // namespace caprese::arch::trap
 
-  void return_to_user_mode();
-} // namespace caprese::arch
-
-#endif // CAPRESE_ARCH_RISCV_TRAP_H_
+#endif // CAPRESE_ARCH_RV64_TRAP_H_

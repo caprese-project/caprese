@@ -8,14 +8,14 @@
  * @copyright (c) 2023 cosocaf
  *
  * This project is released under the MIT License.
- * @see https://github.com/cosocaf/caprese/LICENSE
+ * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  */
 
-#ifndef CAPRESE_KERNEL_PANIC_H_
-#define CAPRESE_KERNEL_PANIC_H_
+#ifndef CAPRESE_PANIC_H_
+#define CAPRESE_PANIC_H_
 
 namespace caprese {
-  [[noreturn]] void panic(const char* msg);
+  [[noreturn]] void panic(const char* fmt, ...);
 } // namespace caprese
 
-#endif // CAPRESE_KERNEL_PANIC_H_
+#endif // CAPRESE_PANIC_H_

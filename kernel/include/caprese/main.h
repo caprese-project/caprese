@@ -8,16 +8,16 @@
  * @copyright (c) 2023 cosocaf
  *
  * This project is released under the MIT License.
- * @see https://github.com/cosocaf/caprese/LICENSE
+ * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  */
 
-#ifndef CAPRESE_KERNEL_MAIN_H_
-#define CAPRESE_KERNEL_MAIN_H_
+#ifndef CAPRESE_MAIN_H_
+#define CAPRESE_MAIN_H_
 
-#include <cstdint>
+#include <libcaprese/boot/boot_info.h>
 
 namespace caprese {
-  [[noreturn]] void main(uintptr_t hartid, const void* dtb);
+  [[noreturn]] void main();
 } // namespace caprese
 
-#endif // CAPRESE_KERNEL_MAIN_H_
+#endif // CAPRESE_MAIN_H_
