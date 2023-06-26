@@ -15,6 +15,7 @@
 #ifndef CAPRESE_MEMORY_ADDRESS_H_
 #define CAPRESE_MEMORY_ADDRESS_H_
 
+#include <cassert>
 #include <cstdint>
 
 #include <caprese/arch/common/memory/layout.h>
@@ -42,10 +43,13 @@ namespace caprese::memory {
   using physical_address_t = address_t;
 
   constexpr virtual_address_t phys_to_virt(physical_address_t phys_addr) {
-    return arch::memory::begin_of_phys_map_space + phys_addr.value();
+    auto address = arch::memory::begin_of_phys_map_space + phys_addr.value();
+    assert(arch::memory::begin_of_phys_map_space <= address || address <= arch::memory::end_of_phys_map_space);
+    return address;
   }
 
   constexpr physical_address_t virt_to_phys(virtual_address_t virt_addr) {
+    assert(arch::memory::begin_of_phys_map_space <= virt_addr.value() || virt_addr.value() <= arch::memory::end_of_phys_map_space);
     return virt_addr.value() - arch::memory::begin_of_phys_map_space;
   }
 } // namespace caprese::memory
