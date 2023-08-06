@@ -12,14 +12,14 @@
  *
  */
 
-#ifndef CAPRESE_ARCH_RISCV_SBI_H_
-#define CAPRESE_ARCH_RISCV_SBI_H_
+#ifndef CAPRESE_ARCH_RV64_SBI_H_
+#define CAPRESE_ARCH_RV64_SBI_H_
 
-#ifdef CONFIG_ARCH_RISCV
+#if defined(CONFIG_ARCH_RISCV) && defined(CONFIG_XLEN_64)
 
 #include <cstdint>
 
-namespace caprese::arch {
+namespace caprese::arch::inline rv64 {
   inline namespace sbi {
     struct sbiret {
       long error;
@@ -258,7 +258,7 @@ namespace caprese::arch {
       }
     } // namespace rfence_extension
 
-    namespace hart_state_management_extension {
+    inline namespace hart_state_management_extension {
       constexpr unsigned long EID = 0x48534D;
 
       inline sbiret sbi_hart_start(unsigned long hartid, unsigned long start_addr, unsigned long opaque) {
@@ -366,6 +366,6 @@ namespace caprese::arch {
 
 } // namespace caprese::arch
 
-#endif // CONFIG_ARCH_RISCV
+#endif // defined(CONFIG_ARCH_RISCV) && defined(CONFIG_XLEN_64)
 
-#endif // CAPRESE_ARCH_RISCV_SBI_H_
+#endif // CAPRESE_ARCH_RV64_SBI_H_

@@ -12,21 +12,12 @@
  *
  */
 
-#ifndef CAPRESE_ARCH_RV64_TASK_TASK_H_
-#define CAPRESE_ARCH_RV64_TASK_TASK_H_
+#ifndef CAPRESE_ARCH_RV64_TASK_H_
+#define CAPRESE_ARCH_RV64_TASK_H_
 
 #include <cstdint>
 
-#include <caprese/memory/address.h>
-#include <caprese/memory/page.h>
-
-namespace caprese::arch::task {
-  struct task_context;
-} // namespace caprese::arch::task
-
-extern "C" void switch_context(const caprese::arch::task::task_context* old_context, const caprese::arch::task::task_context* new_context);
-
-namespace caprese::arch::task {
+namespace caprese::arch::inline rv64 {
   struct task_context {
     uintptr_t ra;
     uintptr_t sp;
@@ -83,26 +74,7 @@ namespace caprese::arch::task {
     uintptr_t t6;
   };
 
-  struct task_t {
-    task_trap_frame trap_frame;
-    task_context    context;
-    uintptr_t       satp;
-    alignas(16) char trampoline[0];
+  struct task_t { };
+} // namespace caprese::arch
 
-    inline void set_root_page_table(caprese::memory::virtual_address_t root_page_table) {
-      satp = (9ull << 60) | (caprese::memory::virt_to_phys(root_page_table).value() >> caprese::memory::page_size_bit());
-    }
-
-    inline caprese::memory::virtual_address_t get_root_page_table() {
-      return caprese::memory::phys_to_virt((satp & ((1ull << 44) - 1)) << caprese::memory::page_size_bit());
-    }
-
-    void setup(caprese::memory::virtual_address_t entry_address);
-  };
-
-  inline void switch_context(task_t* old_task, task_t* new_task) {
-    ::switch_context(&old_task->context, &new_task->context);
-  }
-} // namespace caprese::arch::task
-
-#endif // CAPRESE_ARCH_RV64_TASK_TASK_H_
+#endif // CAPRESE_ARCH_RV64_TASK_H_

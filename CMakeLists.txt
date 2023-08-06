@@ -17,6 +17,8 @@ project(
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(GEN_DIR ${CMAKE_BINARY_DIR}/generated/caprese/generated)
+file(MAKE_DIRECTORY ${GEN_DIR})
 
 include(configs/helpers/declare_arch.cmake)
 include(configs/helpers/check_config.cmake)
@@ -31,13 +33,12 @@ endif(DEFINED PLATFORM)
 
 declare_deps()
 
-if(NOT DEFINED CONFIG_ROOT_SERVER_BIN)
-  message(FATAL_ERROR "CONFIG_ROOT_SERVER_BIN is not defined.")
-endif(NOT DEFINED CONFIG_ROOT_SERVER_BIN)
+if(NOT DEFINED CONFIG_USER_PAYLOAD)
+  message(FATAL_ERROR "CONFIG_USER_PAYLOAD is not defined.")
+endif(NOT DEFINED CONFIG_USER_PAYLOAD)
 
-if(NOT DEFINED CONFIG_ROOT_SERVER_BASE_ADDRESS)
-  message(FATAL_ERROR "CONFIG_ROOT_SERVER_BASE_ADDRESS is not defined.")
-endif(NOT DEFINED CONFIG_ROOT_SERVER_BASE_ADDRESS)
+if(NOT DEFINED CONFIG_USER_PAYLOAD_BASE_ADDRESS)
+  message(FATAL_ERROR "CONFIG_USER_PAYLOAD_BASE_ADDRESS is not defined.")
+endif(NOT DEFINED CONFIG_USER_PAYLOAD_BASE_ADDRESS)
 
-add_subdirectory(${ROOT_DIR}/kernel)
-add_subdirectory(${ROOT_DIR}/boot_loader)
+add_subdirectory(${ROOT_DIR}/src)

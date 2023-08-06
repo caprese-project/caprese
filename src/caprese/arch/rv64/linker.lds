@@ -11,6 +11,7 @@
  * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  */
 
+#include <caprese/generated/kernel_payload_base.h>
 #define PAGE_SIZE 4096
 
 OUTPUT_ARCH( "riscv" )
@@ -18,7 +19,9 @@ ENTRY( _start )
 
 SECTIONS
 {
-  . = 0x780000000000;
+  . = CONFIG_KERNEL_PAYLOAD_BASE;
+
+  _kernel_start = .;
 
   .text :
   {
@@ -50,5 +53,14 @@ SECTIONS
     *(.sbss*)
     *(.bss)
     *(.bss.*)
+  }
+
+  . = ALIGN(PAGE_SIZE);
+
+  _kernel_end = .;
+
+  .payload :
+  {
+    *(.payload)
   }
 }

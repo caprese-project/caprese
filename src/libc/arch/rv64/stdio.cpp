@@ -16,8 +16,7 @@
 #include <cstdio>
 
 #include <caprese/arch/rv64/sbi.h>
-
-#include <libcaprese/util/printf.h>
+#include <caprese/util/printf.h>
 
 extern "C" {
   int printf(const char* fmt, ...) {
@@ -35,7 +34,7 @@ extern "C" {
       caprese::arch::sbi_console_putchar(c);
       ++size;
     };
-    libcaprese::util::printf_template::printf(fmt, arg, callback);
+    caprese::printf_template::printf(fmt, arg, callback);
     return size;
   }
 
@@ -57,7 +56,7 @@ extern "C" {
       dst[size] = c;
       ++size;
     };
-    libcaprese::util::printf_template::printf(fmt, arg, callback);
+    caprese::printf_template::printf(fmt, arg, callback);
     dst[size] = '\0';
     return size;
   }

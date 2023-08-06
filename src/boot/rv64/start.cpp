@@ -12,202 +12,118 @@
  *
  */
 
-#include <bit>
-#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 
-#include <caprese/memory/page.h>
-
-#include <libcaprese/device/device_tree.h>
-#include <libcaprese/util/align.h>
-
-#include "boot_info.h"
-#include "capability.h"
-#include "memory.h"
-#include "panic.h"
+#include <caprese/arch/rv64/csr.h>
+#include <caprese/arch/rv64/sbi.h>
 
 extern "C" {
-  extern char _boot_loader_start[];
-  extern char _boot_loader_end[];
-  extern char _kernel_start[];
-  extern char _kernel_end[];
+  extern const char _boot_loader_start[];
+  extern const char _boot_loader_end[];
+  extern const char _payload_base[];
+  extern char       _page_table[];
 }
 
-namespace caprese::boot_loader {
-  void map_kernel_space() {
-    auto phys_base = reinterpret_cast<uintptr_t>(_kernel_start);
-    auto virt_base = arch::memory::begin_of_kernel_code_space;
-    auto size      = _kernel_end - _kernel_start;
-    for (decltype(size) i = 0; i < size; i += memory::page_size()) {
-      map_page(virt_base + i, phys_base + i, PF_R | PF_W | PF_X | PF_G);
-    }
-  }
+namespace boot {
+  using namespace caprese::arch;
 
-  void map_phys_space() {
-    auto cap_table = get_current_capability_table();
-    while (cap_table) {
-      for (uint8_t i = 0; i < cap_table->table->used; ++i) {
-        if (cap_table->table->slots[i].type() == capability::capability_type::memory) [[likely]] {
-          auto phys_addr = cap_table->table->slots[i].memory.phys_page_number << memory::page_size_bit();
-          auto virt_addr = arch::memory::begin_of_phys_map_space + phys_addr;
-          if (virt_addr > arch::memory::end_of_phys_map_space) [[unlikely]] {
-            continue;
-          }
-          map_page(virt_addr, phys_addr, PF_R | PF_W | PF_G);
-        }
-      }
-      cap_table = cap_table->prev;
-    }
-  }
-
-  void map_boot_loader_space() {
-    auto phys_base = reinterpret_cast<uintptr_t>(_boot_loader_start);
-    auto virt_base = phys_base;
-    auto size      = _boot_loader_end - _boot_loader_start;
-    for (decltype(size) i = 0; i < size; i += memory::page_size()) {
-      map_page(virt_base + i, phys_base + i, PF_R | PF_W | PF_X);
-    }
-  }
-
-  memory_region get_mmode_resv(const device_tree_node_t& node, uint32_t address_cells = 2, uint32_t size_cells = 1) {
-    if (strncmp(node.name, "mmode_resv", 10) == 0) [[unlikely]] {
-      device_tree_node_property_t prop;
-      if (get_first_device_tree_node_property(&prop, &node) < 0) [[unlikely]] {
-        if (errno != ENOENT) [[unlikely]] {
-          panic("Failed to get mmode resv.");
-        }
-      } else {
-        do {
-          if (strcmp(prop.name, "reg") == 0) [[unlikely]] {
-            auto ptr = reinterpret_cast<const uint32_t*>(prop.data);
-
-            uintptr_t address = 0;
-            for (size_t i = 0; i < address_cells; ++i) {
-              uint32_t cell = std::byteswap(*ptr);
-              address <<= 32;
-              address |= cell;
-              ++ptr;
-            }
-
-            size_t size = 0;
-            for (size_t i = 0; i < size_cells; ++i) {
-              uint32_t cell = std::byteswap(*ptr);
-              size <<= 32;
-              size |= cell;
-              ++ptr;
-            }
-
-            return { address, address + size };
-          }
-        } while (get_next_device_tree_node_property(&prop, &prop) == 0);
-      }
-    }
-
-    uint32_t children_address_cells = 2;
-    uint32_t children_size_cells    = 1;
-
-    device_tree_node_property_t prop;
-    if (get_first_device_tree_node_property(&prop, &node) < 0) [[unlikely]] {
-      if (errno != ENOENT) [[unlikely]] {
-        panic("Failed to get mmode resv.");
-      }
-    } else {
-      errno = 0;
-
-      do {
-        if (strcmp(prop.name, "#address-cells") == 0) [[unlikely]] {
-          children_address_cells = std::byteswap(*reinterpret_cast<const uint32_t*>(prop.data));
-        } else if (strcmp(prop.name, "#size-cells") == 0) [[unlikely]] {
-          children_size_cells = std::byteswap(*reinterpret_cast<const uint32_t*>(prop.data));
-        }
-      } while (get_next_device_tree_node_property(&prop, &prop) == 0);
-
-      if (errno && errno != ENOENT) [[unlikely]] {
-        panic("Failed to get mmode resv.");
-      }
-    }
-
-    device_tree_node_t child_node;
-    if (get_first_child_device_tree_node(&child_node, &node) < 0) [[unlikely]] {
-      return { 0, 0 };
-    }
-
-    errno = 0;
-
-    do {
-      auto result = get_mmode_resv(child_node, children_address_cells, children_size_cells);
-      if (result.end != 0) [[unlikely]] {
-        return result;
-      }
-    } while (get_next_sibling_device_tree_node(&child_node, &child_node) == 0);
-
-    if (errno && errno != ENOENT) [[unlikely]] {
-      panic("Failed to get mmode resv.");
-    }
-
-    return { 0, 0 };
-  }
-} // namespace caprese::boot_loader
-
-extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob) {
-  device_tree_t dev_tree;
-  if (load_device_tree_blob(&dev_tree, device_tree_blob) < 0) [[unlikely]] {
-    panic("Failed to load device tree blob.");
-  }
-
-  device_tree_node_t root_node;
-  if (get_root_device_tree_node(&root_node, &dev_tree) < 0) [[unlikely]] {
-    panic("Failed to get root device tree node.");
-  }
-
-  auto free_page_start = libcaprese::util::round_up(reinterpret_cast<uintptr_t>(device_tree_blob) + dev_tree.total_size, caprese::memory::page_size());
-  caprese::boot_loader::init_free_page(root_node, free_page_start);
-  caprese::boot_loader::create_root_page_table();
-
-  caprese::boot_loader::create_memory_capabilities(root_node);
-  caprese::boot_loader::create_irq_capabilities(root_node);
-
-  caprese::boot_loader::shallow_map_huge_page();
-
-  caprese::boot_loader::map_kernel_space();
-  caprese::boot_loader::map_phys_space();
-  caprese::boot_loader::map_boot_loader_space();
-
-  auto mmode_resv = caprese::boot_loader::get_mmode_resv(root_node);
-
-  auto boot_info               = reinterpret_cast<caprese::boot_loader::boot_info_t*>(caprese::boot_loader::alloc_page());
-  boot_info->hartid            = hartid;
-  boot_info->device_tree_blob  = caprese::arch::memory::begin_of_phys_map_space + reinterpret_cast<uintptr_t>(device_tree_blob);
-  boot_info->root_page_table   = caprese::arch::memory::begin_of_phys_map_space + caprese::boot_loader::get_root_page_table();
-  boot_info->nhart             = 1; // TODO: impl
-  boot_info->total_memory_size = caprese::boot_loader::get_total_memory_size();
-
-  size_t     used_regions_count = 0;
-  const auto insert_region      = [boot_info, &used_regions_count](uintptr_t begin, uintptr_t end) {
-    boot_info->used_regions[used_regions_count].begin = begin;
-    boot_info->used_regions[used_regions_count].end   = end;
-    ++used_regions_count;
-    boot_info->used_regions[used_regions_count].begin = 0;
-    boot_info->used_regions[used_regions_count].end   = 0;
+  struct page_table_entry_t {
+    uint64_t v               : 1;
+    uint64_t r               : 1;
+    uint64_t w               : 1;
+    uint64_t x               : 1;
+    uint64_t u               : 1;
+    uint64_t g               : 1;
+    uint64_t a               : 1;
+    uint64_t d               : 1;
+    uint64_t rsv             : 2;
+    uint64_t next_page_number: 44;
   };
 
-  insert_region(reinterpret_cast<uintptr_t>(_boot_loader_start), reinterpret_cast<uintptr_t>(_boot_loader_end));
-  insert_region(reinterpret_cast<uintptr_t>(_kernel_start), reinterpret_cast<uintptr_t>(_kernel_end));
-  insert_region(mmode_resv.begin, mmode_resv.end);
-  auto arena = caprese::boot_loader::root_arena;
-  while (arena) {
-    if (arena->allocated > 0) {
-      insert_region(arena->region.begin, arena->region.begin + arena->allocated);
+  [[noreturn]] void panic(const char* msg) {
+    sbi_debug_console_write(strlen(msg), reinterpret_cast<uintptr_t>(msg), 0);
+
+    while (true) {
+      sbi_hart_stop();
     }
-    arena = arena->next_arena;
   }
 
-  caprese::boot_loader::enable_mmu();
+  void map_kernel_window() {
+#if defined(CONFIG_MMU_SV39)
+    constexpr size_t page_size_bit = 9 + 9 + 12;
+#elif defined(CONFIG_MMU_SV48)
+    constexpr size_t page_size_bit = 9 + 9 + 9 + 12;
+#endif
 
-  asm volatile("mv a0, %0" : : "r"(caprese::arch::memory::begin_of_phys_map_space + reinterpret_cast<uintptr_t>(boot_info)));
-  asm volatile("jr %0" : : "r"(caprese::arch::memory::begin_of_kernel_code_space));
+    constexpr size_t    page_size  = 1 << page_size_bit;
+    page_table_entry_t* page_table = reinterpret_cast<page_table_entry_t*>(_page_table);
 
-  panic("UNREACHABLE");
+    for (uintptr_t phys = 0; phys < CONFIG_MAPPED_SPACE_SIZE; phys += page_size) {
+      uintptr_t virt                     = CONFIG_MAPPED_SPACE_BASE + phys;
+      size_t    index                    = (virt >> page_size_bit) & 0x1ff;
+      page_table[index].v                = 1;
+      page_table[index].r                = 1;
+      page_table[index].w                = 1;
+      page_table[index].x                = 1;
+      page_table[index].g                = 1;
+      page_table[index].next_page_number = phys >> 12;
+      printf("Mapped page: virtual address=0x%016lx, physical address=0x%016lx, size=0x%lx\n", virt, phys, page_size);
+    }
+
+    for (uintptr_t phys = 0; phys < CONFIG_MAPPED_SPACE_SIZE; phys += page_size) {
+      uintptr_t virt                     = phys;
+      size_t    index                    = (virt >> page_size_bit) & 0x1ff;
+      page_table[index].v                = 1;
+      page_table[index].r                = 1;
+      page_table[index].w                = 1;
+      page_table[index].x                = 1;
+      page_table[index].g                = 1;
+      page_table[index].next_page_number = phys >> 12;
+      printf("Mapped page: virtual address=0x%016lx, physical address=0x%016lx, size=0x%lx\n", virt, phys, page_size);
+    }
+  }
+
+  void enable_mmu() {
+    uintptr_t satp = reinterpret_cast<uintptr_t>(_page_table) >> 12;
+#if defined(CONFIG_MMU_SV39)
+    satp |= caprese::arch::SATP_MODE_SV39;
+    printf("Enabling MMU in sv39 mode...\n");
+#elif defined(CONFIG_MMU_SV48)
+    satp |= caprese::arch::SATP_MODE_SV48;
+    printf("Enabling MMU in sv48 mode...\n");
+#endif
+
+    asm volatile("sfence.vma zero, zero");
+    asm volatile("csrw satp, %0" : : "r"(satp));
+    asm volatile("sfence.vma zero, zero");
+  }
+
+  [[noreturn]] void jump_to_kernel(uint64_t hartid, const char* device_tree_blob) {
+    asm volatile("mv a0, %0" : : "r"(hartid));
+    asm volatile("mv a1, %0" : : "r"(CONFIG_MAPPED_SPACE_BASE + device_tree_blob));
+
+    uintptr_t kernel_entry = CONFIG_MAPPED_SPACE_BASE + reinterpret_cast<uintptr_t>(_payload_base);
+    asm volatile("jr %0" : : "r"(kernel_entry));
+
+    panic("UNREACHABLE\n");
+  }
+} // namespace boot
+
+extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob) {
+  using namespace boot;
+
+  printf("\nBooting on hart %lu...\n\n", hartid);
+
+  printf("Initializing page tables...\n");
+  map_kernel_window();
+  printf("Page table initialization completed.\n\n");
+
+  printf("Enabling MMU...\n");
+  enable_mmu();
+  printf("MMU enabled.\n\n");
+
+  printf("Jumping to kernel...\n\n");
+  jump_to_kernel(hartid, device_tree_blob);
 }

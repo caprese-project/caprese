@@ -7,54 +7,57 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-find_package(libcaprese COMPONENTS device util REQUIRED)
+function(boot_template name)
+  add_executable(${name})
 
-add_executable(boot_loader)
+  target_sources(
+    ${name}
+    PRIVATE
+    entry.S
+    start.cpp
+  )
 
-target_sources(
-  boot_loader
-  PRIVATE
-  src/entry.S
-  src/start.cpp
-  src/memory.cpp
-  src/capability.cpp
-  src/libc.cpp
+  target_compile_features(${name} PRIVATE cxx_std_23)
+  target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${CONFIG_CXX_OPTIONS}>)
+
+  target_compile_definitions(${name} PRIVATE CONFIG_BOOT_PAYLOAD_BASE=${CONFIG_BOOT_PAYLOAD_BASE})
+
+  target_include_directories(${name} PRIVATE ${ROOT_DIR}/include)
+
+  target_link_libraries(${name} libc)
+
+  target_link_options(
+    ${name}
+    PRIVATE
+    -T ${CMAKE_CURRENT_BINARY_DIR}/${name}-linker.ld
+    -nostdlib
+    -z max-page-size=4096
+  )
+  set_target_properties(${name} PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds)
+
+  add_custom_target(
+    ${name}_linker
+    COMMAND ${CMAKE_C_COMPILER} -DCONFIG_BOOT_PAYLOAD_BASE=${CONFIG_BOOT_PAYLOAD_BASE} -I ${CMAKE_BINARY_DIR}/generated -E -P -x c ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds >${CMAKE_CURRENT_BINARY_DIR}/${name}-linker.ld
+    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${name}-linker.ld
+  )
+  add_dependencies(${name} ${name}_linker)
+endfunction(boot_template)
+
+boot_template(prebuild_boot)
+
+add_custom_target(
+  kernel_payload_base
+  COMMAND sh "-c" "${CMAKE_OBJDUMP} $<TARGET_FILE:prebuild_boot> -h | awk '/.payload/{print \"#define CONFIG_KERNEL_PAYLOAD_BASE 0x\"$4}' > ${GEN_DIR}/kernel_payload_base.h"
+  BYPRODUCTS ${GEN_DIR}/kernel_payload_base.h
+  VERBATIM
 )
+add_dependencies(kernel_payload_base prebuild_boot)
 
-set_source_files_properties(src/entry.S OBJECT_DEPENDS ${CMAKE_BINARY_DIR}/kernel_payload)
+boot_template(boot)
+add_dependencies(boot_linker kernel_payload kernel_payload_size)
 
-target_compile_features(boot_loader PRIVATE cxx_std_23)
-target_compile_options(boot_loader PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${CONFIG_CXX_OPTIONS}>)
-
-target_compile_definitions(boot_loader PRIVATE CONFIG_KERNEL_BIN="${CMAKE_BINARY_DIR}/kernel_payload")
-
-target_include_directories(
-  boot_loader
-  PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${ROOT_DIR}/kernel/include
-  $<TARGET_PROPERTY:libcaprese::device,INTERFACE_INCLUDE_DIRECTORIES>
-  $<TARGET_PROPERTY:libcaprese::util,INTERFACE_INCLUDE_DIRECTORIES>
+add_custom_target(
+  boot_payload
+  COMMAND ${CMAKE_OBJCOPY} -O binary --update-section .payload=$<TARGET_FILE_DIR:kernel>/payload $<TARGET_FILE:boot> $<TARGET_FILE_DIR:boot>/payload
 )
-
-target_link_options(
-  boot_loader
-  PRIVATE
-  -T $<TARGET_FILE_DIR:boot_loader>/linker.ld
-  -nostdlib
-  -z max-page-size=4096
-)
-set_target_properties(boot_loader PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/linker.lds)
-
-target_link_libraries(boot_loader PRIVATE libcaprese::device libcaprese::util)
-
-add_dependencies(boot_loader kernel_payload)
-
-add_custom_command(
-  TARGET boot_loader PRE_LINK
-  COMMAND ${CMAKE_C_COMPILER} -E -P -x c ${CMAKE_CURRENT_SOURCE_DIR}/src/linker.lds >$<TARGET_FILE_DIR:boot_loader>/linker.ld
-)
-add_custom_command(
-  TARGET boot_loader POST_BUILD
-  COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:boot_loader> $<TARGET_FILE_DIR:boot_loader>/payload
-)
+add_dependencies(boot_payload boot kernel_payload kernel_payload_size)

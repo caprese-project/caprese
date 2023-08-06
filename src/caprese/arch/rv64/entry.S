@@ -13,8 +13,8 @@
 
 .extern __global_pointer$
 .type __global_pointer$, @object
-.extern arch_main
-.type arch_main, @function
+.extern start
+.type start, @function
 .global _begin_of_root_server
 .type _begin_of_root_server, @object
 .global _end_of_root_server
@@ -34,8 +34,8 @@ _start:
   .option pop
 
   la sp, stack
-  # Boot Loader stores boot_info in a0.
-  la t0, arch_main
+  # Boot loader stores hartid in a0 and pointer to dtb in a1.
+  la t0, start
   jr t0
 
 spin:
@@ -47,8 +47,5 @@ spin:
 .space 4096
 stack:
 
-.section .data
-.balign 4096
-_begin_of_root_server:
-.incbin CONFIG_ROOT_SERVER_BIN
-_end_of_root_server:
+.section .payload, "ax", %progbits
+.incbin	CONFIG_USER_PAYLOAD

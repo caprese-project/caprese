@@ -66,4 +66,15 @@ extern "C" {
     }
     return src;
   }
+
+  void* memcpy(void* dest, const void* src, size_t n) {
+    unsigned char*       cdest = reinterpret_cast<unsigned char*>(dest);
+    const unsigned char* csrc  = reinterpret_cast<const unsigned char*>(src);
+
+    for (size_t i = 0; i < n; i++) {
+      cdest[i] = csrc[i];
+    }
+
+    return dest;
+  }
 }

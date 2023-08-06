@@ -11,15 +11,17 @@
  * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  */
 
+#if __has_include(<caprese/generated/kernel_payload_size.h>)
+#include <caprese/generated/kernel_payload_size.h>
+#endif
 #define PAGE_SIZE 4096
-#define BOOT_LOADER_START 0x80200000
 
 OUTPUT_ARCH( "riscv" )
 ENTRY( _start )
 
 SECTIONS
 {
-  . = BOOT_LOADER_START;
+  . = CONFIG_BOOT_PAYLOAD_BASE;
 
   _boot_loader_start = .;
 
@@ -63,8 +65,19 @@ SECTIONS
 
   . = ALIGN(PAGE_SIZE);
 
-  .kernel :
+  .payload : {
+    _payload_base = .;
+    KEEP(*(.payload))
+#ifdef CONFIG_KERNEL_PAYLOAD_SIZE
+    . = . + CONFIG_KERNEL_PAYLOAD_SIZE;
+#endif
+  }
+
+  . = ALIGN(PAGE_SIZE);
+
+  .page_table :
   {
-    *(.kernel)
+    _page_table = .;
+    KEEP(*(.page_table))
   }
 }

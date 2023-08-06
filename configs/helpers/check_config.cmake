@@ -15,12 +15,4 @@ function(check_config)
   if(NOT ${CONFIG_ARCH} MATCHES "^(rv64)$")
     message(FATAL_ERROR "Unsupported arch: ${CONFIG_ARCH}")
   endif()
-
-  if(NOT DEFINED CONFIG_DTS_PATH)
-    message(FATAL_ERROR "CONFIG_DTS_PATH is not defined.")
-  endif()
-
-  if(NOT EXISTS ${CONFIG_DTS_PATH})
-    message(FATAL_ERROR "'${CONFIG_DTS_PATH}' not found.")
-  endif()
 endfunction(check_config)

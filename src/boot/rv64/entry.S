@@ -42,13 +42,5 @@ spin:
 .space 4096
 stack:
 
-.section .kernel,"a",@progbits
-.balign 16
-.global _kernel_start
-.type _kernel_start, @object
-.global _kernel_end
-.type _kernel_end, @object
-_kernel_start:
-.incbin CONFIG_KERNEL_BIN
-_kernel_end:
-.balign 16
+.section .payload, "ax", @progbits
+.section .page_table, "a", @progbits

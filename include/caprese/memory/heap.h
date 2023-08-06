@@ -17,35 +17,14 @@
 
 #include <cstddef>
 
-#include <caprese/capability/capability.h>
+#include <caprese/arch/boot_info.h>
 #include <caprese/memory/address.h>
 
 namespace caprese::memory {
-  struct heap_block_t;
+  void init_heap_space(arch::boot_info_t* boot_info);
 
-  struct heap_header_t {
-    capability::capability_handle_t this_cap;
-    heap_block_t*                   prev;
-    heap_block_t*                   next;
-    uint16_t                        used;
-    uint16_t                        released;
-  };
-
-  struct heap_block_t {
-    heap_header_t header;
-    uint8_t       data[page_size() - sizeof(heap_header_t)];
-  };
-
-  static_assert(sizeof(heap_block_t) == page_size());
-
-  constexpr size_t max_heap_alloc_size() {
-    return sizeof(heap_block_t::data);
-  }
-
-  void append_heap(capability::capability_handle_t memory_cap_handle);
-
-  virtual_address_t allocate(size_t size);
-  void              deallocate(virtual_address_t addr, size_t size);
+  mapped_address_t allocate(size_t size, size_t align);
+  void             deallocate(mapped_address_t addr);
 } // namespace caprese::memory
 
 #endif // CAPRESE_MEMORY_HEAP_H_

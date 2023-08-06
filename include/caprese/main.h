@@ -14,10 +14,10 @@
 #ifndef CAPRESE_MAIN_H_
 #define CAPRESE_MAIN_H_
 
-#include <libcaprese/boot/boot_info.h>
+#include <caprese/arch/boot_info.h>
 
 namespace caprese {
-  [[noreturn]] void main();
+  [[noreturn]] void main(arch::boot_info_t* boot_info);
 } // namespace caprese
 
 #endif // CAPRESE_MAIN_H_
