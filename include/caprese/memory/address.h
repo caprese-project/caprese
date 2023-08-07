@@ -85,11 +85,15 @@ namespace caprese::memory {
     }
   };
 
+  struct mapped_address_t;
+
   /**
    * @brief Type representing a physical address.
    *
    */
-  struct physical_address_t: public base_address_t<physical_address_t> { };
+  struct physical_address_t: public base_address_t<physical_address_t> {
+    constexpr mapped_address_t mapped_address();
+  };
 
   /**
    * @brief Type representing a virtual address.
@@ -105,6 +109,10 @@ namespace caprese::memory {
     constexpr physical_address_t physical_address() {
       return physical_address_t::from(value - CONFIG_MAPPED_SPACE_BASE);
     }
+  };
+
+  constexpr mapped_address_t physical_address_t::mapped_address() {
+    return mapped_address_t::from(CONFIG_MAPPED_SPACE_BASE + value);
   };
 
   static_assert(std::is_trivially_copyable_v<physical_address_t>);

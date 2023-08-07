@@ -12,12 +12,17 @@
  *
  */
 
+#include <bit>
 #include <cstdlib>
 
+#include <caprese/arch/rv64/csr.h>
 #include <caprese/arch/rv64/memory.h>
+#include <caprese/memory/address.h>
 
 namespace caprese::arch::inline rv64 {
   namespace {
+    constexpr size_t PAGE_SIZE_BIT = std::countr_zero(PAGE_SIZE);
+
     struct page_table_entry_t {
       uint64_t v               : 1;
       uint64_t r               : 1;
@@ -30,6 +35,8 @@ namespace caprese::arch::inline rv64 {
       uint64_t rsv             : 2;
       uint64_t next_page_number: 44;
     };
+
+    static_assert(sizeof(page_table_entry_t) == sizeof(uint64_t));
 
     page_table_entry_t* walk_page(uintptr_t root_page_table, uintptr_t virtual_address, bool allocate) {
 #if defined(CONFIG_MMU_SV39)
@@ -60,11 +67,13 @@ namespace caprese::arch::inline rv64 {
             .a                = 0,
             .d                = 0,
             .rsv              = 0,
-            .next_page_number = reinterpret_cast<uint64_t>(aligned_alloc(PAGE_SIZE, PAGE_SIZE)) >> PAGE_SIZE_BIT,
+            .next_page_number = memory::mapped_address_t::from(aligned_alloc(PAGE_SIZE, PAGE_SIZE)).physical_address().value >> PAGE_SIZE_BIT,
           };
           if (!pte->next_page_number) [[unlikely]] {
             return nullptr;
           }
+        } else if (pte->r || pte->w || pte->x) [[unlikely]] {
+          return nullptr;
         }
         page_table = reinterpret_cast<page_table_entry_t*>(pte->next_page_number << PAGE_SIZE_BIT);
       }
@@ -98,5 +107,11 @@ namespace caprese::arch::inline rv64 {
     *pte = {};
 
     return true;
+  }
+
+  uintptr_t get_kernel_root_page_table() {
+    uint64_t satp;
+    asm volatile("csrr %0, satp" : "=r"(satp));
+    return (satp & SATP_PPN) << PAGE_SIZE_BIT;
   }
 } // namespace caprese::arch::inline rv64
