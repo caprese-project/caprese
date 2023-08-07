@@ -22,6 +22,7 @@
 #include <caprese/arch/memory.h>
 #include <caprese/memory/heap.h>
 #include <caprese/util/align.h>
+#include <caprese/util/panic.h>
 
 extern "C" {
   extern char _kernel_start[];
@@ -188,7 +189,7 @@ namespace caprese::memory {
       uintptr_t     index      = point / sizeof(using_page_t) / 8;
 
       if ((using_page->used_flags[index] & (1 << (point % 8))) == 0) [[unlikely]] {
-        return; // TODO: panic()
+        panic("Attempted to free an invalid pointer: %p", addr.as<void>());
       }
 
       using_page->used_flags[index] &= ~(1 << (point % 8));

@@ -8,6 +8,7 @@
 #include <caprese/arch/boot_info.h>
 #include <caprese/util/align.h>
 #include <caprese/util/lambda.h>
+#include <caprese/util/panic.h>
 
 namespace caprese::arch::inline rv64 {
   struct fdt_header_t {
@@ -53,7 +54,7 @@ namespace caprese::arch::inline rv64 {
   void scan_device(boot_info_t* boot_info, F callback) {
     const fdt_header_t* header = reinterpret_cast<const fdt_header_t*>(boot_info->device_tree_blob);
     if (header->magic != std::byteswap(FDT_HEADER_MAGIC)) {
-      return; // TODO: panic
+      panic("Invalid device tree header magic: 0x%x", header->magic);
     }
 
     const char* struct_block = boot_info->device_tree_blob + std::byteswap(header->off_dt_struct);

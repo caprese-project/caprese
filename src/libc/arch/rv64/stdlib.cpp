@@ -1,5 +1,7 @@
+#include <cstdio>
 #include <cstdlib>
 
+#include <caprese/arch/rv64/sbi.h>
 #include <caprese/memory/heap.h>
 
 extern "C" {
@@ -27,5 +29,13 @@ extern "C" {
 
   void free(void* ptr) {
     caprese::memory::deallocate(caprese::memory::mapped_address_t::from(ptr));
+  }
+
+  [[noreturn]] void abort() {
+    printf("Aborted\n");
+
+    while (true) {
+      caprese::arch::sbi_hart_stop();
+    }
   }
 }

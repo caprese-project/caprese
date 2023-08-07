@@ -13,10 +13,9 @@
  */
 
 #include <cstdio>
-
-#include <caprese/panic.h>
+#include <cstdlib>
 
 extern "C" [[noreturn]] void __assert_func(const char* file, int line, const char* function, const char* condition) {
   printf("Assertion failed: %s, %s at %s:%d\n", condition, function, file, line);
-  caprese::panic("ASSERTION FAILED");
+  abort();
 }

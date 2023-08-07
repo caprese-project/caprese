@@ -1,9 +1,9 @@
 #include <cstdio>
 
-#include <caprese/arch/rv64/panic.h>
+#include <caprese/arch/rv64/system.h>
 
-namespace caprese::arch {
-  void dump_context() {
+namespace caprese::arch::inline rv64 {
+  void dump_system_context() {
     void *ra, *sp, *gp, *tp, *t0, *t1, *t2, *s0, *s1, *a0, *a1, *a2, *a3, *a4, *a5, *a6, *a7, *s2, *s3, *s4, *s5, *s6, *s7, *s8, *s9, *s10, *s11, *t3, *t4, *t5,
         *t6;
     asm volatile("mv %0, ra" : "=r"(ra));
@@ -69,10 +69,4 @@ namespace caprese::arch {
     printf("t5:  %p\n", t5);
     printf("t6:  %p\n", t6);
   }
-
-  [[noreturn]] void halt() {
-    while (true) {
-      asm volatile("wfi");
-    }
-  }
-} // namespace caprese::arch
+} // namespace caprese::arch::inline rv64

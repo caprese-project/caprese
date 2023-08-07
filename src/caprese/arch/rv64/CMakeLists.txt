@@ -13,6 +13,7 @@ target_sources(
   entry.S
   start.cpp
   memory.cpp
+  system.cpp
 )
 
 add_custom_target(

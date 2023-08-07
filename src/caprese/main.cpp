@@ -18,6 +18,7 @@
 #include <caprese/memory/heap.h>
 #include <caprese/task/init.h>
 #include <caprese/task/task.h>
+#include <caprese/util/panic.h>
 
 constexpr auto LOGO_TEXT = R"(
   ____
@@ -70,6 +71,6 @@ namespace caprese {
     printf("Switching to kernel task...\n\n");
     task::switch_to(kernel_task);
 
-    while (true) {}
+    panic("UNREACHABLE");
   }
 } // namespace caprese
