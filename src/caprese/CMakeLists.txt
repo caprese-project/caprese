@@ -15,6 +15,7 @@ target_sources(
   main.cpp
   memory/page.cpp
   memory/heap.cpp
+  memory/cls.cpp
   task/init.cpp
   task/task.cpp
   capability/init.cpp

@@ -27,5 +27,7 @@ extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob
   boot_info.hartid           = hartid;
   boot_info.device_tree_blob = device_tree_blob;
 
+  asm volatile("mv tp, %0" : : "r"(hartid));
+
   main(&boot_info);
 }
