@@ -14,6 +14,7 @@
 
 #include <bit>
 #include <cstdlib>
+#include <cstring>
 
 #include <caprese/arch/rv64/csr.h>
 #include <caprese/arch/rv64/memory.h>
@@ -109,14 +110,18 @@ namespace caprese::arch::inline rv64 {
     return true;
   }
 
-  bool is_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address) {
-    page_table_entry_t* pte = walk_page(root_page_table, virtual_address, false);
-    return pte != nullptr && pte->v;
+  void copy_kernel_space_page_mapping(uintptr_t kernel_root_page_table, uintptr_t root_page_table) {
+    memcpy(reinterpret_cast<void*>(root_page_table + PAGE_SIZE / 2), reinterpret_cast<const void*>(kernel_root_page_table + PAGE_SIZE / 2), PAGE_SIZE / 2);
   }
 
-  uintptr_t get_kernel_root_page_table() {
+  uintptr_t get_current_root_page_table() {
     uint64_t satp;
     asm volatile("csrr %0, satp" : "=r"(satp));
     return (satp & SATP_PPN) << PAGE_SIZE_BIT;
+  }
+
+  bool is_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address) {
+    page_table_entry_t* pte = walk_page(root_page_table, virtual_address, false);
+    return pte != nullptr && pte->v;
   }
 } // namespace caprese::arch::inline rv64

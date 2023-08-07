@@ -24,6 +24,7 @@ namespace caprese::memory {
 
   bool is_mapped(mapped_address_t root_page_table, virtual_address_t virtual_address);
 
+  mapped_address_t get_current_root_page_table();
   mapped_address_t get_kernel_root_page_table();
 } // namespace caprese::memory
 

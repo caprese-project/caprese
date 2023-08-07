@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include <caprese/arch/task.h>
+#include <caprese/memory/address.h>
 
 namespace caprese::task {
   constexpr uint32_t INIT_TID_GENERATION = (1 << (32 - std::countr_zero<size_t>(CONFIG_MAX_TASKS))) - 1;
@@ -45,10 +46,12 @@ namespace caprese::task {
 
   static_assert(sizeof(task_t) == CONFIG_TASK_SIZE);
 
-  task_t* create_task();
-  void    switch_to(task_t* task);
-  task_t* lookup(tid_t tid);
-  task_t* get_current_task();
+  task_t*                  create_task();
+  void                     switch_to(task_t* task);
+  task_t*                  lookup(tid_t tid);
+  task_t*                  get_current_task();
+  task_t*                  get_kernel_task();
+  memory::mapped_address_t get_root_page_table(task_t* task);
 } // namespace caprese::task
 
 #endif // CAPRESE_TASK_TASK_H_

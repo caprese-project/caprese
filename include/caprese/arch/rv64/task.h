@@ -16,6 +16,7 @@
 #define CAPRESE_ARCH_RV64_TASK_H_
 
 #include <cstdint>
+
 #include <caprese/arch/boot_info.h>
 
 namespace caprese::arch::inline rv64 {
@@ -37,6 +38,8 @@ namespace caprese::arch::inline rv64 {
   };
 
   struct trap_frame_t {
+    uintptr_t sepc;
+    uintptr_t satp;
     uintptr_t ra;
     uintptr_t sp;
     uintptr_t gp;
@@ -71,13 +74,16 @@ namespace caprese::arch::inline rv64 {
   };
 
   struct task_t {
-    context_t context;
+    context_t    context;
     trap_frame_t trap_frame;
   };
 
-  void create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info);
-  void switch_context(task_t* old_task, task_t* new_task);
-  void load_context(task_t* task);
-} // namespace caprese::arch
+  void      create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info);
+  void      load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info);
+  void      init_task(task_t* task);
+  void      switch_context(task_t* old_task, task_t* new_task);
+  void      load_context(task_t* task);
+  uintptr_t get_root_page_table(task_t* task);
+} // namespace caprese::arch::inline rv64
 
 #endif // CAPRESE_ARCH_RV64_TASK_H_

@@ -17,6 +17,7 @@
 
 #include <caprese/arch/memory.h>
 #include <caprese/memory/page.h>
+#include <caprese/task/task.h>
 
 namespace caprese::memory {
   bool map(mapped_address_t root_page_table, virtual_address_t virtual_address, physical_address_t physical_address, arch::page_flags_t flags, bool allocate) {
@@ -53,7 +54,11 @@ namespace caprese::memory {
     return arch::is_mapped_page(root_page_table.value, virtual_address.value);
   }
 
+  mapped_address_t get_current_root_page_table() {
+    return physical_address_t::from(arch::get_current_root_page_table()).mapped_address();
+  }
+
   mapped_address_t get_kernel_root_page_table() {
-    return physical_address_t::from(arch::get_kernel_root_page_table()).mapped_address();
+    return task::get_root_page_table(task::get_kernel_task());
   }
 } // namespace caprese::memory
