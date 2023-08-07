@@ -14,7 +14,7 @@ cd caprese
 
 2. Configure CMake
 ```sh
-# <YOUR_PLATFORM> is the target platform, see cmake/platforms.
+# <YOUR_PLATFORM> is the target platform, see configs/platforms.
 cmake -B build -G Ninja -DPLATFORM=<YOUR_PLATFORM> -DDCONFIG_USER_PAYLOAD=<YOUR_USER_PAYLOAD> -DDCONFIG_USER_PAYLOAD_BASE_ADDRESS=<0x00000000>
 ```
 
