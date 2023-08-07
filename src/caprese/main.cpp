@@ -11,6 +11,7 @@
  * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  */
 
+#include <bit>
 #include <cstdio>
 
 #include <caprese/capability/init.h>
@@ -35,10 +36,13 @@ namespace caprese {
     [[noreturn]] void kernel_task_entry(arch::boot_info_t* boot_info) {
       printf("Creating init task...\n");
       task::task_t* init_task = task::create_task();
-      printf("Init task creation completed.\n");
+      if (init_task == nullptr) [[unlikely]] {
+        panic("Failed to create init task.");
+      }
+      printf("Init task creation completed. Init task id: 0x%x\n", std::bit_cast<uint32_t>(init_task->tid));
       printf("Loading the payload for the init task...\n");
       task::load_init_task_payload(init_task, boot_info);
-      printf("Ready to execute the init task.\n\n");
+      printf("Ready to execute the init task.\n");
 
       printf(LOGO_TEXT);
 
@@ -59,6 +63,9 @@ namespace caprese {
     printf("Task space initialization completed.\n");
     printf("Creating kernel task...\n");
     task::task_t* kernel_task = task::create_kernel_task(kernel_task_entry, boot_info);
+    if (kernel_task == nullptr) [[unlikely]] {
+      panic("Failed to create kernel task.");
+    }
     printf("Kernel task creation completed.\n\n");
 
     printf("Initializing capability space...\n");
@@ -69,7 +76,7 @@ namespace caprese {
     printf("Initial capabilities creation completed.\n\n");
 
     printf("Switching to kernel task...\n\n");
-    task::switch_to(kernel_task);
+    task::switch_to_kernel_task(kernel_task);
 
     panic("UNREACHABLE");
   }

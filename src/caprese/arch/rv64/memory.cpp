@@ -109,6 +109,11 @@ namespace caprese::arch::inline rv64 {
     return true;
   }
 
+  bool is_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address) {
+    page_table_entry_t* pte = walk_page(root_page_table, virtual_address, false);
+    return pte != nullptr && pte->v;
+  }
+
   uintptr_t get_kernel_root_page_table() {
     uint64_t satp;
     asm volatile("csrr %0, satp" : "=r"(satp));

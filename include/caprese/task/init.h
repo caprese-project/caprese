@@ -7,6 +7,7 @@
 namespace caprese::task {
   void    init_task_space();
   task_t* create_kernel_task(void (*entry)(arch::boot_info_t*), arch::boot_info_t* boot_info);
+  void    switch_to_kernel_task(task_t* kernel_task);
   void    load_init_task_payload(task_t* init_task, arch::boot_info_t* boot_info);
 } // namespace caprese::task
 

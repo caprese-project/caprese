@@ -19,7 +19,7 @@ ENTRY( _start )
 
 SECTIONS
 {
-  . = CONFIG_KERNEL_PAYLOAD_BASE;
+  . = CONFIG_MAPPED_SPACE_BASE + CONFIG_KERNEL_PAYLOAD_BASE;
 
   _kernel_start = .;
 

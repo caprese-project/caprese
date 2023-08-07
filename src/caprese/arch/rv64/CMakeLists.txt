@@ -14,11 +14,13 @@ target_sources(
   start.cpp
   memory.cpp
   system.cpp
+  task.cpp
+  trap.S
 )
 
 add_custom_target(
   linker
-  COMMAND ${CMAKE_C_COMPILER} -I ${CMAKE_BINARY_DIR}/generated -E -P -x c ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds >${CMAKE_CURRENT_BINARY_DIR}/linker.ld
+  COMMAND ${CMAKE_C_COMPILER} -DCONFIG_MAPPED_SPACE_BASE=${CONFIG_MAPPED_SPACE_BASE} -I ${CMAKE_BINARY_DIR}/generated -E -P -x c ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds >${CMAKE_CURRENT_BINARY_DIR}/linker.ld
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds
   BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/linker.ld
 )

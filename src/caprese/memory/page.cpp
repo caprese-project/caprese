@@ -42,6 +42,17 @@ namespace caprese::memory {
     return arch::unmap_page(root_page_table.value, virtual_address.value);
   }
 
+  bool is_mapped(mapped_address_t root_page_table, virtual_address_t virtual_address) {
+    assert((root_page_table.value & (arch::PAGE_SIZE - 1)) == 0);
+    assert((virtual_address.value & (arch::PAGE_SIZE - 1)) == 0);
+
+    if (virtual_address.value >= CONFIG_MAX_VIRTUAL_ADDRESS) [[unlikely]] {
+      return false;
+    }
+
+    return arch::is_mapped_page(root_page_table.value, virtual_address.value);
+  }
+
   mapped_address_t get_kernel_root_page_table() {
     return physical_address_t::from(arch::get_kernel_root_page_table()).mapped_address();
   }

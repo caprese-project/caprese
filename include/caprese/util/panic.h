@@ -25,7 +25,6 @@ namespace caprese::inline util {
     printf("KERNEL PANIC: ");
 
     va_list arg;
-    int     len;
     va_start(arg, fmt);
     vprintf(fmt, arg);
     va_end(arg);
