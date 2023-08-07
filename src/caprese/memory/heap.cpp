@@ -103,7 +103,7 @@ namespace caprese::memory {
     }
   } // namespace
 
-  void init_heap_space(arch::boot_info_t* boot_info) {
+  void init_heap_space(const arch::boot_info_t* boot_info) {
     free_page_list     = nullptr;
     current_using_page = nullptr;
 

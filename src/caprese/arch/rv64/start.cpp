@@ -17,7 +17,7 @@
 #include <caprese/arch/boot_info.h>
 #include <caprese/main.h>
 
-extern "C" [[noreturn]] void start(uint64_t hartid, char* device_tree_blob) {
+extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob) {
   using namespace caprese;
   using namespace caprese::arch;
 

@@ -21,7 +21,7 @@ namespace caprese::task {
     }
   }
 
-  task_t* create_kernel_task(void (*entry)(arch::boot_info_t*), arch::boot_info_t* boot_info) {
+  task_t* create_kernel_task(void (*entry)(const arch::boot_info_t*), const arch::boot_info_t* boot_info) {
     task_t* kernel_task = reinterpret_cast<task_t*>(CONFIG_TASK_SPACE_BASE);
     if ((kernel_task->flags & TASK_FLAG_UNUSED) == 0) [[unlikely]] {
       return nullptr;
@@ -39,7 +39,7 @@ namespace caprese::task {
     arch::load_context(&kernel_task->arch_task);
   }
 
-  void load_init_task_payload(task_t* init_task, arch::boot_info_t* boot_info) {
+  void load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info) {
     (void)init_task;
     (void)boot_info;
   }

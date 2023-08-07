@@ -24,7 +24,7 @@ extern "C" {
 }
 
 namespace caprese::arch::inline rv64 {
-  void create_kernel_task(task_t* task, void (*entry)(boot_info_t*), boot_info_t* boot_info) {
+  void create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info) {
     task->context    = {};
     task->trap_frame = {};
 

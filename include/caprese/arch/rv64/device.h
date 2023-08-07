@@ -4,6 +4,7 @@
 #include <bit>
 #include <concepts>
 #include <cstddef>
+#include <cstring>
 
 #include <caprese/arch/boot_info.h>
 #include <caprese/util/align.h>
@@ -51,7 +52,7 @@ namespace caprese::arch::inline rv64 {
   };
 
   template<scan_callback F>
-  void scan_device(boot_info_t* boot_info, F callback) {
+  void scan_device(const boot_info_t* boot_info, F callback) {
     const fdt_header_t* header = reinterpret_cast<const fdt_header_t*>(boot_info->device_tree_blob);
     if (header->magic != std::byteswap(FDT_HEADER_MAGIC)) {
       panic("Invalid device tree header magic: 0x%x", header->magic);
@@ -114,10 +115,6 @@ namespace caprese::arch::inline rv64 {
             } else if (strcmp(prop_name, "#size-cells") == 0) {
               child_size_cells = to_u32(prop_data);
             } else if (strcmp(prop_name, "reg") == 0) {
-              if (strncmp(node_name, "cpu", 3) == 0) [[unlikely]] {
-                break;
-              }
-
               for (size_t i = 0; i < len; i += (address_cells + size_cells) * sizeof(uint32_t)) {
                 uintptr_t address = 0;
                 for (size_t j = 0; j < address_cells; ++j) {

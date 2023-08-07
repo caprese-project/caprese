@@ -21,7 +21,7 @@
 #include <caprese/memory/address.h>
 
 namespace caprese::memory {
-  void init_heap_space(arch::boot_info_t* boot_info);
+  void init_heap_space(const arch::boot_info_t* boot_info);
 
   mapped_address_t allocate(size_t size, size_t align);
   void             deallocate(mapped_address_t addr);

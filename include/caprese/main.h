@@ -17,7 +17,7 @@
 #include <caprese/arch/boot_info.h>
 
 namespace caprese {
-  [[noreturn]] void main(arch::boot_info_t* boot_info);
+  [[noreturn]] void main(const arch::boot_info_t* boot_info);
 } // namespace caprese
 
 #endif // CAPRESE_MAIN_H_

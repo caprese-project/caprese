@@ -5,8 +5,8 @@
 
 namespace caprese::arch::inline rv64 {
   struct boot_info_t {
-    uint64_t hartid;
-    char*    device_tree_blob;
+    uint64_t    hartid;
+    const char* device_tree_blob;
   };
 } // namespace caprese::arch::inline rv64
 

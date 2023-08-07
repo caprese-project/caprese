@@ -16,6 +16,7 @@
 
 #include <caprese/capability/init.h>
 #include <caprese/main.h>
+#include <caprese/memory/cls.h>
 #include <caprese/memory/heap.h>
 #include <caprese/task/init.h>
 #include <caprese/task/task.h>
@@ -33,7 +34,7 @@ constexpr auto LOGO_TEXT = R"(
 
 namespace caprese {
   namespace {
-    [[noreturn]] void kernel_task_entry(arch::boot_info_t* boot_info) {
+    [[noreturn]] void kernel_task_entry(const arch::boot_info_t* boot_info) {
       printf("Creating init task...\n");
       task::task_t* init_task = task::create_task();
       if (init_task == nullptr) [[unlikely]] {
@@ -53,10 +54,14 @@ namespace caprese {
     }
   } // namespace
 
-  [[noreturn]] void main(arch::boot_info_t* boot_info) {
+  [[noreturn]] void main(const arch::boot_info_t* boot_info) {
     printf("Initializing heap...\n");
     memory::init_heap_space(boot_info);
     printf("Heap initialization completed.\n\n");
+
+    printf("Initializing core local storage...\n");
+    memory::init_cls_space(boot_info);
+    printf("Core local storage initialized.\n\n");
 
     printf("Initializing task space...\n");
     task::init_task_space();

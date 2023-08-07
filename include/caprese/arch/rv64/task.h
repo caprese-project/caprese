@@ -75,7 +75,7 @@ namespace caprese::arch::inline rv64 {
     trap_frame_t trap_frame;
   };
 
-  void create_kernel_task(task_t* task, void (*entry)(boot_info_t*), boot_info_t* boot_info);
+  void create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info);
   void switch_context(task_t* old_task, task_t* new_task);
   void load_context(task_t* task);
 } // namespace caprese::arch
