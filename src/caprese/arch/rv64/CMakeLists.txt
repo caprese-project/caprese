@@ -14,6 +14,7 @@ target_sources(
   start.cpp
   memory.cpp
   system.cpp
+  device.cpp
   task.cpp
   trap.S
 )

@@ -55,12 +55,16 @@ SECTIONS
     *(.bss.*)
   }
 
+  _kernel_end = .;
+
   . = ALIGN(PAGE_SIZE);
 
-  _kernel_end = .;
+  _payload_start = .;
 
   .payload :
   {
     *(.payload)
   }
+
+  _payload_end = .;
 }

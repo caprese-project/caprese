@@ -107,42 +107,38 @@ namespace caprese::memory {
     free_page_list     = nullptr;
     current_using_page = nullptr;
 
-    uintptr_t reserved_address_start = -1;
-    size_t    reserved_address_end   = 0;
+    auto reserved_spaces = arch::get_reserved_ram_spaces(boot_info);
+    iterate_tuple(reserved_spaces, [](auto&& space) { printf("Reserved space: 0x%lx to 0x%lx\n", space.first, space.first + space.second); });
 
     arch::scan_device(boot_info, [&](arch::scan_callback_args_t* args) {
       if (args->flags.device) {
         return;
       }
 
-#if defined(CONFIG_ARCH_RISCV)
-      if (strncmp(args->device_name, "mmode_resv", 10) == 0) {
-        reserved_address_start = std::min(reserved_address_start, args->address);
-        reserved_address_end   = std::max(reserved_address_end, args->address + args->size);
-      }
-#endif // defined(CONFIG_ARCH_RISCV)
-
       if (!args->flags.unavailable) {
         printf("Found an available ram(%s): address=0x%lx, size=0x%lx\n", args->device_name, args->address, args->size);
 
-        auto spaces =
-            subtract_spaces({ args->address, args->address + args->size },
-                            { mapped_address_t::from(_kernel_start).physical_address().value, mapped_address_t::from(_kernel_end).physical_address().value });
-        iterate_tuple(spaces, [&](const std::pair<uintptr_t, uintptr_t>& space) {
-          if ((space.first == 0 && space.second == 0) || space.first == space.second) {
-            return;
-          }
-
-          auto spaces = subtract_spaces(space, { reserved_address_start, reserved_address_end });
-          iterate_tuple(spaces, [](const std::pair<uintptr_t, uintptr_t>& space) {
-            if ((space.first == 0 && space.second == 0) || space.first == space.second) {
-              return;
+        std::pair<uintptr_t, uintptr_t> spaces[1 << std::tuple_size_v<decltype(reserved_spaces)>] = {
+          {args->address, args->address + args->size}
+        };
+        iterate_tuple(reserved_spaces, [&spaces](auto&& reserved_space, size_t index) {
+          for (size_t i = 0; i < (1ull << index); ++i) {
+            if ((spaces[i].first == 0 && spaces[i].second == 0) || spaces[i].first == spaces[i].second) {
+              continue;
             }
-
-            printf("Inserted into kernel heap: address=0x%lx, size=0x%lx\n", space.first, space.second - space.first);
-            insert(physical_address_t::from(space.first), space.second - space.first);
-          });
+            auto&& split                = subtract_spaces(spaces[i], std::make_pair(reserved_space.first, reserved_space.first + reserved_space.second));
+            spaces[i]                   = std::get<0>(split);
+            spaces[i + (1ull << index)] = std::get<1>(split);
+          }
         });
+
+        for (auto& space : spaces) {
+          if ((space.first == 0 && space.second == 0) || space.first == space.second) {
+            continue;
+          }
+          printf("Inserted into kernel heap: address=0x%lx, size=0x%lx\n", space.first, space.second - space.first);
+          insert(physical_address_t::from(space.first), space.second - space.first);
+        }
       }
     });
 

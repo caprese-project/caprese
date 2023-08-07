@@ -22,10 +22,24 @@ namespace caprese::inline util {
     return recursive_lambda<std::decay_t<F>>(std::forward<std::decay_t<F>>(f));
   }
 
+  template<typename F, typename Arg>
+  concept iterate_tuple_callback = requires(F f, Arg arg) {
+    { f(arg) } -> std::same_as<void>;
+  };
+
+  template<typename F, typename Arg1, typename Arg2>
+  concept iterate_tuple_with_index_callback = requires(F f, Arg1 arg1, Arg2 arg2) {
+    { f(arg1, arg2) } -> std::same_as<void>;
+  };
+
   template<size_t N = 0, typename T, typename F>
   void iterate_tuple(const T& t, F callback) {
     if constexpr (N < std::tuple_size<T>::value) {
-      callback(std::get<N>(t));
+      if constexpr (iterate_tuple_callback<F, decltype(std::get<N>(t))>) {
+        callback(std::get<N>(t));
+      } else if constexpr (iterate_tuple_with_index_callback<F, decltype(std::get<N>(t)), size_t>) {
+        callback(std::get<N>(t), N);
+      }
       iterate_tuple<N + 1>(t, callback);
     }
   }
