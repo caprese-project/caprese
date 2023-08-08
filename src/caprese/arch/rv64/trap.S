@@ -82,8 +82,8 @@ user_trap:
   slli tp, tp, CONFIG_CLS_SIZE_BIT
   add a0, a0, tp
   ld a0, 8(a0) # current tid
-  srliw a0, a0, (32 - CONFIG_TASK_SIZE_BIT)
-  slliw a0, a0, (32 - CONFIG_TASK_SIZE_BIT)
+  slliw a0, a0, (32 - CONFIG_MAX_TASKS_BIT)
+  srliw a0, a0, (32 - CONFIG_MAX_TASKS_BIT)
   slli a0, a0, CONFIG_TASK_SIZE_BIT
   li tp, CONFIG_TASK_SPACE_BASE
   add tp, tp, a0 # current task
@@ -138,8 +138,8 @@ user_trap:
   slli t1, t1, CONFIG_CLS_SIZE_BIT
   add t0, t0, t1
   ld t0, 8(t0) # current tid
-  srliw t0, t0, (32 - CONFIG_TASK_SIZE_BIT)
-  slliw t0, t0, (32 - CONFIG_TASK_SIZE_BIT)
+  slliw t0, t0, (32 - CONFIG_MAX_TASKS_BIT)
+  srliw t0, t0, (32 - CONFIG_MAX_TASKS_BIT)
   addi t0, t0, 1
   slli t0, t0, 12
   li t1, CONFIG_STACK_SPACE_BASE
