@@ -45,6 +45,7 @@ namespace caprese::task {
   };
 
   static_assert(sizeof(task_t) == CONFIG_TASK_SIZE);
+  static_assert(offsetof(task_t, arch_task) == CONFIG_ARCH_TASK_OFFSET);
 
   task_t*                  create_task();
   void                     switch_to(task_t* task);

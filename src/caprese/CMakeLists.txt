@@ -19,6 +19,7 @@ target_sources(
   memory/kernel_space.cpp
   task/init.cpp
   task/task.cpp
+  task/syscall.cpp
   capability/init.cpp
 )
 target_compile_features(kernel PRIVATE cxx_std_23)

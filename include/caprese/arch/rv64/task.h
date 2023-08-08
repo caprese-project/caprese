@@ -38,8 +38,6 @@ namespace caprese::arch::inline rv64 {
   };
 
   struct trap_frame_t {
-    uintptr_t sepc;
-    uintptr_t satp;
     uintptr_t ra;
     uintptr_t sp;
     uintptr_t gp;
@@ -71,12 +69,18 @@ namespace caprese::arch::inline rv64 {
     uintptr_t t4;
     uintptr_t t5;
     uintptr_t t6;
+    uintptr_t sepc;
+    uintptr_t satp;
+    uintptr_t hartid;
   };
 
   struct task_t {
     context_t    context;
     trap_frame_t trap_frame;
   };
+
+  static_assert(offsetof(task_t, context) == CONFIG_ARCH_TASK_CONTEXT_OFFSET);
+  static_assert(offsetof(task_t, trap_frame) == CONFIG_ARCH_TASK_TRAP_FRAME_OFFSET);
 
   void      create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info);
   void      load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info);

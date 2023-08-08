@@ -118,7 +118,27 @@ namespace caprese::arch::inline rv64 {
   constexpr uint64_t SIE_STIE = 0b1ull << 5;
   constexpr uint64_t SIE_SSIE = 0b1ull << 1;
 
-  constexpr uint64_t SCAUSE_INTERRUPT = 0b1ull << 63;
+  constexpr uint64_t SCAUSE_EXCEPTION_CODE = (0b1ull << 63) - 1;
+  constexpr uint64_t SCAUSE_INTERRUPT      = 0b1ull << 63;
+
+  constexpr uint64_t SCAUSE_SUPERVISOR_SOFTWARE_INTERRUPT = 0x1;
+  constexpr uint64_t SCAUSE_SUPERVISOR_TIMER_INTERRUPT    = 0x5;
+  constexpr uint64_t SCAUSE_SUPERVISOR_EXTERNAL_INTERRUPT = 0x9;
+
+  constexpr uint64_t SCAUSE_INSTRUCTION_ADDRESS_MISALIGNED = 0x0;
+  constexpr uint64_t SCAUSE_INSTRUCTION_ACCESS_FAULT       = 0x1;
+  constexpr uint64_t SCAUSE_ILLEGAL_INSTRUCTION            = 0x2;
+  constexpr uint64_t SCAUSE_BREAKPOINT                     = 0x3;
+  constexpr uint64_t SCAUSE_LOAD_ADDRESS_MISALIGNED        = 0x4;
+  constexpr uint64_t SCAUSE_LOAD_ACCESS_FAULT              = 0x5;
+  constexpr uint64_t SCAUSE_STORE_AMO_ADDRESS_MISALIGNED   = 0x6;
+  constexpr uint64_t SCAUSE_STORE_AMO_ACCESS_FAULT         = 0x7;
+  constexpr uint64_t SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE   = 0x8;
+  constexpr uint64_t SCAUSE_ENVIRONMENT_CALL_FROM_S_MODE   = 0x9;
+  constexpr uint64_t SCAUSE_ENVIRONMENT_CALL_FROM_M_MODE   = 0xB;
+  constexpr uint64_t SCAUSE_INSTRUCTION_PAGE_FAULT         = 0xC;
+  constexpr uint64_t SCAUSE_LOAD_PAGE_FAULT                = 0xD;
+  constexpr uint64_t SCAUSE_STORE_AMO_PAGE_FAULT           = 0xF;
 
   constexpr uint64_t SATP_PPN  = (1ull << 44) - 1;
   constexpr uint64_t SATP_ASID = ((1ull << 60) - 1) & ~SATP_PPN;
@@ -127,6 +147,6 @@ namespace caprese::arch::inline rv64 {
   constexpr uint64_t SATP_MODE_BARE = 0b0000ull << 60;
   constexpr uint64_t SATP_MODE_SV39 = 0b1000ull << 60;
   constexpr uint64_t SATP_MODE_SV48 = 0b1001ull << 60;
-} // namespace caprese::arch
+} // namespace caprese::arch::inline rv64
 
 #endif // CAPRESE_ARCH_RV64_CSR_H_

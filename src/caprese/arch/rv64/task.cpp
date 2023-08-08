@@ -23,27 +23,67 @@
 #include <caprese/arch/system.h>
 #include <caprese/memory/address.h>
 #include <caprese/memory/kernel_space.h>
+#include <caprese/task/syscall.h>
 #include <caprese/task/task.h>
+
+namespace {
+  void return_to_user_mode();
+} // namespace
 
 extern "C" {
   extern void _jump_to_kernel_entry();
+  extern void _return_to_user_mode(caprese::arch::trap_frame_t* trap_frame);
   extern void _switch_context(caprese::arch::task_t* old_task, caprese::arch::task_t* new_task);
   extern void _load_context([[maybe_unused]] nullptr_t, caprese::arch::task_t* task);
 
   extern const char _payload_start[];
   extern const char _payload_end[];
   extern const char _stack[];
+
+  void _user_trap() {
+    using namespace caprese;
+    using namespace caprese::arch;
+
+    uint64_t scause;
+    asm volatile("csrr %0, scause" : "=r"(scause));
+
+    task_t* task = &task::get_current_task()->arch_task;
+
+    if (scause & SCAUSE_INTERRUPT) {
+      printf("scause-interrupt: 0x%lx\n", scause & SCAUSE_EXCEPTION_CODE);
+    } else {
+      if (scause & SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE) {
+        uint64_t code = task->trap_frame.a7;
+        uint64_t arg0 = task->trap_frame.a0;
+        uint64_t arg1 = task->trap_frame.a1;
+        uint64_t arg2 = task->trap_frame.a2;
+        uint64_t arg3 = task->trap_frame.a3;
+        uint64_t arg4 = task->trap_frame.a4;
+        uint64_t arg5 = task->trap_frame.a5;
+        task::handle_system_call(code, arg0, arg1, arg2, arg3, arg4, arg5);
+        task->trap_frame.sepc += 4;
+      } else {
+        printf("scause-exception: 0x%lx\n", scause & SCAUSE_EXCEPTION_CODE);
+      }
+    }
+
+    return_to_user_mode();
+  }
 }
 
+namespace {
+  constexpr size_t PAGE_SIZE_BIT = std::countr_zero(caprese::arch::PAGE_SIZE);
+
+  void return_to_user_mode() {
+    using namespace caprese;
+    using namespace caprese::arch;
+
+    task_t* task = &task::get_current_task()->arch_task;
+    _return_to_user_mode(&task->trap_frame);
+  };
+} // namespace
+
 namespace caprese::arch::inline rv64 {
-  namespace {
-    constexpr size_t PAGE_SIZE_BIT = std::countr_zero(PAGE_SIZE);
-
-    void return_to_user_mode() {
-      printf("Return To User Mode!\n");
-    };
-  } // namespace
-
   void create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info) {
     task->context    = {};
     task->trap_frame = {};
