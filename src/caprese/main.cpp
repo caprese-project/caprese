@@ -18,6 +18,7 @@
 #include <caprese/main.h>
 #include <caprese/memory/cls.h>
 #include <caprese/memory/heap.h>
+#include <caprese/memory/kernel_space.h>
 #include <caprese/task/init.h>
 #include <caprese/task/task.h>
 #include <caprese/util/panic.h>
@@ -40,7 +41,7 @@ namespace caprese {
       if (init_task == nullptr) [[unlikely]] {
         panic("Failed to create init task.");
       }
-      printf("Init task creation completed. Init task id: 0x%x\n", std::bit_cast<uint32_t>(init_task->tid));
+      printf("Init task creation completed. tid: 0x%x\n", std::bit_cast<uint32_t>(init_task->tid));
       printf("Loading the payload for the init task...\n");
       task::load_init_task_payload(init_task, boot_info);
       printf("Ready to execute the init task.\n");
@@ -56,12 +57,16 @@ namespace caprese {
 
   [[noreturn]] void main(const arch::boot_info_t* boot_info) {
     printf("Initializing heap...\n");
-    memory::init_heap_space(boot_info);
+    memory::init_heap(boot_info);
     printf("Heap initialization completed.\n\n");
 
     printf("Initializing core local storage...\n");
     memory::init_cls_space(boot_info);
     printf("Core local storage initialized.\n\n");
+
+    printf("Initializing kernel virtual address space...\n");
+    memory::init_kernel_space();
+    printf("Kernel virtual address space initialized.\n\n");
 
     printf("Initializing task space...\n");
     task::init_task_space();

@@ -13,6 +13,7 @@
  */
 
 #include <bit>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -21,6 +22,8 @@
 #include <caprese/arch/rv64/task.h>
 #include <caprese/arch/system.h>
 #include <caprese/memory/address.h>
+#include <caprese/memory/kernel_space.h>
+#include <caprese/task/task.h>
 
 extern "C" {
   extern void _jump_to_kernel_entry();
@@ -29,11 +32,16 @@ extern "C" {
 
   extern const char _payload_start[];
   extern const char _payload_end[];
+  extern const char _stack[];
 }
 
 namespace caprese::arch::inline rv64 {
   namespace {
     constexpr size_t PAGE_SIZE_BIT = std::countr_zero(PAGE_SIZE);
+
+    void return_to_user_mode() {
+      printf("Return To User Mode!\n");
+    };
   } // namespace
 
   void create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info) {
@@ -41,17 +49,21 @@ namespace caprese::arch::inline rv64 {
     task->trap_frame = {};
 
     task->context.ra = reinterpret_cast<uint64_t>(_jump_to_kernel_entry);
-    task->context.sp = reinterpret_cast<uint64_t>(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE)) + arch::PAGE_SIZE;
+    task->context.sp = CONFIG_STACK_SPACE_BASE + arch::PAGE_SIZE;
     task->context.s0 = reinterpret_cast<uint64_t>(entry);
     task->context.s1 = reinterpret_cast<uint64_t>(boot_info);
 
     asm volatile("csrr %0, satp" : "=r"(task->trap_frame.satp));
+
+    uintptr_t root_page_table = memory::physical_address_t::from(get_root_page_table(task)).mapped_address().value;
+    map_page(root_page_table,
+             CONFIG_STACK_SPACE_BASE,
+             memory::mapped_address_t::from(_stack).physical_address().value - arch::PAGE_SIZE,
+             { .readable = true, .writable = true, .executable = false, .user = false },
+             true);
   }
 
   void load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info) {
-    init_task->context.ra = 0; // return to user mode
-    init_task->context.sp = 0; // cls sp
-
     init_task->trap_frame.a0   = get_core_id();
     init_task->trap_frame.a1   = reinterpret_cast<uint64_t>(boot_info);
     init_task->trap_frame.sepc = CONFIG_USER_PAYLOAD_BASE_ADDRESS;
@@ -64,17 +76,29 @@ namespace caprese::arch::inline rv64 {
       map_page(root_page_table,
                CONFIG_USER_PAYLOAD_BASE_ADDRESS + page,
                memory::mapped_address_t::from(start + page).physical_address().value,
-               { .readable = 1, .writable = 1, .executable = 1, .user = 1 },
+               { .readable = true, .writable = true, .executable = true, .user = true },
                true);
     }
   }
 
-  void init_task(task_t* task) {
+  void init_task(task_t* task, uintptr_t stack_address) {
     task->context    = {};
     task->trap_frame = {};
 
+    task->context.ra = reinterpret_cast<uint64_t>(return_to_user_mode);
+    task->context.sp = stack_address + arch::PAGE_SIZE;
+
     auto root_page_table = memory::mapped_address_t::from(aligned_alloc(PAGE_SIZE, PAGE_SIZE));
     memset(root_page_table.as<void>(), 0, PAGE_SIZE);
+
+    memory::copy_kernel_space_mapping(root_page_table, task::get_kernel_root_page_table());
+
+    memory::mapped_address_t stack = memory::mapped_address_t::from(aligned_alloc(PAGE_SIZE, PAGE_SIZE));
+    map_page(root_page_table.value,
+             stack_address,
+             stack.physical_address().value,
+             { .readable = true, .writable = true, .executable = false, .user = false },
+             true);
 
 #if defined(CONFIG_MMU_SV39)
     task->trap_frame.satp = SATP_MODE_SV39 | (root_page_table.physical_address().value >> PAGE_SIZE_BIT);

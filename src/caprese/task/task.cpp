@@ -22,13 +22,13 @@ namespace caprese::task {
   task_t* create_task() {
     task_t* new_task = nullptr;
 
-    auto root_page_table = memory::get_kernel_root_page_table();
+    auto root_page_table = get_kernel_root_page_table();
     for (uintptr_t page = CONFIG_TASK_SPACE_BASE; page < CONFIG_TASK_SPACE_BASE + CONFIG_TASK_SPACE_SIZE; page += arch::PAGE_SIZE) {
       if (!memory::is_mapped(root_page_table, memory::virtual_address_t::from(page))) {
         auto result = memory::map(root_page_table,
                                   memory::virtual_address_t::from(page),
                                   memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE)).physical_address(),
-                                  { .readable = 1, .writable = 1, .executable = 0, .user = 0 },
+                                  { .readable = true, .writable = true, .executable = false, .user = false },
                                   true);
         if (!result) [[unlikely]] {
           return nullptr;
@@ -56,8 +56,7 @@ namespace caprese::task {
     new_task->flags &= ~TASK_FLAG_UNUSED;
     new_task->flags |= TASK_FLAG_CREATING;
     new_task->tid.generation++;
-    arch::init_task(&new_task->arch_task);
-    arch::copy_kernel_space_page_mapping(memory::get_kernel_root_page_table().value, get_root_page_table(new_task).value);
+    arch::init_task(&new_task->arch_task, CONFIG_STACK_SPACE_BASE + new_task->tid.index * arch::PAGE_SIZE);
 
     return new_task;
   }
@@ -72,7 +71,7 @@ namespace caprese::task {
     task->flags &= ~TASK_FLAG_READY;
     task->flags |= TASK_FLAG_RUNNING;
     memory::get_cls()->current_tid = task->tid;
-    arch::switch_context(&get_current_task()->arch_task, &task->arch_task);
+    arch::switch_context(&current_task->arch_task, &task->arch_task);
   }
 
   task_t* lookup(tid_t tid) {
@@ -83,7 +82,7 @@ namespace caprese::task {
       return task;
     }
 
-    auto root_page_table = memory::get_kernel_root_page_table();
+    auto root_page_table = get_kernel_root_page_table();
     if (!memory::is_mapped(root_page_table, memory::virtual_address_t::from(page))) [[unlikely]] {
       return nullptr;
     }
@@ -104,5 +103,9 @@ namespace caprese::task {
 
   memory::mapped_address_t get_root_page_table(task_t* task) {
     return memory::physical_address_t::from(arch::get_root_page_table(&task->arch_task)).mapped_address();
+  }
+
+  memory::mapped_address_t get_kernel_root_page_table() {
+    return task::get_root_page_table(task::get_kernel_task());
   }
 } // namespace caprese::task

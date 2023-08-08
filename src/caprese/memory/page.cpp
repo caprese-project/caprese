@@ -13,11 +13,9 @@
  */
 
 #include <cassert>
-#include <cstdio>
 
 #include <caprese/arch/memory.h>
 #include <caprese/memory/page.h>
-#include <caprese/task/task.h>
 
 namespace caprese::memory {
   bool map(mapped_address_t root_page_table, virtual_address_t virtual_address, physical_address_t physical_address, arch::page_flags_t flags, bool allocate) {
@@ -54,11 +52,30 @@ namespace caprese::memory {
     return arch::is_mapped_page(root_page_table.value, virtual_address.value);
   }
 
-  mapped_address_t get_current_root_page_table() {
-    return physical_address_t::from(arch::get_current_root_page_table()).mapped_address();
+  bool shallow_map(mapped_address_t root_page_table, virtual_address_t virtual_address, physical_address_t physical_address) {
+    assert((root_page_table.value & (arch::PAGE_SIZE - 1)) == 0);
+    assert((virtual_address.value & (arch::MAX_PAGE_SIZE - 1)) == 0);
+    assert((physical_address.value & (arch::PAGE_SIZE - 1)) == 0);
+
+    return arch::shallow_map_page(root_page_table.value, virtual_address.value, physical_address.value);
   }
 
-  mapped_address_t get_kernel_root_page_table() {
-    return task::get_root_page_table(task::get_kernel_task());
+  bool copy_shallow_mapping(mapped_address_t dst_page_table, mapped_address_t src_page_table, virtual_address_t virtual_address) {
+    assert((dst_page_table.value & (arch::PAGE_SIZE - 1)) == 0);
+    assert((src_page_table.value & (arch::PAGE_SIZE - 1)) == 0);
+    assert((virtual_address.value & (arch::MAX_PAGE_SIZE - 1)) == 0);
+
+    return arch::copy_shallow_page_mapping(dst_page_table.value, src_page_table.value, virtual_address.value);
+  }
+
+  bool is_shallow_mapped(mapped_address_t root_page_table, virtual_address_t virtual_address) {
+    assert((root_page_table.value & (arch::PAGE_SIZE - 1)) == 0);
+    assert((virtual_address.value & (arch::MAX_PAGE_SIZE - 1)) == 0);
+
+    return arch::is_shallow_mapped_page(root_page_table.value, virtual_address.value);
+  }
+
+  mapped_address_t get_current_root_page_table() {
+    return physical_address_t::from(arch::get_current_root_page_table()).mapped_address();
   }
 } // namespace caprese::memory

@@ -15,15 +15,11 @@
 .type __global_pointer$, @object
 .extern start
 .type start, @function
-.global _begin_of_root_server
-.type _begin_of_root_server, @object
-.global _end_of_root_server
-.type _end_of_root_server, @object
-.global _start
-.type _start, @function
 
 .section .text.entry
 
+.global _start
+.type _start, @function
 _start:
   # Without norelax option, "auipc gp, %pcrel_hi(__global_pointer$)" is optimized to "auipc gp, gp".
   .option push
@@ -33,7 +29,7 @@ _start:
       addi  gp, gp, %pcrel_lo(1b)
   .option pop
 
-  la sp, stack
+  la sp, _stack
   # Boot loader stores hartid in a0 and pointer to dtb in a1.
   la t0, start
   jr t0
@@ -43,9 +39,12 @@ spin:
   j spin
 
 .section .data
-.balign 16
+
+.global _stack
+.type _stack, @object
+.p2align 12
 .space 4096
-stack:
+_stack:
 
 .section .payload, "ax", %progbits
 .incbin	CONFIG_USER_PAYLOAD

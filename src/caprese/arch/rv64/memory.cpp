@@ -39,21 +39,21 @@ namespace caprese::arch::inline rv64 {
 
     static_assert(sizeof(page_table_entry_t) == sizeof(uint64_t));
 
-    page_table_entry_t* walk_page(uintptr_t root_page_table, uintptr_t virtual_address, bool allocate) {
 #if defined(CONFIG_MMU_SV39)
-      constexpr int levels = 2;
+    constexpr int MMU_LEVELS = 2;
 #elif defined(CONFIG_MMU_SV48)
-      constexpr int levels = 3;
+    constexpr int MMU_LEVELS = 3;
 #endif
 
-      const auto get_index = [&virtual_address](int level) {
-        return (virtual_address >> (9 * level + PAGE_SIZE_BIT)) & 0x1ff;
-      };
+    constexpr size_t get_pte_index(uintptr_t virtual_address, int level) {
+      return (virtual_address >> (9 * level + PAGE_SIZE_BIT)) & 0x1ff;
+    }
 
+    page_table_entry_t* walk_page(uintptr_t root_page_table, uintptr_t virtual_address, bool allocate) {
       page_table_entry_t* page_table = reinterpret_cast<page_table_entry_t*>(root_page_table);
 
-      for (int i = levels; i > 0; --i) {
-        page_table_entry_t* pte = page_table + get_index(i);
+      for (int i = MMU_LEVELS; i > 0; --i) {
+        page_table_entry_t* pte = page_table + get_pte_index(virtual_address, i);
         if (pte->v == 0) {
           if (!allocate) [[unlikely]] {
             return nullptr;
@@ -79,7 +79,7 @@ namespace caprese::arch::inline rv64 {
         page_table = reinterpret_cast<page_table_entry_t*>(pte->next_page_number << PAGE_SIZE_BIT);
       }
 
-      return page_table + get_index(0);
+      return page_table + get_pte_index(virtual_address, 0);
     }
   } // namespace
 
@@ -110,10 +110,6 @@ namespace caprese::arch::inline rv64 {
     return true;
   }
 
-  void copy_kernel_space_page_mapping(uintptr_t kernel_root_page_table, uintptr_t root_page_table) {
-    memcpy(reinterpret_cast<void*>(root_page_table + PAGE_SIZE / 2), reinterpret_cast<const void*>(kernel_root_page_table + PAGE_SIZE / 2), PAGE_SIZE / 2);
-  }
-
   uintptr_t get_current_root_page_table() {
     uint64_t satp;
     asm volatile("csrr %0, satp" : "=r"(satp));
@@ -123,5 +119,36 @@ namespace caprese::arch::inline rv64 {
   bool is_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address) {
     page_table_entry_t* pte = walk_page(root_page_table, virtual_address, false);
     return pte != nullptr && pte->v;
+  }
+
+  bool shallow_map_page(uintptr_t root_page_table, uintptr_t virtual_address, uintptr_t physical_address) {
+    page_table_entry_t* pte = reinterpret_cast<page_table_entry_t*>(root_page_table) + get_pte_index(virtual_address, MMU_LEVELS);
+    if (pte->v) [[unlikely]] {
+      return false;
+    }
+
+    *pte                  = {};
+    pte->v                = 1;
+    pte->next_page_number = physical_address >> PAGE_SIZE_BIT;
+
+    return true;
+  }
+
+  bool copy_shallow_page_mapping(uintptr_t dst_page_table, uintptr_t src_page_table, uintptr_t virtual_address) {
+    page_table_entry_t* src_pte = reinterpret_cast<page_table_entry_t*>(src_page_table) + get_pte_index(virtual_address, MMU_LEVELS);
+    page_table_entry_t* dst_pte = reinterpret_cast<page_table_entry_t*>(dst_page_table) + get_pte_index(virtual_address, MMU_LEVELS);
+
+    if (!src_pte->v || dst_pte->v) [[unlikely]] {
+      return false;
+    }
+
+    *dst_pte = *src_pte;
+
+    return true;
+  }
+
+  bool is_shallow_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address) {
+    page_table_entry_t* pte = reinterpret_cast<page_table_entry_t*>(root_page_table) + get_pte_index(virtual_address, MMU_LEVELS);
+    return pte->v;
   }
 } // namespace caprese::arch::inline rv64

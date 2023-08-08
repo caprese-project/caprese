@@ -42,7 +42,7 @@ _switch_context:
   sd s10, 96(a0)
   sd s11, 104(a0)
 
-.balign 4
+.balign 16
 _load_context:
   ld ra, 0(a1)
   ld sp, 8(a1)

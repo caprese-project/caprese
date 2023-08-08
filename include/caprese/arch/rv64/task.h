@@ -80,7 +80,7 @@ namespace caprese::arch::inline rv64 {
 
   void      create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info);
   void      load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info);
-  void      init_task(task_t* task);
+  void      init_task(task_t* task, uintptr_t stack_address);
   void      switch_context(task_t* old_task, task_t* new_task);
   void      load_context(task_t* task);
   uintptr_t get_root_page_table(task_t* task);

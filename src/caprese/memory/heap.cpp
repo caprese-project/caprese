@@ -103,7 +103,7 @@ namespace caprese::memory {
     }
   } // namespace
 
-  void init_heap_space(const arch::boot_info_t* boot_info) {
+  void init_heap(const arch::boot_info_t* boot_info) {
     free_page_list     = nullptr;
     current_using_page = nullptr;
 
@@ -146,6 +146,9 @@ namespace caprese::memory {
   }
 
   mapped_address_t allocate(size_t size, size_t align) {
+    if (size > arch::PAGE_SIZE) [[unlikely]] {
+      panic("Too large size: 0x%lx", size);
+    }
     if (size > sizeof(using_page_t::block)) {
       if (free_page_list == nullptr) [[unlikely]] {
         return mapped_address_t::null();

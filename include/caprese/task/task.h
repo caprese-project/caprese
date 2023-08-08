@@ -52,6 +52,7 @@ namespace caprese::task {
   task_t*                  get_current_task();
   task_t*                  get_kernel_task();
   memory::mapped_address_t get_root_page_table(task_t* task);
+  memory::mapped_address_t get_kernel_root_page_table();
 } // namespace caprese::task
 
 #endif // CAPRESE_TASK_TASK_H_

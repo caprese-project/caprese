@@ -14,7 +14,7 @@ namespace caprese::memory {
   void init_cls_space(const arch::boot_info_t* boot_info) {
     int max_core_id = 0;
     arch::scan_device(boot_info, [&max_core_id](arch::scan_callback_args_t* args) {
-      if (strncmp(args->device_name, "cpu", 3) == 0) {
+      if (strncmp(args->device_name, "cpu", 3) == 0) [[unlikely]] {
         max_core_id = std::max<int>(max_core_id, args->address);
       }
     });
