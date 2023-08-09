@@ -17,6 +17,7 @@ target_sources(
   device.cpp
   task.cpp
   trap.S
+  syscall.cpp
 )
 
 add_custom_target(
