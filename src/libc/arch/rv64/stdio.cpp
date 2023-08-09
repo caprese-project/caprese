@@ -19,6 +19,11 @@
 #include <caprese/util/printf.h>
 
 extern "C" {
+  int putchar(int c) {
+    caprese::arch::sbi_console_putchar(c);
+    return c;
+  }
+
   int printf(const char* fmt, ...) {
     va_list arg;
     int     len;
