@@ -78,9 +78,9 @@ namespace caprese {
     }
     printf("Kernel task creation completed.\n\n");
 
-    printf("Initializing capability space...\n");
-    capability::init_capability_space();
-    printf("Capability space initialization completed.\n\n");
+    printf("Creating built-in capability classes...\n");
+    capability::create_builtin_capability_classes();
+    printf("Built-in capability classes creation completed.\n");
     printf("Creating initial capabilities...\n");
     capability::create_init_capabilities(kernel_task, boot_info);
     printf("Initial capabilities creation completed.\n\n");

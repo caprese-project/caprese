@@ -21,6 +21,7 @@ target_sources(
   task/task.cpp
   task/syscall.cpp
   capability/init.cpp
+  capability/capability.cpp
 )
 target_compile_features(kernel PRIVATE cxx_std_23)
 target_compile_options(kernel PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${CONFIG_CXX_OPTIONS}>)

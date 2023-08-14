@@ -18,6 +18,8 @@
 #include <cstdint>
 #include <type_traits>
 
+#include <caprese/util/concepts.h>
+
 namespace caprese::memory {
   /**
    * @brief Base type for various address types.
@@ -73,6 +75,18 @@ namespace caprese::memory {
     template<typename T>
     constexpr static Derived from(const T* ptr) {
       return Derived { reinterpret_cast<uintptr_t>(ptr) };
+    }
+
+    /**
+     * @brief Creates an instance from a function pointer.
+     *
+     * @tparam F
+     * @param f The function pointer to be specified.
+     * @return constexpr Derived
+     */
+    template<function_pointer F>
+    constexpr static Derived from(F f) {
+      return Derived { reinterpret_cast<uintptr_t>(f) };
     }
 
     /**

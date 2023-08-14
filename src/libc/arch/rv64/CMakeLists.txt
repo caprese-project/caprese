@@ -17,6 +17,7 @@ target_sources(
   builtin/assert_func.cpp
   builtin/bswapsi2.cpp
   builtin/bswapdi2.cpp
+  builtin/ctzdi2.cpp
   builtin/popcountdi2.cpp
 )
 

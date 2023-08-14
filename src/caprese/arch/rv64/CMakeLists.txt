@@ -17,8 +17,10 @@ target_sources(
   device.cpp
   task.cpp
   trap.S
-  syscall.cpp
+  builtin_capability.cpp
 )
+
+set_source_files_properties(entry.S PROPERTIES OBJECT_DEPENDS ${CONFIG_USER_PAYLOAD})
 
 add_custom_target(
   linker

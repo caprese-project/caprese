@@ -1,51 +1,112 @@
 #include <bit>
 #include <cstdio>
 
-#include <caprese/arch/syscall.h>
 #include <caprese/task/syscall.h>
+#include <caprese/task/task.h>
 #include <caprese/util/array_size.h>
 
 namespace caprese::task {
   namespace syscall {
-    uintptr_t null([[maybe_unused]] uintptr_t arg0,
-                   [[maybe_unused]] uintptr_t arg1,
-                   [[maybe_unused]] uintptr_t arg2,
-                   [[maybe_unused]] uintptr_t arg3,
-                   [[maybe_unused]] uintptr_t arg4,
-                   [[maybe_unused]] uintptr_t arg5) {
-      return 0;
+    sysret_t null([[maybe_unused]] uintptr_t arg0,
+                  [[maybe_unused]] uintptr_t arg1,
+                  [[maybe_unused]] uintptr_t arg2,
+                  [[maybe_unused]] uintptr_t arg3,
+                  [[maybe_unused]] uintptr_t arg4,
+                  [[maybe_unused]] uintptr_t arg5) {
+      return {};
     }
 
+    sysret_t debug_putchar(uintptr_t                  ch,
+                           [[maybe_unused]] uintptr_t arg1,
+                           [[maybe_unused]] uintptr_t arg2,
+                           [[maybe_unused]] uintptr_t arg3,
+                           [[maybe_unused]] uintptr_t arg4,
+                           [[maybe_unused]] uintptr_t arg5) {
 #if !defined(NDEBUG)
-    uintptr_t debug_putchar(uintptr_t                  arg0,
-                            [[maybe_unused]] uintptr_t arg1,
-                            [[maybe_unused]] uintptr_t arg2,
-                            [[maybe_unused]] uintptr_t arg3,
-                            [[maybe_unused]] uintptr_t arg4,
-                            [[maybe_unused]] uintptr_t arg5) {
-      putchar(arg0);
-      return 0;
-    }
+      putchar(ch);
 #endif // !defined(NDEBUG)
+      return {};
+    }
+
+    sysret_t cap_create_class([[maybe_unused]] uintptr_t arg0,
+                              [[maybe_unused]] uintptr_t arg1,
+                              [[maybe_unused]] uintptr_t arg2,
+                              [[maybe_unused]] uintptr_t arg3,
+                              [[maybe_unused]] uintptr_t arg4,
+                              [[maybe_unused]] uintptr_t arg5) {
+      // TODO: impl
+      return {};
+    }
+
+    sysret_t cap_create([[maybe_unused]] uintptr_t ccid,
+                        [[maybe_unused]] uintptr_t arg1,
+                        [[maybe_unused]] uintptr_t arg2,
+                        [[maybe_unused]] uintptr_t arg3,
+                        [[maybe_unused]] uintptr_t arg4,
+                        [[maybe_unused]] uintptr_t arg5) {
+      // TODO: impl
+      return {};
+    }
+
+    sysret_t cap_call_method(uintptr_t cid, uintptr_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3) {
+      task_t*                   task       = get_current_task();
+      capability::capability_t* capability = lookup_capability(task, std::bit_cast<capability::cid_t>(static_cast<uint32_t>(cid)));
+
+      if (capability == nullptr) [[unlikely]] {
+        return { .result = 0, .error = 1 };
+      }
+
+      capability::capret_t ret = capability::call_method(capability, method, arg0, arg1, arg2, arg3);
+      return { .result = ret.result, .error = ret.error };
+    }
+
+    sysret_t cap_get_field(uintptr_t                  cid,
+                           uintptr_t                  field,
+                           [[maybe_unused]] uintptr_t arg2,
+                           [[maybe_unused]] uintptr_t arg3,
+                           [[maybe_unused]] uintptr_t arg4,
+                           [[maybe_unused]] uintptr_t arg5) {
+      task_t*                   task       = get_current_task();
+      capability::capability_t* capability = lookup_capability(task, std::bit_cast<capability::cid_t>(static_cast<uint32_t>(cid)));
+      if (capability == nullptr) [[unlikely]] {
+        return { .result = 0, .error = 1 };
+      }
+      capability::capret_t ret = capability::get_field(capability, field);
+      return { .result = ret.result, .error = ret.error };
+    }
+
+    sysret_t cap_is_permitted(uintptr_t                  cid,
+                              uintptr_t                  permission,
+                              [[maybe_unused]] uintptr_t arg2,
+                              [[maybe_unused]] uintptr_t arg3,
+                              [[maybe_unused]] uintptr_t arg4,
+                              [[maybe_unused]] uintptr_t arg5) {
+      task_t*                   task       = get_current_task();
+      capability::capability_t* capability = lookup_capability(task, std::bit_cast<capability::cid_t>(static_cast<uint32_t>(cid)));
+      if (capability == nullptr) [[unlikely]] {
+        return { .result = 0, .error = 1 };
+      }
+      capability::capret_t ret = capability::is_permitted(capability, permission);
+      return { .result = ret.result, .error = ret.error };
+    }
 
     namespace {
-      using syscall_handler_t                 = uintptr_t (*)(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
+      using syscall_handler_t                 = sysret_t (*)(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
       const syscall_handler_t syscall_table[] = {
-        null,
-#if !defined(NDEBUG)
-        debug_putchar,
-#endif // !defined(NDEBUG)
+        [SYS_NULL]             = null,
+        [SYS_DEBUG_PUTCHAR]    = debug_putchar,
+        [SYS_CAP_CREATE_CLASS] = cap_create_class,
+        [SYS_CAP_CREATE]       = cap_create,
+        [SYS_CAP_CALL_METHOD]  = cap_call_method,
+        [SYS_CAP_GET_FIELD]    = cap_get_field,
+        [SYS_CAP_IS_PERMITTED] = cap_is_permitted,
       };
     }; // namespace
   }    // namespace syscall
 
-  uintptr_t handle_system_call(uintptr_t code, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {
-    constexpr uintptr_t mask = static_cast<uintptr_t>(1) << (sizeof(uintptr_t) * 8 - 1);
-    if (code & mask) {
-      return arch::handle_system_call(code & ~mask, arg0, arg1, arg2, arg3, arg4, arg5);
-    }
+  sysret_t handle_system_call(uintptr_t code, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {
     if (code >= array_size_of(syscall::syscall_table)) [[unlikely]] {
-      return -1;
+      return { .result = 0, .error = 1 };
     }
     return syscall::syscall_table[code](arg0, arg1, arg2, arg3, arg4, arg5);
   }

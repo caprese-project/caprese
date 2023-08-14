@@ -16,18 +16,18 @@
 #define CAPRESE_TASK_TASK_H_
 
 #include <bit>
-#include <cstddef>
 #include <cstdint>
 
 #include <caprese/arch/task.h>
+#include <caprese/capability/capability.h>
 #include <caprese/memory/address.h>
 
 namespace caprese::task {
-  constexpr uint32_t INIT_TID_GENERATION = (1 << (32 - std::countr_zero<size_t>(CONFIG_MAX_TASKS))) - 1;
+  constexpr uint32_t INIT_TID_GENERATION = (1 << (32 - std::countr_zero<uintptr_t>(CONFIG_MAX_TASKS))) - 1;
 
   struct tid_t {
-    uint32_t index: std::countr_zero<size_t>(CONFIG_MAX_TASKS);
-    uint32_t generation: 32 - std::countr_zero<size_t>(CONFIG_MAX_TASKS);
+    uint32_t index: std::countr_zero<uintptr_t>(CONFIG_MAX_TASKS);
+    uint32_t generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_TASKS);
   };
 
   static_assert(sizeof(tid_t) == sizeof(uint32_t));
@@ -47,13 +47,14 @@ namespace caprese::task {
   static_assert(sizeof(task_t) == CONFIG_TASK_SIZE);
   static_assert(offsetof(task_t, arch_task) == CONFIG_ARCH_TASK_OFFSET);
 
-  task_t*                  create_task();
-  void                     switch_to(task_t* task);
-  task_t*                  lookup(tid_t tid);
-  task_t*                  get_current_task();
-  task_t*                  get_kernel_task();
-  memory::mapped_address_t get_root_page_table(task_t* task);
-  memory::mapped_address_t get_kernel_root_page_table();
+  task_t*                   create_task();
+  void                      switch_to(task_t* task);
+  task_t*                   lookup(tid_t tid);
+  task_t*                   get_current_task();
+  task_t*                   get_kernel_task();
+  memory::mapped_address_t  get_root_page_table(task_t* task);
+  memory::mapped_address_t  get_kernel_root_page_table();
+  capability::capability_t* lookup_capability(task_t* task, capability::cid_t cid);
 } // namespace caprese::task
 
 #endif // CAPRESE_TASK_TASK_H_

@@ -82,7 +82,7 @@ namespace caprese::task {
       return task;
     }
 
-    auto root_page_table = get_kernel_root_page_table();
+    memory::mapped_address_t root_page_table = get_kernel_root_page_table();
     if (!memory::is_mapped(root_page_table, memory::virtual_address_t::from(page))) [[unlikely]] {
       return nullptr;
     }
@@ -107,5 +107,16 @@ namespace caprese::task {
 
   memory::mapped_address_t get_kernel_root_page_table() {
     return task::get_root_page_table(task::get_kernel_task());
+  }
+
+  capability::capability_t* lookup_capability(task_t* task, capability::cid_t cid) {
+    capability::capability_t* capability = capability::lookup(cid);
+    if (capability == nullptr) [[unlikely]] {
+      return nullptr;
+    }
+    if (capability->tid != std::bit_cast<uint32_t>(task->tid)) [[unlikely]] {
+      return nullptr;
+    }
+    return capability;
   }
 } // namespace caprese::task

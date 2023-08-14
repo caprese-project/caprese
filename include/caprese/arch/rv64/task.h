@@ -16,6 +16,7 @@
 #define CAPRESE_ARCH_RV64_TASK_H_
 
 #include <cstdint>
+#include <cstddef>
 
 #include <caprese/arch/boot_info.h>
 

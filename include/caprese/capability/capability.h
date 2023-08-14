@@ -15,163 +15,69 @@
 #ifndef CAPRESE_CAPABILITY_CAPABILITY_H_
 #define CAPRESE_CAPABILITY_CAPABILITY_H_
 
-#include <cassert>
-#include <cstddef>
+#include <bit>
 #include <cstdint>
 
-#include <caprese/arch/common/memory/layout.h>
-#include <caprese/memory/page.h>
+#include <caprese/memory/address.h>
 
 namespace caprese::capability {
-  enum struct capability_type {
-    null         = 0,
-    parent       = 1,
-    memory       = 2,
-    irq          = 3,
-    rsv4         = 4,
-    rsv5         = 5,
-    rsv6         = 6,
-    rsv7         = 7,
-    rsv8         = 8,
-    rsv9         = 9,
-    rsv10        = 10,
-    rsv11        = 11,
-    rsv12        = 12,
-    rsv13        = 13,
-    rsv14        = 14,
-    rsv15        = 15,
-    rsv16        = 16,
-    rsv17        = 17,
-    rsv18        = 18,
-    rsv19        = 19,
-    rsv20        = 20,
-    rsv21        = 21,
-    rsv22        = 22,
-    rsv23        = 23,
-    rsv24        = 24,
-    rsv25        = 25,
-    rsv26        = 26,
-    rsv27        = 27,
-    rsv28        = 28,
-    rsv29        = 29,
-    rsv30        = 30,
-    user_defined = 31,
+  constexpr uint8_t CLASS_FLAG_VALID         = 1 << 0;
+  constexpr uint8_t CLASS_FLAG_BUILTIN       = 1 << 1;
+  constexpr uint8_t CLASS_FLAG_CONSTRUCTABLE = 1 << 2;
+  constexpr uint8_t CLASS_FLAG_MOVABLE       = 1 << 3;
+  constexpr uint8_t CLASS_FLAG_COPYABLE      = 1 << 4;
+
+  using ccid_t = uint16_t;
+  static_assert(8 * sizeof(ccid_t) == CONFIG_MAX_CAPABILITY_CLASSES_BIT);
+
+  struct cid_t {
+    uint32_t index: std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
+    uint32_t generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
   };
 
-  union capability_t;
+  static_assert(sizeof(cid_t) == sizeof(uint32_t));
 
-  struct capability_null_type {
-    uint64_t valid    : 1;
-    uint64_t type     : 5;
-    uint64_t reserved1: 58;
-    uint64_t reserved2;
+  struct capret_t {
+    uintptr_t result;
+    uintptr_t error;
   };
 
-  struct capability_parent_type {
-    uint64_t valid    : 1;
-    uint64_t type     : 5;
-    uint64_t rsv      : 10;
-    uint64_t node_page: 48;
+  struct capability_t;
+
+  using method_t = capret_t (*)(capability_t*, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+
+  struct class_t {
+    const char* name;
+    uint8_t     flags;
+    uint8_t     num_permissions;
+    uint8_t     num_fields;
+    uint8_t     num_methods;
+    uint8_t     idx_construct;
+    uint8_t     idx_move;
+    uint8_t     idx_copy;
+    uint8_t     reserved;
+    method_t*   methods;
   };
 
-  struct capability_memory_type {
-    uint64_t valid           : 1;
-    uint64_t type            : 5;
-    uint64_t readable        : 1;
-    uint64_t writable        : 1;
-    uint64_t executable      : 1;
-    uint64_t device          : 1;
-    uint64_t phys_page_number: 36;
-    uint64_t reserved0       : 18;
-    uint64_t reserved1       : 64;
+  static_assert(sizeof(class_t) == CONFIG_CAPABILITY_CLASS_SIZE);
 
-    inline memory::virtual_address_t address() {
-      return memory::phys_to_virt(phys_page_number << memory::page_size_bit());
-    }
+  struct capability_t {
+    uint32_t                 ccid: CONFIG_MAX_CAPABILITY_CLASSES_BIT;
+    uint32_t                 cid_generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
+    uint32_t                 tid;
+    memory::mapped_address_t instance;
   };
 
-  struct capability_irq_type {
-    uint64_t valid     : 1;
-    uint64_t type      : 5;
-    uint64_t irq_number: 32;
-    uint64_t reserved1 : 26;
-    uint64_t reserved2 : 64;
-  };
+  static_assert(sizeof(capability_t) == CONFIG_CAPABILITY_SIZE);
 
-  struct capability_user_defined_type {
-    uint64_t valid : 1;
-    uint64_t type  : 5;
-    uint64_t id    : 24;
-    uint64_t value1: 34;
-    uint64_t value2: 64;
-  };
-
-  struct capability_node;
-
-  union capability_t {
-    struct {
-      uint64_t valid: 1;
-      uint64_t type : 5;
-    } _header;
-
-    capability_null_type         null;
-    capability_parent_type       parent;
-    capability_memory_type       memory;
-    capability_irq_type          irq;
-    capability_user_defined_type user_defined;
-
-    constexpr bool valid() const {
-      return _header.valid == 1;
-    }
-
-    constexpr capability_type type() const {
-      return static_cast<capability_type>(_header.type);
-    }
-  };
-
-  static_assert(sizeof(capability_t) == sizeof(uint64_t) * 2);
-
-  struct capability_handle_t {
-    uint64_t table_index        : 8;
-    uint64_t generation         : 24;
-    uint64_t capability_space_id: 32;
-  };
-
-  struct capability_table_t {
-    uint32_t prev_cap_space_id;
-    uint32_t next_cap_space_id;
-    uint64_t task_id;
-    uint8_t  used;
-    uint8_t  released;
-    uint16_t reserved0;
-    uint32_t generation: 24;
-    uint32_t this_cap_space_id;
-    uint32_t reserved1;
-    alignas(sizeof(capability_t)) capability_t slots[memory::page_size() / sizeof(capability_t) - 2];
-  };
-
-  static_assert(sizeof(capability_table_t) == memory::page_size());
-
-  inline capability_table_t* get_capability_table_by_id(uint32_t cap_space_id) {
-    return reinterpret_cast<capability_table_t*>(arch::memory::begin_of_capability_space + cap_space_id * sizeof(capability_table_t));
-  }
-
-  inline capability_t& get_capability(capability_handle_t handle) {
-    return get_capability_table_by_id(handle.capability_space_id)->slots[handle.table_index];
-  }
-
-  inline capability_handle_t make_handle(const capability_t* cap) {
-    assert(reinterpret_cast<uintptr_t>(cap) >= arch::memory::begin_of_capability_space);
-    assert(reinterpret_cast<uintptr_t>(cap) < arch::memory::end_of_capability_space);
-    auto table_index  = ((reinterpret_cast<uintptr_t>(cap) & (sizeof(capability_table_t) - 1)) - offsetof(capability_table_t, slots)) / sizeof(capability_t);
-    auto generation   = reinterpret_cast<capability_table_t*>(reinterpret_cast<uintptr_t>(cap) & ~(sizeof(capability_table_t) - 1))->generation;
-    auto cap_space_id = (reinterpret_cast<uintptr_t>(cap) - arch::memory::begin_of_capability_space) / sizeof(capability_table_t);
-    return capability_handle_t {
-      .table_index         = table_index,
-      .generation          = generation,
-      .capability_space_id = cap_space_id,
-    };
-  }
+  class_t*      create_capability_class();
+  capability_t* create_capability(ccid_t ccid);
+  class_t*      lookup_class(ccid_t ccid);
+  capability_t* lookup(cid_t cid);
+  capret_t      call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
+  void          set_field(capability_t* capability, uint8_t field, uintptr_t value);
+  capret_t      get_field(capability_t* capability, uint8_t field);
+  capret_t      is_permitted(capability_t* capability, uint8_t permission);
 } // namespace caprese::capability
 
 #endif // CAPRESE_CAPABILITY_H_
