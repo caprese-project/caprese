@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+import os
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--template", required=True)
+
+args = parser.parse_args()
+
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+proj_dir = os.path.join(root_dir, "samples", args.template)
+
+subprocess.run(["cmake", "-B", "build", "-G", "Ninja"], cwd=proj_dir)
+subprocess.run(["cmake", "--build", "build"], cwd=proj_dir)
+
+payload_elf = os.path.join(proj_dir, "build", f"{args.template}.elf")
+payload_path = os.path.join(proj_dir, "build", f"{args.template}.bin")
+
+dump = subprocess.run(
+    ["riscv64-unknown-elf-objdump", "-h", payload_elf], capture_output=True, text=True
+).stdout
+payload_base = None
+for line in dump.splitlines():
+    if line.find(".text") >= 0:
+        payload_base = f"0x{line.split()[3]}"
+
+if payload_base is None:
+    raise Exception(".text section not found.")
+
+subprocess.run(
+    ["riscv64-unknown-elf-objcopy", "-O", "binary", payload_elf, payload_path]
+)
+
+subprocess.run(
+    [
+        "cmake",
+        "-B",
+        "build",
+        "-G",
+        "Ninja",
+        "-DCMAKE_BUILD_TYPE:STRING=Debug",
+        "-DPLATFORM=qemu-riscv-virt",
+        f"-DCONFIG_USER_PAYLOAD={payload_path}",
+        f"-DCONFIG_USER_PAYLOAD_BASE_ADDRESS={payload_base}",
+    ],
+    cwd=root_dir,
+)
+
+subprocess.run(["cmake", "--build", "build"], cwd=root_dir)
