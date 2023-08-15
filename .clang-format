@@ -37,7 +37,7 @@ BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeColon
 BreakInheritanceList: BeforeColon
 BreakStringLiterals: true
-ColumnLimit: 160
+ColumnLimit: 200
 CompactNamespaces: false
 Cpp11BracedListStyle: false
 DisableFormat: false
@@ -73,6 +73,10 @@ MaxEmptyLinesToKeep: 1
 NamespaceIndentation: All
 PPIndentWidth: 0
 PackConstructorInitializers: CurrentLine
+PenaltyBreakAssignment: 500
+PenaltyBreakBeforeFirstCallParameter: 200
+PenaltyExcessCharacter: 50
+PenaltyReturnTypeOnItsOwnLine : 500
 PointerAlignment: Left
 QualifierAlignment: Left
 ReferenceAlignment: Left
