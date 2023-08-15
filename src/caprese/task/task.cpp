@@ -25,9 +25,14 @@ namespace caprese::task {
     auto root_page_table = get_kernel_root_page_table();
     for (uintptr_t page = CONFIG_TASK_SPACE_BASE; page < CONFIG_TASK_SPACE_BASE + CONFIG_TASK_SPACE_SIZE; page += arch::PAGE_SIZE) {
       if (!memory::is_mapped(root_page_table, memory::virtual_address_t::from(page))) {
+        memory::mapped_address_t physical_page = memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
+        if (physical_page.is_null()) [[unlikely]] {
+          return nullptr;
+        }
+
         auto result = memory::map(root_page_table,
                                   memory::virtual_address_t::from(page),
-                                  memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE)).physical_address(),
+                                  physical_page.physical_address(),
                                   { .readable = true, .writable = true, .executable = false, .user = false },
                                   true);
         if (!result) [[unlikely]] {
@@ -56,7 +61,14 @@ namespace caprese::task {
     new_task->flags &= ~TASK_FLAG_UNUSED;
     new_task->flags |= TASK_FLAG_CREATING;
     new_task->tid.generation++;
-    arch::init_task(&new_task->arch_task, CONFIG_STACK_SPACE_BASE + new_task->tid.index * arch::PAGE_SIZE);
+
+    bool result = arch::init_task(&new_task->arch_task, CONFIG_STACK_SPACE_BASE + new_task->tid.index * arch::PAGE_SIZE);
+    if (!result) [[unlikely]] {
+      new_task->tid.generation--;
+      new_task->flags &= ~TASK_FLAG_CREATING;
+      new_task->flags |= TASK_FLAG_UNUSED;
+      return nullptr;
+    }
 
     return new_task;
   }

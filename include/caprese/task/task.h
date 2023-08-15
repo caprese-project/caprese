@@ -47,14 +47,14 @@ namespace caprese::task {
   static_assert(sizeof(task_t) == CONFIG_TASK_SIZE);
   static_assert(offsetof(task_t, arch_task) == CONFIG_ARCH_TASK_OFFSET);
 
-  task_t*                   create_task();
-  void                      switch_to(task_t* task);
-  task_t*                   lookup(tid_t tid);
-  task_t*                   get_current_task();
-  task_t*                   get_kernel_task();
-  memory::mapped_address_t  get_root_page_table(task_t* task);
-  memory::mapped_address_t  get_kernel_root_page_table();
-  capability::capability_t* lookup_capability(task_t* task, capability::cid_t cid);
+  [[nodiscard]] task_t*                   create_task();
+  void                                    switch_to(task_t* task);
+  [[nodiscard]] task_t*                   lookup(tid_t tid);
+  [[nodiscard]] task_t*                   get_current_task();
+  [[nodiscard]] task_t*                   get_kernel_task();
+  [[nodiscard]] memory::mapped_address_t  get_root_page_table(task_t* task);
+  [[nodiscard]] memory::mapped_address_t  get_kernel_root_page_table();
+  [[nodiscard]] capability::capability_t* lookup_capability(task_t* task, capability::cid_t cid);
 } // namespace caprese::task
 
 #endif // CAPRESE_TASK_TASK_H_

@@ -87,7 +87,7 @@ namespace {
 } // namespace
 
 namespace caprese::arch::inline rv64 {
-  void create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info) {
+  bool create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info) {
     task->context    = {};
     task->trap_frame = {};
 
@@ -99,14 +99,16 @@ namespace caprese::arch::inline rv64 {
     asm volatile("csrr %0, satp" : "=r"(task->trap_frame.satp));
 
     uintptr_t root_page_table = memory::physical_address_t::from(get_root_page_table(task)).mapped_address().value;
-    map_page(root_page_table,
-             CONFIG_STACK_SPACE_BASE,
-             memory::mapped_address_t::from(_stack).physical_address().value - arch::PAGE_SIZE,
-             { .readable = true, .writable = true, .executable = false, .user = false },
-             true);
+    bool      result          = map_page(root_page_table,
+                           CONFIG_STACK_SPACE_BASE,
+                           memory::mapped_address_t::from(_stack).physical_address().value - arch::PAGE_SIZE,
+                           { .readable = true, .writable = true, .executable = false, .user = false },
+                           true);
+
+    return result;
   }
 
-  void load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info) {
+  bool load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info) {
     init_task->trap_frame.a0   = get_core_id();
     init_task->trap_frame.a1   = reinterpret_cast<uint64_t>(boot_info);
     init_task->trap_frame.sepc = CONFIG_USER_PAYLOAD_BASE_ADDRESS;
@@ -116,15 +118,19 @@ namespace caprese::arch::inline rv64 {
     uintptr_t payload_size    = end - start;
     uintptr_t root_page_table = memory::physical_address_t::from(get_root_page_table(init_task)).mapped_address().value;
     for (uintptr_t page = 0; page < payload_size; page += PAGE_SIZE) {
-      map_page(root_page_table,
-               CONFIG_USER_PAYLOAD_BASE_ADDRESS + page,
-               memory::mapped_address_t::from(start + page).physical_address().value,
-               { .readable = true, .writable = true, .executable = true, .user = true },
-               true);
+      bool result = map_page(root_page_table,
+                             CONFIG_USER_PAYLOAD_BASE_ADDRESS + page,
+                             memory::mapped_address_t::from(start + page).physical_address().value,
+                             { .readable = true, .writable = true, .executable = true, .user = true },
+                             true);
+      if (!result) [[unlikely]] {
+        return false;
+      }
     }
+    return true;
   }
 
-  void init_task(task_t* task, uintptr_t stack_address) {
+  bool init_task(task_t* task, uintptr_t stack_address) {
     task->context    = {};
     task->trap_frame = {};
 
@@ -132,22 +138,33 @@ namespace caprese::arch::inline rv64 {
     task->context.sp = stack_address + arch::PAGE_SIZE;
 
     auto root_page_table = memory::mapped_address_t::from(aligned_alloc(PAGE_SIZE, PAGE_SIZE));
+    if (root_page_table.is_null()) [[unlikely]] {
+      return false;
+    }
     memset(root_page_table.as<void>(), 0, PAGE_SIZE);
 
-    memory::copy_kernel_space_mapping(root_page_table, task::get_kernel_root_page_table());
+    bool result = memory::copy_kernel_space_mapping(root_page_table, task::get_kernel_root_page_table());
+    if (!result) [[unlikely]] {
+      return false;
+    }
 
     memory::mapped_address_t stack = memory::mapped_address_t::from(aligned_alloc(PAGE_SIZE, PAGE_SIZE));
-    map_page(root_page_table.value,
-             stack_address,
-             stack.physical_address().value,
-             { .readable = true, .writable = true, .executable = false, .user = false },
-             true);
+    if (stack.is_null()) [[unlikely]] {
+      return false;
+    }
+
+    result = map_page(root_page_table.value, stack_address, stack.physical_address().value, { .readable = true, .writable = true, .executable = false, .user = false }, true);
+    if (!result) [[unlikely]] {
+      return false;
+    }
 
 #if defined(CONFIG_MMU_SV39)
     task->trap_frame.satp = SATP_MODE_SV39 | (root_page_table.physical_address().value >> PAGE_SIZE_BIT);
 #elif defined(CONFIG_MMU_SV48)
     task->trap_frame.satp = SATP_MODE_SV48 | (root_page_table.physical_address().value >> PAGE_SIZE_BIT);
 #endif
+
+    return true;
   }
 
   void switch_context(task_t* old_task, task_t* new_task) {

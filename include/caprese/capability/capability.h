@@ -70,14 +70,14 @@ namespace caprese::capability {
 
   static_assert(sizeof(capability_t) == CONFIG_CAPABILITY_SIZE);
 
-  class_t*      create_capability_class();
-  capability_t* create_capability(ccid_t ccid);
-  class_t*      lookup_class(ccid_t ccid);
-  capability_t* lookup(cid_t cid);
-  capret_t      call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
-  void          set_field(capability_t* capability, uint8_t field, uintptr_t value);
-  capret_t      get_field(capability_t* capability, uint8_t field);
-  capret_t      is_permitted(capability_t* capability, uint8_t permission);
+  [[nodiscard]] class_t*      create_capability_class();
+  [[nodiscard]] capability_t* create_capability(ccid_t ccid);
+  [[nodiscard]] class_t*      lookup_class(ccid_t ccid);
+  [[nodiscard]] capability_t* lookup(cid_t cid);
+  [[nodiscard]] capret_t      call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
+  void                        set_field(capability_t* capability, uint8_t field, uintptr_t value);
+  [[nodiscard]] capret_t      get_field(capability_t* capability, uint8_t field);
+  [[nodiscard]] capret_t      is_permitted(capability_t* capability, uint8_t permission);
 } // namespace caprese::capability
 
 #endif // CAPRESE_CAPABILITY_H_

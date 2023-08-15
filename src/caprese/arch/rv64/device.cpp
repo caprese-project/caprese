@@ -13,8 +13,7 @@ extern "C" {
 }
 
 namespace caprese::arch::inline rv64 {
-  std::tuple<std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>>
-      get_reserved_ram_spaces(const boot_info_t* boot_info) {
+  std::tuple<std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>> get_reserved_ram_spaces(const boot_info_t* boot_info) {
     std::tuple<std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>> result;
 
     uintptr_t mmode_resv_start = -1;

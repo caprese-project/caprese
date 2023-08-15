@@ -40,7 +40,7 @@ namespace caprese::memory {
      * @return constexpr T*
      */
     template<typename T>
-    constexpr T* as() {
+    [[nodiscard]] constexpr T* as() {
       return reinterpret_cast<T*>(value);
     }
 
@@ -51,8 +51,12 @@ namespace caprese::memory {
      * @return constexpr const T*
      */
     template<typename T>
-    constexpr const T* as() const {
+    [[nodiscard]] constexpr const T* as() const {
       return reinterpret_cast<const T*>(value);
+    }
+
+    [[nodiscard]] constexpr bool is_null() const {
+      return value == 0;
     }
 
     /**
@@ -61,7 +65,7 @@ namespace caprese::memory {
      * @param address The address to be specified.
      * @return constexpr Derived
      */
-    constexpr static Derived from(uintptr_t address) {
+    [[nodiscard]] constexpr static Derived from(uintptr_t address) {
       return Derived { address };
     }
 
@@ -73,7 +77,7 @@ namespace caprese::memory {
      * @return constexpr Derived
      */
     template<typename T>
-    constexpr static Derived from(const T* ptr) {
+    [[nodiscard]] constexpr static Derived from(const T* ptr) {
       return Derived { reinterpret_cast<uintptr_t>(ptr) };
     }
 
@@ -85,7 +89,7 @@ namespace caprese::memory {
      * @return constexpr Derived
      */
     template<function_pointer F>
-    constexpr static Derived from(F f) {
+    [[nodiscard]] constexpr static Derived from(F f) {
       return Derived { reinterpret_cast<uintptr_t>(f) };
     }
 
@@ -94,7 +98,7 @@ namespace caprese::memory {
      *
      * @return constexpr Derived
      */
-    constexpr static Derived null() {
+    [[nodiscard]] constexpr static Derived null() {
       return Derived { 0 };
     }
   };
@@ -106,7 +110,7 @@ namespace caprese::memory {
    *
    */
   struct physical_address_t: public base_address_t<physical_address_t> {
-    constexpr mapped_address_t mapped_address();
+    [[nodiscard]] constexpr mapped_address_t mapped_address();
   };
 
   /**
@@ -120,7 +124,7 @@ namespace caprese::memory {
    *
    */
   struct mapped_address_t: public base_address_t<mapped_address_t> {
-    constexpr physical_address_t physical_address() {
+    [[nodiscard]] constexpr physical_address_t physical_address() {
       return physical_address_t::from(value - CONFIG_MAPPED_SPACE_BASE);
     }
   };

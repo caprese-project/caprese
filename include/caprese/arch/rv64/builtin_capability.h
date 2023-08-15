@@ -31,7 +31,7 @@ namespace caprese::arch::inline rv64 {
 
   constexpr uint8_t TASK_CAP_FIELD_TID = 0;
 
-  void create_builtin_capability_classes();
+  [[nodiscard]] bool create_builtin_capability_classes();
 } // namespace caprese::arch::inline rv64
 
 #endif // CAPRESE_ARCH_RV64_BUILTIN_CAPABILITY_H_

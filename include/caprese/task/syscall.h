@@ -27,7 +27,7 @@ namespace caprese::task {
     sysret_t cap_is_permitted(uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
   } // namespace syscall
 
-  sysret_t handle_system_call(uintptr_t code, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
+  [[nodiscard]] sysret_t handle_system_call(uintptr_t code, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
 } // namespace caprese::task
 
 #endif // CAPRESE_TASK_SYSCALL_H_

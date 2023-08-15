@@ -19,15 +19,15 @@ namespace caprese::arch::inline rv64 {
     int user      : 1;
   };
 
-  bool map_page(uintptr_t root_page_table, uintptr_t virtual_address, uintptr_t physical_address, page_flags_t flags, bool allocate);
-  bool unmap_page(uintptr_t root_page_table, uintptr_t virtual_address);
-  bool is_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address);
+  [[nodiscard]] bool map_page(uintptr_t root_page_table, uintptr_t virtual_address, uintptr_t physical_address, page_flags_t flags, bool allocate);
+  [[nodiscard]] bool unmap_page(uintptr_t root_page_table, uintptr_t virtual_address);
+  [[nodiscard]] bool is_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address);
 
-  bool shallow_map_page(uintptr_t root_page_table, uintptr_t virtual_address, uintptr_t physical_address);
-  bool copy_shallow_page_mapping(uintptr_t dst_page_table, uintptr_t src_page_table, uintptr_t virtual_address);
-  bool is_shallow_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address);
+  [[nodiscard]] bool shallow_map_page(uintptr_t root_page_table, uintptr_t virtual_address, uintptr_t physical_address);
+  [[nodiscard]] bool copy_shallow_page_mapping(uintptr_t dst_page_table, uintptr_t src_page_table, uintptr_t virtual_address);
+  [[nodiscard]] bool is_shallow_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address);
 
-  uintptr_t get_current_root_page_table();
+  [[nodiscard]] uintptr_t get_current_root_page_table();
 } // namespace caprese::arch::inline rv64
 
 #endif // CAPRESE_ARCH_RV64_MEMORY_H_

@@ -10,22 +10,19 @@ namespace caprese::arch::inline rv64 {
   namespace {
     using namespace caprese::capability;
 
-    capret_t memory_cap_method_move(
-        capability_t* cap, [[maybe_unused]] uintptr_t arg0, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
+    capret_t memory_cap_method_move(capability_t* cap, [[maybe_unused]] uintptr_t arg0, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
       (void)cap;
       // TODO: impl
       return { .result = 0, .error = 0 };
     }
 
-    capret_t memory_cap_method_copy(
-        capability_t* cap, [[maybe_unused]] uintptr_t arg0, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
+    capret_t memory_cap_method_copy(capability_t* cap, [[maybe_unused]] uintptr_t arg0, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
       (void)cap;
       // TODO: impl
       return { .result = 0, .error = 0 };
     }
 
-    capret_t
-        memory_cap_method_map(capability_t* cap, uintptr_t _new_task_cap_cid, uintptr_t _virtual_address, uintptr_t _flags, [[maybe_unused]] uintptr_t arg3) {
+    capret_t memory_cap_method_map(capability_t* cap, uintptr_t _new_task_cap_cid, uintptr_t _virtual_address, uintptr_t _flags, [[maybe_unused]] uintptr_t arg3) {
 #if CONFIG_USER_SPACE_BASE > 0
       if (_virtual_address < CONFIG_USER_SPACE_BASE) [[unlikely]] {
         return { .result = 0, .error = 1 };
@@ -133,8 +130,7 @@ namespace caprese::arch::inline rv64 {
       return { .result = 0, .error = 0 };
     }
 
-    capret_t memory_cap_method_unmap(
-        capability_t* cap, uintptr_t _task_cap_cid, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
+    capret_t memory_cap_method_unmap(capability_t* cap, uintptr_t _task_cap_cid, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
       task::task_t* current_task = task::get_current_task();
 
       cid_t         task_cap_cid = std::bit_cast<cid_t>(static_cast<uint32_t>(_task_cap_cid));
@@ -243,7 +239,7 @@ namespace caprese::arch::inline rv64 {
       return { .result = 0, .error = 0 };
     }
 
-    void create_memory_cap_class() {
+    [[nodiscard]] bool create_memory_cap_class() {
       class_t* cap_class = reinterpret_cast<class_t*>(CONFIG_CAPABILITY_CLASS_SPACE_BASE);
 
       cap_class->name            = "memory";
@@ -255,31 +251,56 @@ namespace caprese::arch::inline rv64 {
       cap_class->idx_copy        = 1;
       cap_class->methods         = static_cast<method_t*>(malloc(cap_class->num_methods * sizeof(method_t)));
 
+      if (cap_class->methods == nullptr) [[unlikely]] {
+        return false;
+      }
+
       cap_class->methods[MEMORY_CAP_METHOD_MOVE]  = memory_cap_method_move;
       cap_class->methods[MEMORY_CAP_METHOD_COPY]  = memory_cap_method_copy;
       cap_class->methods[MEMORY_CAP_METHOD_MAP]   = memory_cap_method_map;
       cap_class->methods[MEMORY_CAP_METHOD_UNMAP] = memory_cap_method_unmap;
       cap_class->methods[MEMORY_CAP_METHOD_READ]  = memory_cap_method_read;
       cap_class->methods[MEMORY_CAP_METHOD_WRITE] = memory_cap_method_write;
+
+      return true;
     }
 
-    void create_task_cap_class() { }
+    [[nodiscard]] bool create_task_cap_class() {
+      return true;
+    }
 
-    void create_trap_cap_class() { }
+    [[nodiscard]] bool create_trap_cap_class() {
+      return true;
+    }
   } // namespace
 
-  void create_builtin_capability_classes() {
+  bool create_builtin_capability_classes() {
     memory::mapped_address_t root_page_table = memory::get_current_root_page_table();
     memory::mapped_address_t page            = memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
 
-    memory::map(root_page_table,
-                memory::virtual_address_t::from(CONFIG_CAPABILITY_CLASS_SPACE_BASE),
-                page.physical_address(),
-                { .readable = true, .writable = true, .executable = false, .user = false },
-                true);
+    if (page.is_null()) [[unlikely]] {
+      return false;
+    }
 
-    create_memory_cap_class();
-    create_task_cap_class();
-    create_trap_cap_class();
+    bool result = memory::map(root_page_table,
+                              memory::virtual_address_t::from(CONFIG_CAPABILITY_CLASS_SPACE_BASE),
+                              page.physical_address(),
+                              { .readable = true, .writable = true, .executable = false, .user = false },
+                              true);
+    if (!result) [[unlikely]] {
+      return false;
+    }
+
+    if (!create_memory_cap_class()) [[unlikely]] {
+      return false;
+    }
+    if (!create_task_cap_class()) [[unlikely]] {
+      return false;
+    }
+    if (!create_trap_cap_class()) [[unlikely]] {
+      return false;
+    }
+
+    return true;
   }
 } // namespace caprese::arch::inline rv64

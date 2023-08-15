@@ -46,8 +46,7 @@ namespace caprese::memory {
     free_page_t*  free_page_list;
     using_page_t* current_using_page;
 
-    std::tuple<std::pair<uintptr_t, uintptr_t>, std::pair<uintptr_t, uintptr_t>> subtract_spaces(const std::pair<uintptr_t, uintptr_t>& a,
-                                                                                                 const std::pair<uintptr_t, uintptr_t>& b) {
+    std::tuple<std::pair<uintptr_t, uintptr_t>, std::pair<uintptr_t, uintptr_t>> subtract_spaces(const std::pair<uintptr_t, uintptr_t>& a, const std::pair<uintptr_t, uintptr_t>& b) {
       if (a.second <= b.first || b.second <= a.first) {
         return {
           a,
@@ -103,7 +102,7 @@ namespace caprese::memory {
     }
   } // namespace
 
-  void init_heap(const arch::boot_info_t* boot_info) {
+  bool init_heap(const arch::boot_info_t* boot_info) {
     free_page_list     = nullptr;
     current_using_page = nullptr;
 
@@ -143,6 +142,8 @@ namespace caprese::memory {
     });
 
     new_current_using_page();
+
+    return current_using_page != nullptr;
   }
 
   mapped_address_t allocate(size_t size, size_t align) {
@@ -156,6 +157,9 @@ namespace caprese::memory {
       mapped_address_t result = mapped_address_t::from(free_page_list);
       free_page_list          = free_page_list->prev.as<free_page_t>();
       return result;
+    }
+    if (current_using_page == nullptr) [[unlikely]] {
+      return mapped_address_t::null();
     }
 
     for (int i = arch::PAGE_SIZE / sizeof(max_align_t) / 8 - 1; i >= 0; --i) {

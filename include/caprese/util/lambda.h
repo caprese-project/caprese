@@ -18,7 +18,7 @@ namespace caprese::inline util {
   };
 
   template<typename F>
-  constexpr inline decltype(auto) make_recursive_lambda(F&& f) {
+  [[nodiscard]] constexpr inline decltype(auto) make_recursive_lambda(F&& f) {
     return recursive_lambda<std::decay_t<F>>(std::forward<std::decay_t<F>>(f));
   }
 

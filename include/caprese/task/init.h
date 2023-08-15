@@ -5,10 +5,10 @@
 #include <caprese/task/task.h>
 
 namespace caprese::task {
-  void    init_task_space();
-  task_t* create_kernel_task(void (*entry)(const arch::boot_info_t*), const arch::boot_info_t* boot_info);
-  void    switch_to_kernel_task(task_t* kernel_task);
-  void    load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info);
+  [[nodiscard]] bool    init_task_space();
+  [[nodiscard]] task_t* create_kernel_task(void (*entry)(const arch::boot_info_t*), const arch::boot_info_t* boot_info);
+  void                  switch_to_kernel_task(task_t* kernel_task);
+  [[nodiscard]] bool    load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info);
 } // namespace caprese::task
 
 #endif // CAPRESE_TASK_INIT_H_

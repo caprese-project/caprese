@@ -2,12 +2,13 @@
 #include <caprese/capability/init.h>
 
 namespace caprese::capability {
-  void create_builtin_capability_classes() {
-    arch::create_builtin_capability_classes();
+  bool create_builtin_capability_classes() {
+    return arch::create_builtin_capability_classes();
   }
 
-  void create_init_capabilities(task::task_t* kernel_task, const arch::boot_info_t* boot_info) {
+  bool create_init_capabilities(task::task_t* kernel_task, const arch::boot_info_t* boot_info) {
     (void)kernel_task;
     (void)boot_info;
+    return true;
   }
 } // namespace caprese::capability

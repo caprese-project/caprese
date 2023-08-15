@@ -45,11 +45,11 @@ namespace caprese::arch::inline rv64 {
     constexpr int MMU_LEVELS = 3;
 #endif
 
-    constexpr size_t get_pte_index(uintptr_t virtual_address, int level) {
+    [[nodiscard]] constexpr size_t get_pte_index(uintptr_t virtual_address, int level) {
       return (virtual_address >> (9 * level + PAGE_SIZE_BIT)) & 0x1ff;
     }
 
-    page_table_entry_t* walk_page(uintptr_t root_page_table, uintptr_t virtual_address, bool allocate) {
+    [[nodiscard]] page_table_entry_t* walk_page(uintptr_t root_page_table, uintptr_t virtual_address, bool allocate) {
       page_table_entry_t* page_table = reinterpret_cast<page_table_entry_t*>(root_page_table);
 
       for (int i = MMU_LEVELS; i > 0; --i) {

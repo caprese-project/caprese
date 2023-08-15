@@ -15,8 +15,8 @@
 #ifndef CAPRESE_ARCH_RV64_TASK_H_
 #define CAPRESE_ARCH_RV64_TASK_H_
 
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 
 #include <caprese/arch/boot_info.h>
 
@@ -83,12 +83,12 @@ namespace caprese::arch::inline rv64 {
   static_assert(offsetof(task_t, context) == CONFIG_ARCH_TASK_CONTEXT_OFFSET);
   static_assert(offsetof(task_t, trap_frame) == CONFIG_ARCH_TASK_TRAP_FRAME_OFFSET);
 
-  void      create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info);
-  void      load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info);
-  void      init_task(task_t* task, uintptr_t stack_address);
-  void      switch_context(task_t* old_task, task_t* new_task);
-  void      load_context(task_t* task);
-  uintptr_t get_root_page_table(task_t* task);
+  [[nodiscard]] bool      create_kernel_task(task_t* task, void (*entry)(const boot_info_t*), const boot_info_t* boot_info);
+  [[nodiscard]] bool      load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info);
+  [[nodiscard]] bool      init_task(task_t* task, uintptr_t stack_address);
+  void                    switch_context(task_t* old_task, task_t* new_task);
+  void                    load_context(task_t* task);
+  [[nodiscard]] uintptr_t get_root_page_table(task_t* task);
 } // namespace caprese::arch::inline rv64
 
 #endif // CAPRESE_ARCH_RV64_TASK_H_

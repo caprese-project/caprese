@@ -43,7 +43,9 @@ namespace caprese {
       }
       printf("Init task creation completed. tid: 0x%x\n", std::bit_cast<uint32_t>(init_task->tid));
       printf("Loading the payload for the init task...\n");
-      task::load_init_task_payload(init_task, boot_info);
+      if (!task::load_init_task_payload(init_task, boot_info)) [[unlikely]] {
+        panic("Failed to load init task payload.");
+      }
       printf("Ready to execute the init task.\n");
 
       printf(LOGO_TEXT);
@@ -57,19 +59,27 @@ namespace caprese {
 
   [[noreturn]] void main(const arch::boot_info_t* boot_info) {
     printf("Initializing heap...\n");
-    memory::init_heap(boot_info);
+    if (!memory::init_heap(boot_info)) [[unlikely]] {
+      panic("Failed to initialize heap.");
+    }
     printf("Heap initialization completed.\n\n");
 
     printf("Initializing core local storage...\n");
-    memory::init_cls_space(boot_info);
+    if (!memory::init_cls_space(boot_info)) [[unlikely]] {
+      panic("Failed to initialize core local storage.");
+    }
     printf("Core local storage initialized.\n\n");
 
     printf("Initializing kernel virtual address space...\n");
-    memory::init_kernel_space();
+    if (!memory::init_kernel_space()) [[unlikely]] {
+      panic("Failed to initialize kernel virtual address space");
+    }
     printf("Kernel virtual address space initialized.\n\n");
 
     printf("Initializing task space...\n");
-    task::init_task_space();
+    if (!task::init_task_space()) [[unlikely]] {
+      panic("Failed to initialize task space.");
+    }
     printf("Task space initialization completed.\n");
     printf("Creating kernel task...\n");
     task::task_t* kernel_task = task::create_kernel_task(kernel_task_entry, boot_info);
@@ -79,10 +89,14 @@ namespace caprese {
     printf("Kernel task creation completed.\n\n");
 
     printf("Creating built-in capability classes...\n");
-    capability::create_builtin_capability_classes();
+    if (!capability::create_builtin_capability_classes()) [[unlikely]] {
+      panic("Failed to create built-in capability classes.");
+    }
     printf("Built-in capability classes creation completed.\n");
     printf("Creating initial capabilities...\n");
-    capability::create_init_capabilities(kernel_task, boot_info);
+    if (!capability::create_init_capabilities(kernel_task, boot_info)) [[unlikely]] {
+      panic("Failed to create initial capabilities.");
+    }
     printf("Initial capabilities creation completed.\n\n");
 
     printf("Switching to kernel task...\n\n");

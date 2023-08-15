@@ -176,8 +176,7 @@ namespace caprese::arch::inline rv64 {
   }
 
   // 0: m-mode, 1: dtb, 2: kernel, 3: payload
-  std::tuple<std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>>
-      get_reserved_ram_spaces(const boot_info_t* boot_info);
+  [[nodiscard]] std::tuple<std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>, std::pair<uintptr_t, size_t>> get_reserved_ram_spaces(const boot_info_t* boot_info);
 } // namespace caprese::arch::inline rv64
 
 #endif // CAPRESE_ARCH_RV64_DEVICE_H_

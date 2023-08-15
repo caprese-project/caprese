@@ -12,8 +12,8 @@ namespace caprese::memory {
 
   static_assert(sizeof(core_local_storage_t) == (CONFIG_CLS_SIZE));
 
-  void                  init_cls_space(const arch::boot_info_t* boot_info);
-  core_local_storage_t* get_cls();
+  [[nodiscard]] bool                  init_cls_space(const arch::boot_info_t* boot_info);
+  [[nodiscard]] core_local_storage_t* get_cls();
 } // namespace caprese::memory
 
 extern "C" {

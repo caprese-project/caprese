@@ -5,8 +5,8 @@
 #include <caprese/task/task.h>
 
 namespace caprese::capability {
-  void create_builtin_capability_classes();
-  void create_init_capabilities(task::task_t* kernel_task, const arch::boot_info_t* boot_info);
+  [[nodiscard]] bool create_builtin_capability_classes();
+  [[nodiscard]] bool create_init_capabilities(task::task_t* kernel_task, const arch::boot_info_t* boot_info);
 } // namespace caprese::capability
 
 #endif // CAPRESE_CAPABILITY_INIT_H_

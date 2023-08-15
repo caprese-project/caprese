@@ -5,7 +5,7 @@
 
 namespace caprese::inline util {
   template<typename T, size_t N>
-  constexpr size_t array_size_of(const T (&)[N]) {
+  [[nodiscard]] constexpr size_t array_size_of(const T (&)[N]) {
     return N;
   }
 } // namespace caprese::inline util
