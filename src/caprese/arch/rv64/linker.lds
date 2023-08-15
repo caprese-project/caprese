@@ -12,6 +12,7 @@
  */
 
 #include <caprese/generated/kernel_payload_base.h>
+#include <caprese/generated/user_payload_size.h>
 #define PAGE_SIZE 4096
 
 OUTPUT_ARCH( "riscv" )
@@ -64,6 +65,8 @@ SECTIONS
   .payload :
   {
     *(.payload)
+    KEEP(*(.payload))
+    . += CONFIG_USER_PAYLOAD_SIZE;
   }
 
   _payload_end = .;

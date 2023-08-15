@@ -47,4 +47,3 @@ spin:
 _stack:
 
 .section .payload, "ax", %progbits
-.incbin	CONFIG_USER_PAYLOAD

@@ -69,7 +69,7 @@ SECTIONS
     _payload_base = .;
     KEEP(*(.payload))
 #ifdef CONFIG_KERNEL_PAYLOAD_SIZE
-    . = . + CONFIG_KERNEL_PAYLOAD_SIZE;
+    . += CONFIG_KERNEL_PAYLOAD_SIZE;
 #endif
   }
 

@@ -20,7 +20,13 @@ target_sources(
   builtin_capability.cpp
 )
 
-set_source_files_properties(entry.S PROPERTIES OBJECT_DEPENDS ${CONFIG_USER_PAYLOAD})
+add_custom_target(
+  user_payload_size
+  COMMAND sh "-c" "ls -l ${CONFIG_USER_PAYLOAD} | awk '{print \"#define CONFIG_USER_PAYLOAD_SIZE \"$5}' > ${GEN_DIR}/user_payload_size.h"
+  BYPRODUCTS ${GEN_DIR}/user_payload_size.h
+  VERBATIM
+)
+add_dependencies(kernel user_payload_size)
 
 add_custom_target(
   linker
@@ -41,14 +47,8 @@ target_link_options(
 set_target_properties(kernel PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds)
 
 add_custom_target(
-  user_payload ALL
-  DEPENDS ${CONFIG_USER_PAYLOAD}
-)
-add_dependencies(kernel user_payload)
-
-add_custom_target(
   kernel_payload
-  COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:kernel> $<TARGET_FILE_DIR:kernel>/payload
+  COMMAND ${CMAKE_OBJCOPY} -O binary --update-section .payload=${CONFIG_USER_PAYLOAD} $<TARGET_FILE:kernel> $<TARGET_FILE_DIR:kernel>/payload
 )
 add_dependencies(kernel_payload kernel)
 
