@@ -25,6 +25,8 @@ namespace caprese::memory {
 
   [[nodiscard]] mapped_address_t allocate(size_t size, size_t align);
   void                           deallocate(mapped_address_t addr);
+
+  [[nodiscard]] size_t num_remaining_pages();
 } // namespace caprese::memory
 
 #endif // CAPRESE_MEMORY_HEAP_H_

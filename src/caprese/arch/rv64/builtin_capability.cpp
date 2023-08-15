@@ -3,6 +3,7 @@
 
 #include <caprese/arch/rv64/builtin_capability.h>
 #include <caprese/capability/capability.h>
+#include <caprese/memory/heap.h>
 #include <caprese/memory/page.h>
 #include <caprese/task/task.h>
 
@@ -240,7 +241,7 @@ namespace caprese::arch::inline rv64 {
     }
 
     [[nodiscard]] bool create_memory_cap_class() {
-      class_t* cap_class = reinterpret_cast<class_t*>(CONFIG_CAPABILITY_CLASS_SPACE_BASE);
+      class_t* cap_class = create_capability_class();
 
       cap_class->name            = "memory";
       cap_class->flags           = CLASS_FLAG_VALID | CLASS_FLAG_BUILTIN | CLASS_FLAG_MOVABLE | CLASS_FLAG_COPYABLE;
@@ -275,22 +276,6 @@ namespace caprese::arch::inline rv64 {
   } // namespace
 
   bool create_builtin_capability_classes() {
-    memory::mapped_address_t root_page_table = memory::get_current_root_page_table();
-    memory::mapped_address_t page            = memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
-
-    if (page.is_null()) [[unlikely]] {
-      return false;
-    }
-
-    bool result = memory::map(root_page_table,
-                              memory::virtual_address_t::from(CONFIG_CAPABILITY_CLASS_SPACE_BASE),
-                              page.physical_address(),
-                              { .readable = true, .writable = true, .executable = false, .user = false },
-                              true);
-    if (!result) [[unlikely]] {
-      return false;
-    }
-
     if (!create_memory_cap_class()) [[unlikely]] {
       return false;
     }
@@ -301,6 +286,27 @@ namespace caprese::arch::inline rv64 {
       return false;
     }
 
+    return true;
+  }
+
+  bool create_builtin_capabilities(task::task_t* kernel_task, const boot_info_t* boot_info) {
+    while (memory::num_remaining_pages() > CONFIG_KERNEL_RESERVED_PAGES) {
+      memory::mapped_address_t page = memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
+      if (page.is_null()) [[unlikely]] {
+        return false;
+      }
+
+      capability_t* cap = create_capability(MEMORY_CAP_CCID);
+      set_permission(cap, MEMORY_CAP_PERMISSION_READABLE, true);
+      set_permission(cap, MEMORY_CAP_PERMISSION_WRITABLE, true);
+      set_permission(cap, MEMORY_CAP_PERMISSION_EXECUTABLE, true);
+      set_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS, page.physical_address().value);
+      set_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS, 0);
+      set_field(cap, MEMORY_CAP_FIELD_TID, 0);
+    }
+
+    (void)kernel_task;
+    (void)boot_info;
     return true;
   }
 } // namespace caprese::arch::inline rv64

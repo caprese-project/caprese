@@ -3,6 +3,9 @@
 
 #include <cstdint>
 
+#include <caprese/arch/boot_info.h>
+#include <caprese/task/task.h>
+
 namespace caprese::arch::inline rv64 {
   constexpr uint16_t NULL_CAP_CCID   = 0;
   constexpr uint16_t MEMORY_CAP_CCID = 1;
@@ -32,6 +35,7 @@ namespace caprese::arch::inline rv64 {
   constexpr uint8_t TASK_CAP_FIELD_TID = 0;
 
   [[nodiscard]] bool create_builtin_capability_classes();
+  [[nodiscard]] bool create_builtin_capabilities(task::task_t* kernel_task, const boot_info_t* boot_info);
 } // namespace caprese::arch::inline rv64
 
 #endif // CAPRESE_ARCH_RV64_BUILTIN_CAPABILITY_H_

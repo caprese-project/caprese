@@ -14,7 +14,7 @@
 #include <bit>
 #include <cstdio>
 
-#include <caprese/capability/init.h>
+#include <caprese/capability/builtin.h>
 #include <caprese/main.h>
 #include <caprese/memory/cls.h>
 #include <caprese/memory/heap.h>
@@ -88,16 +88,26 @@ namespace caprese {
     }
     printf("Kernel task creation completed.\n\n");
 
+    printf("Initializing capability class space...\n");
+    if (!capability::init_capability_class_space()) [[unlikely]] {
+      panic("Failed to initialize capability class space.");
+    }
+    printf("Capability class space initialization completed.\n");
+    printf("Initializing capability space...\n");
+    if (!capability::init_capability_space()) [[unlikely]] {
+      panic("Failed to initialize capability space.");
+    }
+    printf("Capability space initialization completed.\n");
     printf("Creating built-in capability classes...\n");
     if (!capability::create_builtin_capability_classes()) [[unlikely]] {
       panic("Failed to create built-in capability classes.");
     }
     printf("Built-in capability classes creation completed.\n");
-    printf("Creating initial capabilities...\n");
-    if (!capability::create_init_capabilities(kernel_task, boot_info)) [[unlikely]] {
-      panic("Failed to create initial capabilities.");
+    printf("Creating built-in capabilities...\n");
+    if (!capability::create_builtin_capabilities(kernel_task, boot_info)) [[unlikely]] {
+      panic("Failed to create built-in capabilities.");
     }
-    printf("Initial capabilities creation completed.\n\n");
+    printf("Built-in capabilities creation completed.\n\n");
 
     printf("Switching to kernel task...\n\n");
     task::switch_to_kernel_task(kernel_task);

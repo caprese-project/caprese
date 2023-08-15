@@ -43,6 +43,7 @@ namespace caprese::memory {
     constexpr size_t a = sizeof(using_page_t);
     static_assert(sizeof(using_page_t) == arch::PAGE_SIZE);
 
+    size_t        free_page_count;
     free_page_t*  free_page_list;
     using_page_t* current_using_page;
 
@@ -89,20 +90,31 @@ namespace caprese::memory {
         free_page_t* next_free_page   = reinterpret_cast<free_page_t*>(CONFIG_MAPPED_SPACE_BASE + physical_address);
         next_free_page->prev          = mapped_address_t::from(free_page_list);
         free_page_list                = next_free_page;
+        ++free_page_count;
       }
     }
 
+    [[nodiscard]] mapped_address_t fetch() {
+      if (free_page_list == nullptr) [[unlikely]] {
+        return mapped_address_t::null();
+      }
+      mapped_address_t result = mapped_address_t::from(free_page_list);
+      free_page_list          = free_page_list->prev.as<free_page_t>();
+      --free_page_count;
+      return result;
+    }
+
     void new_current_using_page() {
-      current_using_page = reinterpret_cast<using_page_t*>(free_page_list);
-      if (current_using_page) {
-        free_page_list = free_page_list->prev.as<free_page_t>();
-        memset(current_using_page, 0, sizeof(using_page_t));
+      current_using_page = fetch().as<using_page_t>();
+      if (current_using_page != nullptr) {
+        memset(current_using_page, 0, sizeof(using_page_t::used_flags));
         current_using_page->used_flags[0] |= 1;
       }
     }
   } // namespace
 
   bool init_heap(const arch::boot_info_t* boot_info) {
+    free_page_count    = 0;
     free_page_list     = nullptr;
     current_using_page = nullptr;
 
@@ -154,9 +166,7 @@ namespace caprese::memory {
       if (free_page_list == nullptr) [[unlikely]] {
         return mapped_address_t::null();
       }
-      mapped_address_t result = mapped_address_t::from(free_page_list);
-      free_page_list          = free_page_list->prev.as<free_page_t>();
-      return result;
+      return fetch();
     }
     if (current_using_page == nullptr) [[unlikely]] {
       return mapped_address_t::null();
@@ -208,5 +218,9 @@ namespace caprese::memory {
     } else {
       insert(addr.physical_address(), arch::PAGE_SIZE);
     }
+  }
+
+  [[nodiscard]] size_t num_remaining_pages() {
+    return free_page_count;
   }
 } // namespace caprese::memory

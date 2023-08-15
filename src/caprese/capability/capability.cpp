@@ -1,10 +1,140 @@
+#include <cstdlib>
+
 #include <caprese/capability/capability.h>
 #include <caprese/memory/page.h>
 #include <caprese/task/task.h>
 #include <caprese/util/align.h>
 
 namespace caprese::capability {
+  namespace {
+    memory::virtual_address_t next_capability_class_space_address;
+    size_t                    next_capability_class_space_offset;
+    capability_t*             free_capability_list;
+    size_t                    capability_block_position;
+    uint32_t                  cid_generation_counter;
+
+    [[nodiscard]] bool init_capability_block(capability_t* cap_block) {
+      for (size_t offset = 0; offset < arch::PAGE_SIZE / sizeof(capability_t); ++offset) {
+        cap_block[offset].info.ccid                  = 0;
+        cap_block[offset].info.cid_generation        = cid_generation_counter;
+        cap_block[offset].management.prev_free_list  = { .index = 0, .generation = 0 };
+        cap_block[offset].management.next_free_list  = { .index = 0, .generation = 0 };
+        cap_block[offset].management.prev_free_index = (offset + 1) % (arch::PAGE_SIZE / sizeof(capability_t));
+      }
+      cid_generation_counter = (cid_generation_counter + 1) % (1 << (32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES)));
+
+      return true;
+    }
+
+    [[nodiscard]] bool allocate_new_capability_block() {
+      memory::mapped_address_t page = memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
+      if (page.is_null()) [[unlikely]] {
+        return false;
+      }
+
+      memory::mapped_address_t root_page_table = task::get_kernel_root_page_table();
+
+      size_t position = capability_block_position;
+      do {
+        memory::virtual_address_t block_page = memory::virtual_address_t::from(CONFIG_CAPABILITY_SPACE_BASE + position);
+        if (!memory::is_mapped(root_page_table, block_page)) {
+          bool result = memory::map(root_page_table, block_page, page.physical_address(), { .readable = true, .writable = true, .executable = false, .user = false }, true);
+          if (!result) [[unlikely]] {
+            return false;
+          }
+
+          capability_t* new_capability_block = block_page.as<capability_t>();
+          if (!init_capability_block(new_capability_block)) [[unlikely]] {
+            return false;
+          }
+
+          if (free_capability_list != nullptr) {
+            new_capability_block->management.prev_free_list = get_cid(free_capability_list);
+            free_capability_list->management.next_free_list = get_cid(new_capability_block);
+          } else {
+            new_capability_block->management.prev_free_list = { .index = 0, .generation = 0 };
+          }
+          free_capability_list = new_capability_block;
+
+          capability_block_position = position;
+          return true;
+        }
+        position = (position + arch::PAGE_SIZE) % CONFIG_CAPABILITY_SPACE_SIZE;
+      } while (position != capability_block_position);
+
+      return false;
+    }
+  } // namespace
+
+  bool init_capability_class_space() {
+    next_capability_class_space_address = memory::virtual_address_t::from(CONFIG_CAPABILITY_CLASS_SPACE_BASE);
+    next_capability_class_space_offset  = 0;
+    return true;
+  }
+
+  bool init_capability_space() {
+    free_capability_list      = nullptr;
+    capability_block_position = 0;
+    cid_generation_counter    = 0;
+    return allocate_new_capability_block();
+  }
+
+  class_t* create_capability_class() {
+    if (next_capability_class_space_address.value - CONFIG_CAPABILITY_CLASS_SPACE_BASE >= CONFIG_CAPABILITY_CLASS_SPACE_SIZE) [[unlikely]] {
+      return nullptr;
+    }
+
+    class_t*                 cap_class       = next_capability_class_space_address.as<class_t>() + next_capability_class_space_offset;
+    memory::mapped_address_t root_page_table = memory::get_current_root_page_table();
+
+    if (!memory::is_mapped(root_page_table, next_capability_class_space_address)) [[unlikely]] {
+      memory::mapped_address_t page = memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
+      if (page.is_null()) [[unlikely]] {
+        return nullptr;
+      }
+
+      bool result = memory::map(root_page_table, next_capability_class_space_address, page.physical_address(), { .readable = true, .writable = true, .executable = false, .user = false }, true);
+      if (!result) [[unlikely]] {
+        return nullptr;
+      }
+    }
+
+    ++next_capability_class_space_offset;
+    if (sizeof(class_t) * next_capability_class_space_offset >= arch::PAGE_SIZE) [[unlikely]] {
+      next_capability_class_space_address.value += arch::PAGE_SIZE;
+      next_capability_class_space_offset = 0;
+    }
+
+    return cap_class;
+  }
+
+  capability_t* create_capability(ccid_t ccid) {
+    if (free_capability_list == nullptr) [[unlikely]] {
+      if (!allocate_new_capability_block()) [[unlikely]] {
+        return nullptr;
+      }
+    }
+
+    capability_t* capability_block = reinterpret_cast<capability_t*>(reinterpret_cast<uintptr_t>(free_capability_list) & ~arch::PAGE_SIZE);
+
+    capability_t* result = capability_block + free_capability_list->management.prev_free_index;
+    if (result == free_capability_list) [[unlikely]] {
+      free_capability_list = reinterpret_cast<capability_t*>(CONFIG_CAPABILITY_SPACE_BASE) + free_capability_list->management.prev_free_list.index;
+    } else {
+      free_capability_list->management.prev_free_index = result->management.prev_free_index;
+    }
+
+    result->info.ccid = ccid;
+    ++result->info.cid_generation;
+
+    return result;
+  }
+
   class_t* lookup_class(ccid_t ccid) {
+    if (ccid == 0) [[unlikely]] {
+      return nullptr;
+    }
+
     class_t*  cap_class = reinterpret_cast<class_t*>(CONFIG_CAPABILITY_CLASS_SPACE_BASE) + ccid;
     uintptr_t page      = reinterpret_cast<uintptr_t>(cap_class) & ~(arch::PAGE_SIZE - 1);
 
@@ -25,11 +155,18 @@ namespace caprese::capability {
       return nullptr;
     }
 
-    if (cap->cid_generation != cid.generation) [[unlikely]] {
+    if (cap->info.ccid == 0) [[unlikely]] {
+      return nullptr;
+    }
+    if (cap->info.cid_generation != cid.generation) [[unlikely]] {
       return nullptr;
     }
 
     return cap;
+  }
+
+  cid_t get_cid(capability_t* capability) {
+    return { .index = static_cast<uint32_t>((reinterpret_cast<uintptr_t>(capability) - CONFIG_CAPABILITY_SPACE_BASE) >> CONFIG_CAPABILITY_SIZE_BIT), .generation = capability->info.cid_generation };
   }
 
   capret_t call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3) {
@@ -54,7 +191,7 @@ namespace caprese::capability {
     }
 
     uintptr_t offset  = round_up(round_up(cap_class->num_permissions, 8) / 8, sizeof(uintptr_t));
-    uintptr_t base    = capability->instance.value + offset;
+    uintptr_t base    = capability->info.instance.value + offset;
     uintptr_t address = base + field * sizeof(uintptr_t);
 
     *reinterpret_cast<uintptr_t*>(address) = value;
@@ -70,11 +207,25 @@ namespace caprese::capability {
     }
 
     uintptr_t offset  = round_up(round_up(cap_class->num_permissions, 8) / 8, sizeof(uintptr_t));
-    uintptr_t base    = capability->instance.value + offset;
+    uintptr_t base    = capability->info.instance.value + offset;
     uintptr_t address = base + field * sizeof(uintptr_t);
     uintptr_t value   = *reinterpret_cast<uintptr_t*>(address);
 
     return { .result = value, .error = 0 };
+  }
+
+  void set_permission(capability_t* capability, uint8_t permission, bool value) {
+    class_t* cap_class = lookup_class(capability->ccid);
+    if (cap_class == nullptr) [[unlikely]] {
+      return;
+    }
+    if (permission >= cap_class->num_permissions) [[unlikely]] {
+      return;
+    }
+
+    uintptr_t base = capability->info.instance.value + permission / 8;
+    *reinterpret_cast<uint8_t*>(base) &= ~(1 << (permission % 8));
+    *reinterpret_cast<uint8_t*>(base) |= (static_cast<uint8_t>(value) << (permission % 8));
   }
 
   capret_t is_permitted(capability_t* capability, uint8_t permission) {
@@ -86,7 +237,7 @@ namespace caprese::capability {
       return { .result = 0, .error = 1 };
     }
 
-    uintptr_t base  = capability->instance.value + permission / 8;
+    uintptr_t base  = capability->info.instance.value + permission / 8;
     uintptr_t value = (*reinterpret_cast<uint8_t*>(base)) & (1 << (permission % 8));
 
     return { .result = (uintptr_t)(value != 0), .error = 0 };

@@ -42,7 +42,7 @@ namespace caprese::capability {
     uintptr_t error;
   };
 
-  struct capability_t;
+  union capability_t;
 
   using method_t = capret_t (*)(capability_t*, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
@@ -61,22 +61,38 @@ namespace caprese::capability {
 
   static_assert(sizeof(class_t) == CONFIG_CAPABILITY_CLASS_SIZE);
 
-  struct capability_t {
-    uint32_t                 ccid: CONFIG_MAX_CAPABILITY_CLASSES_BIT;
-    uint32_t                 cid_generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
-    uint32_t                 tid;
-    memory::mapped_address_t instance;
+  union capability_t {
+    const uint32_t ccid: CONFIG_MAX_CAPABILITY_CLASSES_BIT;
+
+    struct {
+      uint32_t                 ccid: CONFIG_MAX_CAPABILITY_CLASSES_BIT;
+      uint32_t                 cid_generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
+      uint32_t                 tid;
+      memory::mapped_address_t instance;
+    } info;
+
+    struct {
+      const uint32_t ccid: CONFIG_MAX_CAPABILITY_CLASSES_BIT;
+      const uint32_t cid_generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
+      cid_t          prev_free_list;
+      cid_t          next_free_list;
+      uint8_t        prev_free_index;
+    } management;
   };
 
   static_assert(sizeof(capability_t) == CONFIG_CAPABILITY_SIZE);
 
+  [[nodiscard]] bool          init_capability_class_space();
+  [[nodiscard]] bool          init_capability_space();
   [[nodiscard]] class_t*      create_capability_class();
   [[nodiscard]] capability_t* create_capability(ccid_t ccid);
   [[nodiscard]] class_t*      lookup_class(ccid_t ccid);
   [[nodiscard]] capability_t* lookup(cid_t cid);
+  [[nodiscard]] cid_t         get_cid(capability_t* capability);
   [[nodiscard]] capret_t      call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
   void                        set_field(capability_t* capability, uint8_t field, uintptr_t value);
   [[nodiscard]] capret_t      get_field(capability_t* capability, uint8_t field);
+  void                        set_permission(capability_t* capability, uint8_t permission, bool value);
   [[nodiscard]] capret_t      is_permitted(capability_t* capability, uint8_t permission);
 } // namespace caprese::capability
 

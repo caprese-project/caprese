@@ -126,7 +126,7 @@ namespace caprese::task {
     if (capability == nullptr) [[unlikely]] {
       return nullptr;
     }
-    if (capability->tid != std::bit_cast<uint32_t>(task->tid)) [[unlikely]] {
+    if (capability->info.tid != std::bit_cast<uint32_t>(task->tid)) [[unlikely]] {
       return nullptr;
     }
     return capability;
