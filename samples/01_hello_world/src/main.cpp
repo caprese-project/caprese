@@ -1,14 +1,8 @@
-#include <caprese/task/syscall.h>
-
-void putchar(char c) {
-  asm volatile("li a7, %0" : : "i"(SYS_DEBUG_PUTCHAR));
-  asm volatile("mv a0, %0" : : "r"(c));
-  asm volatile("ecall");
-}
+#include <libcaprese/syscall.h>
 
 extern "C" [[noreturn]] int main() {
   for (auto ch : "Hello, world!\n") {
-    putchar(ch);
+    sys_debug_putchar(ch);
   }
 
   while (true) {

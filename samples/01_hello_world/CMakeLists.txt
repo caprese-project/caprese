@@ -21,6 +21,8 @@ project(
 
 set(CMAKE_EXECUTABLE_SUFFIX .elf)
 
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib)
+
 add_executable(
   01_hello_world
   src/entry.S
@@ -35,5 +37,8 @@ target_link_options(01_hello_world PRIVATE -T ${CMAKE_CURRENT_SOURCE_DIR}/src/li
 
 target_include_directories(
   01_hello_world PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/lib/include
   ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
+
+target_link_libraries(01_hello_world libcaprese)
