@@ -62,6 +62,7 @@ namespace caprese::task {
   cap_list_index_t                        insert_capability(task_t* task, capability::capability_t* cap);
   capability::cid_t                       move_capability(task_t* dst_task, task_t* src_task, cap_list_index_t index);
   [[nodiscard]] capability::cid_t*        get_cid(task_t* task, cap_list_index_t index);
+  cap_list_index_t                        allocated_cap_list_size(task_t* task);
 } // namespace caprese::task
 
 #endif // CAPRESE_TASK_TASK_H_

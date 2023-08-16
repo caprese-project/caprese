@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <caprese/arch/builtin_capability.h>
 #include <caprese/arch/memory.h>
 #include <caprese/arch/rv64/csr.h>
 #include <caprese/arch/rv64/task.h>
@@ -117,13 +118,30 @@ namespace caprese::arch::inline rv64 {
     uintptr_t end             = reinterpret_cast<uintptr_t>(_payload_end);
     uintptr_t payload_size    = end - start;
     uintptr_t root_page_table = memory::physical_address_t::from(get_root_page_table(init_task)).mapped_address().value;
+
+    task::task_t* task = task::lookup(std::bit_cast<task::tid_t>(1));
+
     for (uintptr_t page = 0; page < payload_size; page += PAGE_SIZE) {
+      memory::mapped_address_t mapped_page = memory::mapped_address_t::from(start + page);
+
       bool result = map_page(root_page_table,
                              CONFIG_USER_PAYLOAD_BASE_ADDRESS + page,
-                             memory::mapped_address_t::from(start + page).physical_address().value,
+                             mapped_page.physical_address().value,
                              { .readable = true, .writable = true, .executable = true, .user = true, .global = false },
                              true);
       if (!result) [[unlikely]] {
+        return false;
+      }
+
+      capability::capability_t* cap = capability::create_capability(MEMORY_CAP_CCID);
+      set_permission(cap, MEMORY_CAP_PERMISSION_READABLE, true);
+      set_permission(cap, MEMORY_CAP_PERMISSION_WRITABLE, true);
+      set_permission(cap, MEMORY_CAP_PERMISSION_EXECUTABLE, true);
+      set_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS, mapped_page.physical_address().value);
+      set_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS, CONFIG_USER_PAYLOAD_BASE_ADDRESS + page);
+      set_field(cap, MEMORY_CAP_FIELD_TID, 1);
+
+      if (task::insert_capability(task, cap) == 0) [[unlikely]] {
         return false;
       }
     }

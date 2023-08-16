@@ -211,4 +211,8 @@ namespace caprese::task {
     memory::mapped_address_t base = memory::get_mapped_address(root_page_table, cid_page);
     return base.as<capability::cid_t>() + index % (arch::PAGE_SIZE / sizeof(capability::cid_t));
   }
+
+  cap_list_index_t allocated_cap_list_size(task_t* task) {
+    return task->used_cap_space_count * (arch::PAGE_SIZE / sizeof(capability::cid_t));
+  }
 } // namespace caprese::task

@@ -36,12 +36,19 @@ constexpr auto LOGO_TEXT = R"(
 namespace caprese {
   namespace {
     [[noreturn]] void kernel_task_entry(const arch::boot_info_t* boot_info) {
+      task::task_t* kernel_task = task::get_current_task();
+
       printf("Creating init task...\n");
       task::task_t* init_task = task::create_task();
       if (init_task == nullptr) [[unlikely]] {
         panic("Failed to create init task.");
       }
       printf("Init task creation completed. tid: 0x%x\n", std::bit_cast<uint32_t>(init_task->tid));
+      printf("Moving capabilities to init task...\n");
+      for (task::cap_list_index_t i = 0, size = task::allocated_cap_list_size(kernel_task); i < size; ++i) {
+        task::move_capability(init_task, kernel_task, i);
+      }
+      printf("Capabilities have been moved to init task.\n");
       printf("Loading the payload for the init task...\n");
       if (!task::load_init_task_payload(init_task, boot_info)) [[unlikely]] {
         panic("Failed to load init task payload.");
