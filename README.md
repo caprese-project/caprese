@@ -28,6 +28,14 @@ If the target is qemu-riscv-virt, you can run the kernel with the following comm
 ./scripts/simulate
 ```
 
+## Sample OS
+
+```sh
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE:STRING=Debug -DPLATFORM=qemu-riscv-virt
+cmake --build build
+./scripts/simulate
+```
+
 ## Lisence
 
 This project is released under the MIT License, see the [LICENSE](./LICENSE) file for details.

@@ -36,6 +36,7 @@ macro(declare_arch)
       -Wall
       -Wextra
       -Werror
+      -Wno-format-overflow
       -fno-omit-frame-pointer
       -gdwarf-2
       -MD
