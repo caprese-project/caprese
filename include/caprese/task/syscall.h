@@ -1,8 +1,6 @@
 #ifndef CAPRESE_TASK_SYSCALL_H_
 #define CAPRESE_TASK_SYSCALL_H_
 
-#include <cstdint>
-
 #define SYS_NULL             0
 #define SYS_DEBUG_PUTCHAR    1
 #define SYS_CAP_CREATE_CLASS 2
@@ -11,6 +9,10 @@
 #define SYS_CAP_GET_FIELD    5
 #define SYS_CAP_IS_PERMITTED 6
 #define SYS_CAP_LIST_SIZE    7
+
+#ifndef ASM
+
+#include <cstdint>
 
 namespace caprese::task {
   struct sysret_t {
@@ -31,5 +33,7 @@ namespace caprese::task {
 
   [[nodiscard]] sysret_t handle_system_call(uintptr_t code, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
 } // namespace caprese::task
+
+#endif // ASM
 
 #endif // CAPRESE_TASK_SYSCALL_H_

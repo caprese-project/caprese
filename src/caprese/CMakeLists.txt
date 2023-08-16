@@ -33,7 +33,34 @@ target_include_directories(
   ${CMAKE_BINARY_DIR}/generated
 )
 
-target_compile_definitions(kernel PRIVATE CONFIG_USER_PAYLOAD="${CONFIG_USER_PAYLOAD}" CONFIG_USER_PAYLOAD_BASE_ADDRESS=${CONFIG_USER_PAYLOAD_BASE_ADDRESS})
+target_compile_definitions(kernel PRIVATE CONFIG_USER_PAYLOAD_BASE_ADDRESS=${CONFIG_USER_PAYLOAD_BASE_ADDRESS})
 target_link_libraries(kernel libc)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/arch/${CONFIG_ARCH})
+
+add_custom_target(
+  user_payload_size
+  COMMAND sh "-c" "ls -l ${CONFIG_USER_PAYLOAD} | awk '{print \"#define CONFIG_USER_PAYLOAD_SIZE \"$5}' > ${GEN_DIR}/user_payload_size.h"
+  BYPRODUCTS ${GEN_DIR}/user_payload_size.h
+  VERBATIM
+)
+add_dependencies(kernel user_payload_size)
+
+add_custom_target(
+  kernel_payload
+  COMMAND ${CMAKE_OBJCOPY} -O binary --update-section .payload=${CONFIG_USER_PAYLOAD} $<TARGET_FILE:kernel> $<TARGET_FILE_DIR:kernel>/payload
+)
+add_dependencies(kernel_payload kernel)
+
+add_custom_target(
+  kernel_payload_size
+  COMMAND sh "-c" "ls -l $<TARGET_FILE_DIR:kernel>/payload | awk '{print \"#define CONFIG_KERNEL_PAYLOAD_SIZE \"$5}' > ${GEN_DIR}/kernel_payload_size.h"
+  BYPRODUCTS ${GEN_DIR}/kernel_payload_size.h
+  VERBATIM
+)
+add_dependencies(kernel_payload_size kernel_payload)
+
+if(TARGET user_payload)
+  add_dependencies(user_payload_size user_payload)
+  add_dependencies(kernel_payload user_payload)
+endif()

@@ -21,14 +21,6 @@ target_sources(
 )
 
 add_custom_target(
-  user_payload_size
-  COMMAND sh "-c" "ls -l ${CONFIG_USER_PAYLOAD} | awk '{print \"#define CONFIG_USER_PAYLOAD_SIZE \"$5}' > ${GEN_DIR}/user_payload_size.h"
-  BYPRODUCTS ${GEN_DIR}/user_payload_size.h
-  VERBATIM
-)
-add_dependencies(kernel user_payload_size)
-
-add_custom_target(
   linker
   COMMAND ${CMAKE_C_COMPILER} -DCONFIG_MAPPED_SPACE_BASE=${CONFIG_MAPPED_SPACE_BASE} -I ${CMAKE_BINARY_DIR}/generated -E -P -x c ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds >${CMAKE_CURRENT_BINARY_DIR}/linker.ld
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds
@@ -45,17 +37,3 @@ target_link_options(
   -z max-page-size=4096
 )
 set_target_properties(kernel PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds)
-
-add_custom_target(
-  kernel_payload
-  COMMAND ${CMAKE_OBJCOPY} -O binary --update-section .payload=${CONFIG_USER_PAYLOAD} $<TARGET_FILE:kernel> $<TARGET_FILE_DIR:kernel>/payload
-)
-add_dependencies(kernel_payload kernel)
-
-add_custom_target(
-  kernel_payload_size
-  COMMAND sh "-c" "ls -l $<TARGET_FILE_DIR:kernel>/payload | awk '{print \"#define CONFIG_KERNEL_PAYLOAD_SIZE \"$5}' > ${GEN_DIR}/kernel_payload_size.h"
-  BYPRODUCTS ${GEN_DIR}/kernel_payload_size.h
-  VERBATIM
-)
-add_dependencies(kernel_payload_size kernel_payload)
