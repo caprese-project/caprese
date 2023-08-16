@@ -11,19 +11,19 @@ namespace caprese::arch::inline rv64 {
   namespace {
     using namespace caprese::capability;
 
-    capret_t memory_cap_method_move(capability_t* cap, [[maybe_unused]] uintptr_t arg0, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
+    cap_ret_t memory_cap_method_move(capability_t* cap, [[maybe_unused]] uintptr_t arg0, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
       (void)cap;
       // TODO: impl
       return { .result = 0, .error = 0 };
     }
 
-    capret_t memory_cap_method_copy(capability_t* cap, [[maybe_unused]] uintptr_t arg0, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
+    cap_ret_t memory_cap_method_copy(capability_t* cap, [[maybe_unused]] uintptr_t arg0, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
       (void)cap;
       // TODO: impl
       return { .result = 0, .error = 0 };
     }
 
-    capret_t memory_cap_method_map(capability_t* cap, uintptr_t _new_task_cap_cid, uintptr_t _virtual_address, uintptr_t _flags, [[maybe_unused]] uintptr_t arg3) {
+    cap_ret_t memory_cap_method_map(capability_t* cap, uintptr_t _new_task_cap_cid, uintptr_t _virtual_address, uintptr_t _flags, [[maybe_unused]] uintptr_t arg3) {
 #if CONFIG_USER_SPACE_BASE > 0
       if (_virtual_address < CONFIG_USER_SPACE_BASE) [[unlikely]] {
         return { .result = 0, .error = 1 };
@@ -36,7 +36,7 @@ namespace caprese::arch::inline rv64 {
 
       task::task_t* current_task = task::get_current_task();
 
-      cid_t         new_task_cap_cid = std::bit_cast<cid_t>(static_cast<uint32_t>(_new_task_cap_cid));
+      cid_t         new_task_cap_cid = std::bit_cast<cid_t>(static_cast<uint64_t>(_new_task_cap_cid));
       capability_t* new_task_cap     = task::lookup_capability(current_task, new_task_cap_cid);
 
       if (new_task_cap == nullptr) [[unlikely]] {
@@ -46,7 +46,7 @@ namespace caprese::arch::inline rv64 {
         return { .result = 0, .error = 1 };
       }
 
-      capret_t new_tid_field = get_field(new_task_cap, TASK_CAP_FIELD_TID);
+      cap_ret_t new_tid_field = get_field(new_task_cap, TASK_CAP_FIELD_TID);
       if (new_tid_field.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -59,7 +59,7 @@ namespace caprese::arch::inline rv64 {
 
       memory::mapped_address_t new_task_root_page_table = task::get_root_page_table(new_task);
 
-      capret_t physical_address_field = get_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS);
+      cap_ret_t physical_address_field = get_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS);
       if (physical_address_field.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -68,18 +68,19 @@ namespace caprese::arch::inline rv64 {
         .readable   = (static_cast<uint8_t>(_flags) & MEMORY_CAP_MAP_FLAG_READABLE) >> std::countr_zero(MEMORY_CAP_MAP_FLAG_READABLE),
         .writable   = (static_cast<uint8_t>(_flags) & MEMORY_CAP_MAP_FLAG_WRITABLE) >> std::countr_zero(MEMORY_CAP_MAP_FLAG_WRITABLE),
         .executable = (static_cast<uint8_t>(_flags) & MEMORY_CAP_MAP_FLAG_EXECUTABLE) >> std::countr_zero(MEMORY_CAP_MAP_FLAG_EXECUTABLE),
-        .user       = 1,
+        .user       = true,
+        .global     = false,
       };
 
-      capret_t readable_permission = is_permitted(cap, MEMORY_CAP_PERMISSION_READABLE);
+      cap_ret_t readable_permission = is_permitted(cap, MEMORY_CAP_PERMISSION_READABLE);
       if (readable_permission.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
-      capret_t writable_permission = is_permitted(cap, MEMORY_CAP_PERMISSION_WRITABLE);
+      cap_ret_t writable_permission = is_permitted(cap, MEMORY_CAP_PERMISSION_WRITABLE);
       if (writable_permission.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
-      capret_t executable_permission = is_permitted(cap, MEMORY_CAP_PERMISSION_EXECUTABLE);
+      cap_ret_t executable_permission = is_permitted(cap, MEMORY_CAP_PERMISSION_EXECUTABLE);
       if (executable_permission.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -94,7 +95,7 @@ namespace caprese::arch::inline rv64 {
         return { .result = 0, .error = 1 };
       }
 
-      capret_t old_tid_field = get_field(cap, MEMORY_CAP_FIELD_TID);
+      cap_ret_t old_tid_field = get_field(cap, MEMORY_CAP_FIELD_TID);
       if (old_tid_field.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -103,7 +104,7 @@ namespace caprese::arch::inline rv64 {
 
       task::task_t* old_task = task::lookup(old_tid);
       if (old_task != nullptr) {
-        capret_t old_virtual_address_field = get_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS);
+        cap_ret_t old_virtual_address_field = get_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS);
         if (old_virtual_address_field.error) [[unlikely]] {
           return { .result = 0, .error = 1 };
         }
@@ -131,10 +132,10 @@ namespace caprese::arch::inline rv64 {
       return { .result = 0, .error = 0 };
     }
 
-    capret_t memory_cap_method_unmap(capability_t* cap, uintptr_t _task_cap_cid, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
+    cap_ret_t memory_cap_method_unmap(capability_t* cap, uintptr_t _task_cap_cid, [[maybe_unused]] uintptr_t arg1, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
       task::task_t* current_task = task::get_current_task();
 
-      cid_t         task_cap_cid = std::bit_cast<cid_t>(static_cast<uint32_t>(_task_cap_cid));
+      cid_t         task_cap_cid = std::bit_cast<cid_t>(static_cast<uint64_t>(_task_cap_cid));
       capability_t* task_cap     = task::lookup_capability(current_task, task_cap_cid);
 
       if (task_cap == nullptr) [[unlikely]] {
@@ -144,7 +145,7 @@ namespace caprese::arch::inline rv64 {
         return { .result = 0, .error = 1 };
       }
 
-      capret_t tid_field = get_field(task_cap, TASK_CAP_FIELD_TID);
+      cap_ret_t tid_field = get_field(task_cap, TASK_CAP_FIELD_TID);
       if (tid_field.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -157,7 +158,7 @@ namespace caprese::arch::inline rv64 {
 
       memory::mapped_address_t task_root_page_table = task::get_root_page_table(task);
 
-      capret_t virtual_address_field = get_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS);
+      cap_ret_t virtual_address_field = get_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS);
       if (virtual_address_field.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -179,8 +180,8 @@ namespace caprese::arch::inline rv64 {
       return { .result = 0, .error = 0 };
     }
 
-    capret_t memory_cap_method_read(capability_t* cap, uintptr_t offset, uintptr_t size, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
-      capret_t permission = is_permitted(cap, MEMORY_CAP_PERMISSION_READABLE);
+    cap_ret_t memory_cap_method_read(capability_t* cap, uintptr_t offset, uintptr_t size, [[maybe_unused]] uintptr_t arg2, [[maybe_unused]] uintptr_t arg3) {
+      cap_ret_t permission = is_permitted(cap, MEMORY_CAP_PERMISSION_READABLE);
       if (permission.error || !permission.result) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -197,7 +198,7 @@ namespace caprese::arch::inline rv64 {
         return { .result = 0, .error = 1 };
       }
 
-      capret_t phys_addr = get_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS);
+      cap_ret_t phys_addr = get_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS);
       if (phys_addr.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -210,8 +211,8 @@ namespace caprese::arch::inline rv64 {
       return { .result = result, .error = 0 };
     }
 
-    capret_t memory_cap_method_write(capability_t* cap, uintptr_t value, uintptr_t offset, uintptr_t size, [[maybe_unused]] uintptr_t arg3) {
-      capret_t permission = is_permitted(cap, MEMORY_CAP_PERMISSION_WRITABLE);
+    cap_ret_t memory_cap_method_write(capability_t* cap, uintptr_t value, uintptr_t offset, uintptr_t size, [[maybe_unused]] uintptr_t arg3) {
+      cap_ret_t permission = is_permitted(cap, MEMORY_CAP_PERMISSION_WRITABLE);
       if (permission.error || !permission.result) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -228,7 +229,7 @@ namespace caprese::arch::inline rv64 {
         return { .result = 0, .error = 1 };
       }
 
-      capret_t phys_addr = get_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS);
+      cap_ret_t phys_addr = get_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS);
       if (phys_addr.error) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
@@ -303,9 +304,12 @@ namespace caprese::arch::inline rv64 {
       set_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS, page.physical_address().value);
       set_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS, 0);
       set_field(cap, MEMORY_CAP_FIELD_TID, 0);
+
+      if (task::insert_capability(kernel_task, cap) == 0) [[unlikely]] {
+        return false;
+      }
     }
 
-    (void)kernel_task;
     (void)boot_info;
     return true;
   }

@@ -30,21 +30,31 @@ namespace caprese::capability {
   using ccid_t = uint16_t;
   static_assert(8 * sizeof(ccid_t) == CONFIG_MAX_CAPABILITY_CLASSES_BIT);
 
+  using cap_gen_t = uint16_t;
+
+  using cap_ref_t = uint32_t;
+  static_assert(8 * sizeof(cap_ref_t) >= static_cast<size_t>(std::countr_zero<size_t>(CONFIG_MAX_CAPABILITIES)));
+
+  constexpr size_t CAP_REF_SIZE_BIT = std::countr_zero<size_t>(CONFIG_MAX_CAPABILITIES);
+
   struct cid_t {
-    uint32_t index: std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
-    uint32_t generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
+    ccid_t    ccid;
+    cap_gen_t generation;
+    // ccid != 0: index of capability space
+    // ccid == 0: index of previous free capability list
+    cap_ref_t index: CAP_REF_SIZE_BIT;
   };
 
-  static_assert(sizeof(cid_t) == sizeof(uint32_t));
+  static_assert(sizeof(cid_t) == CONFIG_CID_SIZE);
 
-  struct capret_t {
+  struct cap_ret_t {
     uintptr_t result;
     uintptr_t error;
   };
 
   union capability_t;
 
-  using method_t = capret_t (*)(capability_t*, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+  using method_t = cap_ret_t (*)(capability_t*, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
   struct class_t {
     const char* name;
@@ -62,21 +72,23 @@ namespace caprese::capability {
   static_assert(sizeof(class_t) == CONFIG_CAPABILITY_CLASS_SIZE);
 
   union capability_t {
-    const uint32_t ccid: CONFIG_MAX_CAPABILITY_CLASSES_BIT;
+    const ccid_t ccid;
 
+    // ccid != 0
     struct {
-      uint32_t                 ccid: CONFIG_MAX_CAPABILITY_CLASSES_BIT;
-      uint32_t                 cid_generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
+      ccid_t                   ccid;
+      cap_gen_t                cid_generation;
       uint32_t                 tid;
       memory::mapped_address_t instance;
     } info;
 
+    // ccid == 0
     struct {
-      const uint32_t ccid: CONFIG_MAX_CAPABILITY_CLASSES_BIT;
-      const uint32_t cid_generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES);
-      cid_t          prev_free_list;
-      cid_t          next_free_list;
-      uint8_t        prev_free_index;
+      const ccid_t    ccid;
+      const cap_gen_t cid_generation;
+      cap_ref_t       prev_free_list: CAP_REF_SIZE_BIT;
+      cap_ref_t       next_free_list: CAP_REF_SIZE_BIT;
+      uint8_t         prev_free_index;
     } management;
   };
 
@@ -89,11 +101,15 @@ namespace caprese::capability {
   [[nodiscard]] class_t*      lookup_class(ccid_t ccid);
   [[nodiscard]] capability_t* lookup(cid_t cid);
   [[nodiscard]] cid_t         get_cid(capability_t* capability);
-  [[nodiscard]] capret_t      call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
+  [[nodiscard]] cap_ret_t     call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
   void                        set_field(capability_t* capability, uint8_t field, uintptr_t value);
-  [[nodiscard]] capret_t      get_field(capability_t* capability, uint8_t field);
+  [[nodiscard]] cap_ret_t     get_field(capability_t* capability, uint8_t field);
   void                        set_permission(capability_t* capability, uint8_t permission, bool value);
-  [[nodiscard]] capret_t      is_permitted(capability_t* capability, uint8_t permission);
+  [[nodiscard]] cap_ret_t     is_permitted(capability_t* capability, uint8_t permission);
+
+  constexpr cid_t null_cid() {
+    return { .ccid = 0, .generation = 0, .index = 0 };
+  }
 } // namespace caprese::capability
 
 #endif // CAPRESE_CAPABILITY_H_

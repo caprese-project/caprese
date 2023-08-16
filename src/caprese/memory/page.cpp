@@ -52,12 +52,11 @@ namespace caprese::memory {
     return arch::is_mapped_page(root_page_table.value, virtual_address.value);
   }
 
-  bool shallow_map(mapped_address_t root_page_table, virtual_address_t virtual_address, physical_address_t physical_address) {
+  bool shallow_map(mapped_address_t root_page_table, virtual_address_t virtual_address) {
     assert((root_page_table.value & (arch::PAGE_SIZE - 1)) == 0);
     assert((virtual_address.value & (arch::MAX_PAGE_SIZE - 1)) == 0);
-    assert((physical_address.value & (arch::PAGE_SIZE - 1)) == 0);
 
-    return arch::shallow_map_page(root_page_table.value, virtual_address.value, physical_address.value);
+    return arch::shallow_map_page(root_page_table.value, virtual_address.value);
   }
 
   bool copy_shallow_mapping(mapped_address_t dst_page_table, mapped_address_t src_page_table, virtual_address_t virtual_address) {
@@ -73,6 +72,10 @@ namespace caprese::memory {
     assert((virtual_address.value & (arch::MAX_PAGE_SIZE - 1)) == 0);
 
     return arch::is_shallow_mapped_page(root_page_table.value, virtual_address.value);
+  }
+
+  mapped_address_t get_mapped_address(mapped_address_t root_page_table, virtual_address_t virtual_address) {
+    return physical_address_t::from(arch::get_physical_address(root_page_table.value, virtual_address.value)).mapped_address();
   }
 
   mapped_address_t get_current_root_page_table() {

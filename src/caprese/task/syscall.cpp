@@ -50,13 +50,13 @@ namespace caprese::task {
 
     sysret_t cap_call_method(uintptr_t cid, uintptr_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3) {
       task_t*                   task       = get_current_task();
-      capability::capability_t* capability = lookup_capability(task, std::bit_cast<capability::cid_t>(static_cast<uint32_t>(cid)));
+      capability::capability_t* capability = lookup_capability(task, std::bit_cast<capability::cid_t>(static_cast<uint64_t>(cid)));
 
       if (capability == nullptr) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
 
-      capability::capret_t ret = capability::call_method(capability, method, arg0, arg1, arg2, arg3);
+      capability::cap_ret_t ret = capability::call_method(capability, method, arg0, arg1, arg2, arg3);
       return { .result = ret.result, .error = ret.error };
     }
 
@@ -67,11 +67,11 @@ namespace caprese::task {
                            [[maybe_unused]] uintptr_t arg4,
                            [[maybe_unused]] uintptr_t arg5) {
       task_t*                   task       = get_current_task();
-      capability::capability_t* capability = lookup_capability(task, std::bit_cast<capability::cid_t>(static_cast<uint32_t>(cid)));
+      capability::capability_t* capability = lookup_capability(task, std::bit_cast<capability::cid_t>(static_cast<uint64_t>(cid)));
       if (capability == nullptr) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
-      capability::capret_t ret = capability::get_field(capability, field);
+      capability::cap_ret_t ret = capability::get_field(capability, field);
       return { .result = ret.result, .error = ret.error };
     }
 
@@ -82,11 +82,11 @@ namespace caprese::task {
                               [[maybe_unused]] uintptr_t arg4,
                               [[maybe_unused]] uintptr_t arg5) {
       task_t*                   task       = get_current_task();
-      capability::capability_t* capability = lookup_capability(task, std::bit_cast<capability::cid_t>(static_cast<uint32_t>(cid)));
+      capability::capability_t* capability = lookup_capability(task, std::bit_cast<capability::cid_t>(static_cast<uint64_t>(cid)));
       if (capability == nullptr) [[unlikely]] {
         return { .result = 0, .error = 1 };
       }
-      capability::capret_t ret = capability::is_permitted(capability, permission);
+      capability::cap_ret_t ret = capability::is_permitted(capability, permission);
       return { .result = ret.result, .error = ret.error };
     }
 

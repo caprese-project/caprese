@@ -17,7 +17,7 @@ namespace caprese::task {
     bool result = memory::map(root_page_table,
                               memory::virtual_address_t::from(CONFIG_TASK_SPACE_BASE),
                               page.physical_address(),
-                              { .readable = true, .writable = true, .executable = false, .user = false },
+                              { .readable = true, .writable = true, .executable = false, .user = false, .global = true },
                               true);
 
     if (!result) [[unlikely]] {

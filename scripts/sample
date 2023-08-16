@@ -5,14 +5,31 @@ import subprocess
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--template", required=True)
+parser.add_argument("--template", type=str, required=True)
+parser.add_argument(
+    "--kernel-build-type", type=str, choices=["Debug", "Release"], default="Debug"
+)
+parser.add_argument(
+    "--build-type", type=str, choices=["Debug", "Release"], default="Debug"
+)
 
 args = parser.parse_args()
 
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 proj_dir = os.path.join(root_dir, "samples", args.template)
 
-subprocess.run(["cmake", "-B", "build", "-G", "Ninja"], cwd=proj_dir, check=True)
+subprocess.run(
+    [
+        "cmake",
+        "-B",
+        "build",
+        "-G",
+        "Ninja",
+        f"-DCMAKE_BUILD_TYPE:STRING={args.build_type}",
+    ],
+    cwd=proj_dir,
+    check=True,
+)
 subprocess.run(["cmake", "--build", "build"], cwd=proj_dir, check=True)
 
 payload_elf = os.path.join(proj_dir, "build", f"{args.template}.elf")
@@ -44,7 +61,7 @@ subprocess.run(
         "build",
         "-G",
         "Ninja",
-        "-DCMAKE_BUILD_TYPE:STRING=Debug",
+        f"-DCMAKE_BUILD_TYPE:STRING={args.kernel_build_type}",
         "-DPLATFORM=qemu-riscv-virt",
         f"-DCONFIG_USER_PAYLOAD={payload_path}",
         f"-DCONFIG_USER_PAYLOAD_BASE_ADDRESS={payload_base}",

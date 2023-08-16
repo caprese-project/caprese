@@ -102,7 +102,7 @@ namespace caprese::arch::inline rv64 {
     bool      result          = map_page(root_page_table,
                            CONFIG_STACK_SPACE_BASE,
                            memory::mapped_address_t::from(_stack).physical_address().value - arch::PAGE_SIZE,
-                           { .readable = true, .writable = true, .executable = false, .user = false },
+                           { .readable = true, .writable = true, .executable = false, .user = false, .global = true },
                            true);
 
     return result;
@@ -121,7 +121,7 @@ namespace caprese::arch::inline rv64 {
       bool result = map_page(root_page_table,
                              CONFIG_USER_PAYLOAD_BASE_ADDRESS + page,
                              memory::mapped_address_t::from(start + page).physical_address().value,
-                             { .readable = true, .writable = true, .executable = true, .user = true },
+                             { .readable = true, .writable = true, .executable = true, .user = true, .global = false },
                              true);
       if (!result) [[unlikely]] {
         return false;
@@ -153,7 +153,7 @@ namespace caprese::arch::inline rv64 {
       return false;
     }
 
-    result = map_page(root_page_table.value, stack_address, stack.physical_address().value, { .readable = true, .writable = true, .executable = false, .user = false }, true);
+    result = map_page(root_page_table.value, stack_address, stack.physical_address().value, { .readable = true, .writable = true, .executable = false, .user = false, .global = true }, true);
     if (!result) [[unlikely]] {
       return false;
     }

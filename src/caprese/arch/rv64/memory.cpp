@@ -94,6 +94,7 @@ namespace caprese::arch::inline rv64 {
     pte->w                = flags.writable;
     pte->x                = flags.executable;
     pte->u                = flags.user;
+    pte->g                = flags.global;
     pte->next_page_number = physical_address >> PAGE_SIZE_BIT;
 
     return true;
@@ -110,6 +111,15 @@ namespace caprese::arch::inline rv64 {
     return true;
   }
 
+  uintptr_t get_physical_address(uintptr_t root_page_table, uintptr_t virtual_address) {
+    page_table_entry_t* pte = walk_page(root_page_table, virtual_address, false);
+    if (pte == nullptr || !pte->v) [[unlikely]] {
+      return 0;
+    }
+
+    return pte->next_page_number << PAGE_SIZE_BIT;
+  }
+
   uintptr_t get_current_root_page_table() {
     uint64_t satp;
     asm volatile("csrr %0, satp" : "=r"(satp));
@@ -121,15 +131,20 @@ namespace caprese::arch::inline rv64 {
     return pte != nullptr && pte->v;
   }
 
-  bool shallow_map_page(uintptr_t root_page_table, uintptr_t virtual_address, uintptr_t physical_address) {
+  bool shallow_map_page(uintptr_t root_page_table, uintptr_t virtual_address) {
     page_table_entry_t* pte = reinterpret_cast<page_table_entry_t*>(root_page_table) + get_pte_index(virtual_address, MMU_LEVELS);
     if (pte->v) [[unlikely]] {
+      return true;
+    }
+
+    memory::mapped_address_t page = memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
+    if (page.is_null()) [[unlikely]] {
       return false;
     }
 
     *pte                  = {};
     pte->v                = 1;
-    pte->next_page_number = physical_address >> PAGE_SIZE_BIT;
+    pte->next_page_number = page.physical_address().value >> PAGE_SIZE_BIT;
 
     return true;
   }

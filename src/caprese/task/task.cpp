@@ -30,10 +30,10 @@ namespace caprese::task {
           return nullptr;
         }
 
-        auto result = memory::map(root_page_table,
+        bool result = memory::map(root_page_table,
                                   memory::virtual_address_t::from(page),
                                   physical_page.physical_address(),
-                                  { .readable = true, .writable = true, .executable = false, .user = false },
+                                  { .readable = true, .writable = true, .executable = false, .user = false, .global = true },
                                   true);
         if (!result) [[unlikely]] {
           return nullptr;
@@ -61,21 +61,26 @@ namespace caprese::task {
     new_task->flags &= ~TASK_FLAG_UNUSED;
     new_task->flags |= TASK_FLAG_CREATING;
     new_task->tid.generation++;
+    new_task->free_cap_list        = 0;
+    new_task->used_cap_space_count = 0;
 
     bool result = arch::init_task(&new_task->arch_task, CONFIG_STACK_SPACE_BASE + new_task->tid.index * arch::PAGE_SIZE);
     if (!result) [[unlikely]] {
-      new_task->tid.generation--;
-      new_task->flags &= ~TASK_FLAG_CREATING;
-      new_task->flags |= TASK_FLAG_UNUSED;
+      kill(new_task);
       return nullptr;
     }
 
     return new_task;
   }
 
+  void kill(task_t* task) {
+    // TODO: impl
+    (void)task;
+  }
+
   void switch_to(task_t* task) {
     if ((task->flags & TASK_FLAG_READY) == 0) [[unlikely]] {
-      panic("Tried to switch to a non-ready task.");
+      panic("Attempted to switch to a non-ready task.");
     }
     task_t* current_task = get_current_task();
     current_task->flags &= ~TASK_FLAG_RUNNING;
@@ -130,5 +135,80 @@ namespace caprese::task {
       return nullptr;
     }
     return capability;
+  }
+
+  cap_list_index_t insert_capability(task_t* task, capability::capability_t* cap) {
+    if (cap->ccid == 0) [[unlikely]] {
+      panic("Attempted to insert null capability.");
+    }
+
+    if (cap->info.tid != 0) [[unlikely]] {
+      panic("Attempted to insert capability in use.");
+    }
+
+    if (task->free_cap_list == 0) [[unlikely]] {
+      memory::mapped_address_t  page      = memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
+      memory::virtual_address_t cap_space = memory::virtual_address_t::from(CONFIG_CAPABILITY_LIST_SPACE_BASE + arch::PAGE_SIZE * task->used_cap_space_count);
+
+      memory::mapped_address_t root_page_table = task::get_root_page_table(task);
+      bool result = memory::map(root_page_table, cap_space, page.physical_address(), { .readable = true, .writable = false, .executable = false, .user = true, .global = false }, true);
+      if (!result) [[unlikely]] {
+        return 0;
+      }
+
+      capability::cid_t* base       = page.as<capability::cid_t>();
+      cap_list_index_t   base_index = arch::PAGE_SIZE / sizeof(capability::cid_t) * task->used_cap_space_count;
+      for (cap_list_index_t offset = 0; offset < arch::PAGE_SIZE / sizeof(capability::cid_t); ++offset) {
+        capability::cid_t* cid   = base + offset;
+        cap_list_index_t   index = base_index + offset;
+        cid->ccid                = 0;
+        cid->index               = task->free_cap_list;
+        task->free_cap_list      = index;
+      }
+      ++task->used_cap_space_count;
+    }
+
+    cap_list_index_t   index = task->free_cap_list;
+    capability::cid_t* cid   = get_cid(task, index);
+    task->free_cap_list      = cid->index;
+    *cid                     = capability::get_cid(cap);
+    cap->info.tid            = std::bit_cast<uint32_t>(task->tid);
+
+    return index;
+  }
+
+  capability::cid_t move_capability(task_t* dst_task, task_t* src_task, cap_list_index_t index) {
+    capability::cid_t* cid = get_cid(src_task, index);
+
+    capability::capability_t* cap = capability::lookup(*cid);
+    if (cap == nullptr) {
+      return capability::null_cid();
+    }
+
+    if (cap->info.tid != std::bit_cast<uint32_t>(src_task->tid)) {
+      return capability::null_cid();
+    }
+
+    cid->ccid                  = 0;
+    cid->index                 = src_task->free_cap_list;
+    cap->info.tid              = 0;
+    cap_list_index_t dst_index = insert_capability(dst_task, cap);
+    if (dst_index == 0) [[unlikely]] {
+      cap->info.tid = std::bit_cast<uint32_t>(src_task->tid);
+      *cid          = capability::get_cid(cap);
+      return capability::null_cid();
+    }
+
+    src_task->free_cap_list = index;
+
+    return *get_cid(dst_task, dst_index);
+  }
+
+  capability::cid_t* get_cid(task_t* task, cap_list_index_t index) {
+    memory::mapped_address_t  root_page_table = task::get_root_page_table(task);
+    memory::virtual_address_t cid_page        = memory::virtual_address_t::from(CONFIG_CAPABILITY_LIST_SPACE_BASE + arch::PAGE_SIZE * (index / (arch::PAGE_SIZE / sizeof(capability::cid_t))));
+
+    memory::mapped_address_t base = memory::get_mapped_address(root_page_table, cid_page);
+    return base.as<capability::cid_t>() + index % (arch::PAGE_SIZE / sizeof(capability::cid_t));
   }
 } // namespace caprese::task

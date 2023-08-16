@@ -17,8 +17,8 @@ namespace caprese::capability {
       for (size_t offset = 0; offset < arch::PAGE_SIZE / sizeof(capability_t); ++offset) {
         cap_block[offset].info.ccid                  = 0;
         cap_block[offset].info.cid_generation        = cid_generation_counter;
-        cap_block[offset].management.prev_free_list  = { .index = 0, .generation = 0 };
-        cap_block[offset].management.next_free_list  = { .index = 0, .generation = 0 };
+        cap_block[offset].management.prev_free_list  = 0;
+        cap_block[offset].management.next_free_list  = 0;
         cap_block[offset].management.prev_free_index = (offset + 1) % (arch::PAGE_SIZE / sizeof(capability_t));
       }
       cid_generation_counter = (cid_generation_counter + 1) % (1 << (32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES)));
@@ -38,7 +38,7 @@ namespace caprese::capability {
       do {
         memory::virtual_address_t block_page = memory::virtual_address_t::from(CONFIG_CAPABILITY_SPACE_BASE + position);
         if (!memory::is_mapped(root_page_table, block_page)) {
-          bool result = memory::map(root_page_table, block_page, page.physical_address(), { .readable = true, .writable = true, .executable = false, .user = false }, true);
+          bool result = memory::map(root_page_table, block_page, page.physical_address(), { .readable = true, .writable = true, .executable = false, .user = false, .global = true }, true);
           if (!result) [[unlikely]] {
             return false;
           }
@@ -49,10 +49,10 @@ namespace caprese::capability {
           }
 
           if (free_capability_list != nullptr) {
-            new_capability_block->management.prev_free_list = get_cid(free_capability_list);
-            free_capability_list->management.next_free_list = get_cid(new_capability_block);
+            new_capability_block->management.prev_free_list = get_cid(free_capability_list).index;
+            free_capability_list->management.next_free_list = get_cid(new_capability_block).index;
           } else {
-            new_capability_block->management.prev_free_list = { .index = 0, .generation = 0 };
+            new_capability_block->management.prev_free_list = 0;
           }
           free_capability_list = new_capability_block;
 
@@ -93,7 +93,11 @@ namespace caprese::capability {
         return nullptr;
       }
 
-      bool result = memory::map(root_page_table, next_capability_class_space_address, page.physical_address(), { .readable = true, .writable = true, .executable = false, .user = false }, true);
+      bool result = memory::map(root_page_table,
+                                next_capability_class_space_address,
+                                page.physical_address(),
+                                { .readable = true, .writable = true, .executable = false, .user = false, .global = true },
+                                true);
       if (!result) [[unlikely]] {
         return nullptr;
       }
@@ -119,7 +123,7 @@ namespace caprese::capability {
 
     capability_t* result = capability_block + free_capability_list->management.prev_free_index;
     if (result == free_capability_list) [[unlikely]] {
-      free_capability_list = reinterpret_cast<capability_t*>(CONFIG_CAPABILITY_SPACE_BASE) + free_capability_list->management.prev_free_list.index;
+      free_capability_list = reinterpret_cast<capability_t*>(CONFIG_CAPABILITY_SPACE_BASE) + free_capability_list->management.prev_free_list;
     } else {
       free_capability_list->management.prev_free_index = result->management.prev_free_index;
     }
@@ -166,10 +170,12 @@ namespace caprese::capability {
   }
 
   cid_t get_cid(capability_t* capability) {
-    return { .index = static_cast<uint32_t>((reinterpret_cast<uintptr_t>(capability) - CONFIG_CAPABILITY_SPACE_BASE) >> CONFIG_CAPABILITY_SIZE_BIT), .generation = capability->info.cid_generation };
+    return { .ccid       = capability->ccid,
+             .generation = capability->info.cid_generation,
+             .index      = static_cast<uint32_t>((reinterpret_cast<uintptr_t>(capability) - CONFIG_CAPABILITY_SPACE_BASE) >> CONFIG_CAPABILITY_SIZE_BIT) };
   }
 
-  capret_t call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3) {
+  cap_ret_t call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3) {
     class_t* cap_class = lookup_class(capability->ccid);
     if (cap_class == nullptr) [[unlikely]] {
       return { .result = 0, .error = 1 };
@@ -197,7 +203,7 @@ namespace caprese::capability {
     *reinterpret_cast<uintptr_t*>(address) = value;
   }
 
-  capret_t get_field(capability_t* capability, uint8_t field) {
+  cap_ret_t get_field(capability_t* capability, uint8_t field) {
     class_t* cap_class = lookup_class(capability->ccid);
     if (cap_class == nullptr) [[unlikely]] {
       return { .result = 0, .error = 1 };
@@ -228,7 +234,7 @@ namespace caprese::capability {
     *reinterpret_cast<uint8_t*>(base) |= (static_cast<uint8_t>(value) << (permission % 8));
   }
 
-  capret_t is_permitted(capability_t* capability, uint8_t permission) {
+  cap_ret_t is_permitted(capability_t* capability, uint8_t permission) {
     class_t* cap_class = lookup_class(capability->ccid);
     if (cap_class == nullptr) [[unlikely]] {
       return { .result = 0, .error = 1 };
