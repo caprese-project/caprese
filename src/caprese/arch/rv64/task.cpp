@@ -24,7 +24,7 @@
 #include <caprese/arch/system.h>
 #include <caprese/memory/address.h>
 #include <caprese/memory/kernel_space.h>
-#include <caprese/task/syscall.h>
+#include <caprese/syscall/handler.h>
 #include <caprese/task/task.h>
 
 namespace {
@@ -54,14 +54,14 @@ extern "C" {
       printf("scause-interrupt: 0x%lx\n", scause & SCAUSE_EXCEPTION_CODE);
     } else {
       if (scause & SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE) {
-        uint64_t       code   = task->trap_frame.a7;
-        uint64_t       arg0   = task->trap_frame.a0;
-        uint64_t       arg1   = task->trap_frame.a1;
-        uint64_t       arg2   = task->trap_frame.a2;
-        uint64_t       arg3   = task->trap_frame.a3;
-        uint64_t       arg4   = task->trap_frame.a4;
-        uint64_t       arg5   = task->trap_frame.a5;
-        task::sysret_t result = task::handle_system_call(code, arg0, arg1, arg2, arg3, arg4, arg5);
+        uint64_t          code   = task->trap_frame.a7;
+        uint64_t          arg0   = task->trap_frame.a0;
+        uint64_t          arg1   = task->trap_frame.a1;
+        uint64_t          arg2   = task->trap_frame.a2;
+        uint64_t          arg3   = task->trap_frame.a3;
+        uint64_t          arg4   = task->trap_frame.a4;
+        uint64_t          arg5   = task->trap_frame.a5;
+        syscall::sysret_t result = syscall::handle_system_call(code, arg0, arg1, arg2, arg3, arg4, arg5);
 
         task->trap_frame.a0 = result.result;
         task->trap_frame.a1 = result.error;

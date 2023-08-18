@@ -19,7 +19,10 @@ target_sources(
   memory/kernel_space.cpp
   task/init.cpp
   task/task.cpp
-  task/syscall.cpp
+  syscall/handler.cpp
+  syscall/ns_base.cpp
+  syscall/ns_debug.cpp
+  syscall/ns_cap.cpp
   capability/capability.cpp
   capability/builtin.cpp
 )

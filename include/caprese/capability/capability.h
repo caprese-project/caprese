@@ -17,6 +17,7 @@
 
 #include <bit>
 #include <cstdint>
+#include <cstddef>
 
 #include <caprese/memory/address.h>
 
