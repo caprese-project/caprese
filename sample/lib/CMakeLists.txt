@@ -9,6 +9,15 @@ cmake_minimum_required(VERSION 3.20)
 
 add_library(lib)
 
-target_include_directories(lib PUBLIC ${ROOT_DIR}/include)
+target_sources(
+  lib PRIVATE
+  src/debug.cpp
+  src/libc/string.cpp
+)
+
+target_compile_features(lib PRIVATE cxx_std_23)
+target_compile_options(lib PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${CONFIG_CXX_OPTIONS}>)
+
+target_include_directories(lib PUBLIC ${ROOT_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_subdirectory(src/arch/${CONFIG_ARCH})
