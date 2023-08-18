@@ -1,7 +1,7 @@
 .extern __global_pointer$
 .type __global_pointer$, @object
-.extern main
-.type main, @function
+.extern start
+.type start, @function
 
 .section .text.entry
 
@@ -17,8 +17,7 @@ _start:
   .option pop
 
   la sp, _stack
-  la t0, main
-  jr t0
+  call start
 
 spin:
   wfi

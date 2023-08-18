@@ -2,6 +2,7 @@ target_sources(
   init
   PRIVATE
   entry.S
+  start.cpp
 )
 
 target_link_options(

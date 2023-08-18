@@ -9,7 +9,7 @@ namespace caprese::syscall::cap {
 
     constexpr handler_t handler_table[] = {
       [CREATE_CLASS_FID] = sys_create_class, [CREATE_FID] = sys_create,       [CALL_METHOD_FID] = sys_call_method, [GET_FIELD_FID] = sys_get_field,
-      [IS_PERMITTED_FID] = sys_is_permitted, [LIST_SIZE_FID] = sys_list_size,
+      [IS_PERMITTED_FID] = sys_is_permitted, [LIST_BASE_FID] = sys_list_base, [LIST_SIZE_FID] = sys_list_size,
     };
   } // namespace
 
@@ -53,6 +53,10 @@ namespace caprese::syscall::cap {
     }
     capability::cap_ret_t ret = capability::is_permitted(capability, permission);
     return { .result = ret.result, .error = ret.error };
+  }
+
+  sysret_t sys_list_base([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
+    return { .result = CONFIG_CAPABILITY_LIST_SPACE_BASE, .error = 0 };
   }
 
   sysret_t sys_list_size([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
