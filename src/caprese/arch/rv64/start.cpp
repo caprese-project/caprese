@@ -17,13 +17,16 @@
 #include <caprese/arch/boot_info.h>
 #include <caprese/main.h>
 
+namespace {
+    caprese::arch::boot_info_t boot_info;
+}
+
 extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob) {
   using namespace caprese;
   using namespace caprese::arch;
 
   printf("Kernel is booting on hart %lu...\n\n", hartid);
 
-  boot_info_t boot_info;
   boot_info.hartid           = hartid;
   boot_info.device_tree_blob = device_tree_blob;
 
