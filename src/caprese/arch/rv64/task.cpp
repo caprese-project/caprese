@@ -18,6 +18,7 @@
 #include <cstring>
 
 #include <caprese/arch/builtin_capability.h>
+#include <caprese/arch/device.h>
 #include <caprese/arch/memory.h>
 #include <caprese/arch/rv64/csr.h>
 #include <caprese/arch/rv64/task.h>
@@ -26,6 +27,7 @@
 #include <caprese/memory/kernel_space.h>
 #include <caprese/syscall/handler.h>
 #include <caprese/task/task.h>
+#include <caprese/util/align.h>
 
 namespace {
   void return_to_user_mode();
@@ -110,13 +112,9 @@ namespace caprese::arch::inline rv64 {
   }
 
   bool load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info) {
-    init_task->trap_frame.a0   = get_core_id();
-    init_task->trap_frame.a1   = reinterpret_cast<uint64_t>(boot_info);
-    init_task->trap_frame.sepc = CONFIG_USER_PAYLOAD_BASE_ADDRESS;
-
     uintptr_t start           = reinterpret_cast<uintptr_t>(_payload_start);
     uintptr_t end             = reinterpret_cast<uintptr_t>(_payload_end);
-    uintptr_t payload_size    = end - start;
+    uintptr_t payload_size    = round_up(end - start, PAGE_SIZE);
     uintptr_t root_page_table = memory::physical_address_t::from(get_root_page_table(init_task)).mapped_address().value;
 
     task::task_t* task = task::lookup(std::bit_cast<task::tid_t>(1));
@@ -132,6 +130,7 @@ namespace caprese::arch::inline rv64 {
       if (!result) [[unlikely]] {
         return false;
       }
+      printf("Init task page mapped(RWX): virtual address=0x%016lx, physical address=0x%016lx\n", CONFIG_USER_PAYLOAD_BASE_ADDRESS + page, mapped_page.physical_address().value);
 
       capability::capability_t* cap = capability::create_capability(MEMORY_CAP_CCID);
       set_permission(cap, MEMORY_CAP_PERMISSION_READABLE, true);
@@ -145,6 +144,36 @@ namespace caprese::arch::inline rv64 {
         return false;
       }
     }
+
+    auto [dtb_base, dtb_size] = get_dtb_space(boot_info);
+    for (uintptr_t page = 0; page < dtb_size; page += PAGE_SIZE) {
+      bool result = map_page(root_page_table,
+                             CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page,
+                             dtb_base + page,
+                             { .readable = true, .writable = false, .executable = false, .user = true, .global = false },
+                             true);
+      if (!result) [[unlikely]] {
+        return false;
+      }
+      printf("Init task page mapped(R  ): virtual address=0x%016lx, physical address=0x%016lx\n", CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page, dtb_base + page);
+
+      capability::capability_t* cap = capability::create_capability(MEMORY_CAP_CCID);
+      set_permission(cap, MEMORY_CAP_PERMISSION_READABLE, true);
+      set_permission(cap, MEMORY_CAP_PERMISSION_WRITABLE, true);
+      set_permission(cap, MEMORY_CAP_PERMISSION_EXECUTABLE, true);
+      set_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS, CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page);
+      set_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS, CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page);
+      set_field(cap, MEMORY_CAP_FIELD_TID, 1);
+
+      if (task::insert_capability(task, cap) == 0) [[unlikely]] {
+        return false;
+      }
+    }
+
+    init_task->trap_frame.a0   = boot_info->hartid;
+    init_task->trap_frame.a1   = CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size;
+    init_task->trap_frame.sepc = CONFIG_USER_PAYLOAD_BASE_ADDRESS;
+
     return true;
   }
 
