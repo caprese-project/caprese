@@ -16,8 +16,8 @@
 #define CAPRESE_CAPABILITY_CAPABILITY_H_
 
 #include <bit>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 
 #include <caprese/memory/address.h>
 
@@ -99,10 +99,11 @@ namespace caprese::capability {
   [[nodiscard]] bool          init_capability_space();
   [[nodiscard]] class_t*      create_capability_class();
   [[nodiscard]] capability_t* create_capability(ccid_t ccid);
+  void                        delete_capability(capability_t* capability);
   [[nodiscard]] class_t*      lookup_class(ccid_t ccid);
   [[nodiscard]] capability_t* lookup(cid_t cid);
   [[nodiscard]] cid_t         get_cid(capability_t* capability);
-  [[nodiscard]] cap_ret_t     call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
+  [[nodiscard]] cap_ret_t     call_method(capability_t* capability, uint8_t method, uintptr_t arg0 = 0, uintptr_t arg1 = 0, uintptr_t arg2 = 0, uintptr_t arg3 = 0);
   void                        set_field(capability_t* capability, uint8_t field, uintptr_t value);
   [[nodiscard]] cap_ret_t     get_field(capability_t* capability, uint8_t field);
   void                        set_permission(capability_t* capability, uint8_t permission, bool value);

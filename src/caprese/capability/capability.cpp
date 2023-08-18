@@ -4,6 +4,7 @@
 #include <caprese/memory/page.h>
 #include <caprese/task/task.h>
 #include <caprese/util/align.h>
+#include <caprese/util/panic.h>
 
 namespace caprese::capability {
   namespace {
@@ -21,7 +22,7 @@ namespace caprese::capability {
         cap_block[offset].management.next_free_list  = 0;
         cap_block[offset].management.prev_free_index = (offset + 1) % (arch::PAGE_SIZE / sizeof(capability_t));
       }
-      cid_generation_counter = (cid_generation_counter + 1) % (1 << (32 - std::countr_zero<uintptr_t>(CONFIG_MAX_CAPABILITIES)));
+      cid_generation_counter = (cid_generation_counter + 1) % (1 << (8 * sizeof(cap_gen_t)));
 
       return true;
     }
@@ -68,7 +69,7 @@ namespace caprese::capability {
 
   bool init_capability_class_space() {
     next_capability_class_space_address = memory::virtual_address_t::from(CONFIG_CAPABILITY_CLASS_SPACE_BASE);
-    next_capability_class_space_offset  = 0;
+    next_capability_class_space_offset  = 1;
     return true;
   }
 
@@ -113,17 +114,33 @@ namespace caprese::capability {
   }
 
   capability_t* create_capability(ccid_t ccid) {
+    class_t* cap_class = lookup_class(ccid);
+    if (cap_class == nullptr) [[unlikely]] {
+      return nullptr;
+    }
+
+    size_t permissions_size = round_up(round_up(cap_class->num_permissions, 8) / 8, sizeof(uintptr_t));
+    size_t fields_size      = cap_class->num_fields * sizeof(uintptr_t);
+    void*  instance         = malloc(permissions_size + fields_size);
+    if (instance == nullptr) [[unlikely]] {
+      return nullptr;
+    }
+
     if (free_capability_list == nullptr) [[unlikely]] {
       if (!allocate_new_capability_block()) [[unlikely]] {
         return nullptr;
       }
     }
 
-    capability_t* capability_block = reinterpret_cast<capability_t*>(reinterpret_cast<uintptr_t>(free_capability_list) & ~arch::PAGE_SIZE);
+    capability_t* capability_block = reinterpret_cast<capability_t*>(reinterpret_cast<uintptr_t>(free_capability_list) & ~(arch::PAGE_SIZE - 1));
 
     capability_t* result = capability_block + free_capability_list->management.prev_free_index;
     if (result == free_capability_list) [[unlikely]] {
-      free_capability_list = reinterpret_cast<capability_t*>(CONFIG_CAPABILITY_SPACE_BASE) + free_capability_list->management.prev_free_list;
+      if (free_capability_list->management.prev_free_list == 0) [[unlikely]] {
+        free_capability_list = nullptr;
+      } else {
+        free_capability_list = reinterpret_cast<capability_t*>(CONFIG_CAPABILITY_SPACE_BASE) + free_capability_list->management.prev_free_list;
+      }
     } else {
       free_capability_list->management.prev_free_index = result->management.prev_free_index;
     }
@@ -131,9 +148,47 @@ namespace caprese::capability {
     result->info.ccid = ccid;
     ++result->info.cid_generation;
     result->info.tid      = 0;
-    result->info.instance = memory::mapped_address_t::null();
+    result->info.instance = memory::mapped_address_t::from(instance);
 
     return result;
+  }
+
+  void delete_capability(capability_t* capability) {
+    if (capability->ccid == 0) [[unlikely]] {
+      return;
+    }
+
+    capability_t* capability_block = reinterpret_cast<capability_t*>(reinterpret_cast<uintptr_t>(capability) & ~(arch::PAGE_SIZE - 1));
+    size_t        index            = (reinterpret_cast<uintptr_t>(capability) & (arch::PAGE_SIZE - 1)) / sizeof(capability_t);
+
+    size_t count = 0;
+    for (size_t offset = 0; offset < arch::PAGE_SIZE / sizeof(capability_t); ++offset) {
+      if (capability_block[offset].ccid == 0) {
+        if (count == 0) [[unlikely]] {
+          capability->management.prev_free_index              = capability_block[offset].management.prev_free_index;
+          capability_block[offset].management.prev_free_index = index;
+        }
+        ++count;
+      }
+    }
+
+    capability->info.ccid = 0;
+    free(capability->info.instance.as<void>());
+
+    capability->management.next_free_list = 0;
+    capability->management.prev_free_list = 0;
+
+    if (count == arch::PAGE_SIZE / sizeof(capability_t) - 1) [[unlikely]] {
+      free(capability_block);
+    } else if (count == 0) [[unlikely]] {
+      if (free_capability_list != nullptr) {
+        capability->management.prev_free_list           = get_cid(free_capability_list).index;
+        free_capability_list->management.next_free_list = get_cid(capability).index;
+      } else {
+        capability->management.prev_free_list = 0;
+      }
+      free_capability_list = capability;
+    }
   }
 
   class_t* lookup_class(ccid_t ccid) {

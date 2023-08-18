@@ -18,10 +18,13 @@
 #include <tuple>
 #include <utility>
 
+#include <caprese/arch/builtin_capability.h>
 #include <caprese/arch/device.h>
 #include <caprese/arch/memory.h>
 #include <caprese/memory/heap.h>
+#include <caprese/task/task.h>
 #include <caprese/util/align.h>
+#include <caprese/util/array_size.h>
 #include <caprese/util/panic.h>
 
 extern "C" {
@@ -35,9 +38,11 @@ namespace caprese::memory {
       mapped_address_t prev;
     };
 
+    struct alignas(alignof(max_align_t)) using_page_block_t { };
+
     struct using_page_t {
-      uint8_t     used_flags[round_up(arch::PAGE_SIZE / sizeof(max_align_t) / 8, sizeof(max_align_t))];
-      max_align_t block[(arch::PAGE_SIZE - sizeof(used_flags)) / sizeof(max_align_t)];
+      uint8_t            header[arch::PAGE_SIZE / alignof(max_align_t) / 8];
+      using_page_block_t blocks[(arch::PAGE_SIZE - sizeof(header)) / alignof(max_align_t)];
     };
 
     constexpr size_t a = sizeof(using_page_t);
@@ -96,7 +101,33 @@ namespace caprese::memory {
 
     [[nodiscard]] mapped_address_t fetch() {
       if (free_page_list == nullptr) [[unlikely]] {
-        return mapped_address_t::null();
+        task::task_t* kernel_task = task::get_kernel_task();
+        size_t        size        = task::allocated_cap_list_size(kernel_task);
+        for (uintptr_t index = 0; index < size; ++index) {
+          if (free_page_count >= CONFIG_KERNEL_RESERVED_PAGES) [[unlikely]] {
+            break;
+          }
+
+          capability::cid_t* cid = task::get_cid(kernel_task, index);
+          if (cid->ccid != arch::MEMORY_CAP_CCID) {
+            continue;
+          }
+
+          capability::capability_t* cap = capability::lookup(*cid);
+          if (capability::get_field(cap, arch::MEMORY_CAP_FIELD_VIRTUAL_ADDRESS).result != 0) {
+            continue;
+          }
+
+          physical_address_t physical_address = physical_address_t::from(capability::get_field(cap, arch::MEMORY_CAP_FIELD_PHYSICAL_ADDRESS).result);
+          capability::delete_capability(cap);
+          cid->ccid = 0;
+
+          insert(physical_address, arch::PAGE_SIZE);
+        }
+
+        if (free_page_list == nullptr) [[unlikely]] {
+          return mapped_address_t::null();
+        }
       }
       mapped_address_t result = mapped_address_t::from(free_page_list);
       free_page_list          = free_page_list->prev.as<free_page_t>();
@@ -107,8 +138,8 @@ namespace caprese::memory {
     void new_current_using_page() {
       current_using_page = fetch().as<using_page_t>();
       if (current_using_page != nullptr) {
-        memset(current_using_page, 0, sizeof(using_page_t::used_flags));
-        current_using_page->used_flags[0] |= 1;
+        memset(current_using_page, 0, sizeof(using_page_t::header));
+        current_using_page->header[0] |= 1;
       }
     }
   } // namespace
@@ -162,26 +193,27 @@ namespace caprese::memory {
     if (size > arch::PAGE_SIZE) [[unlikely]] {
       panic("Too large size: 0x%lx", size);
     }
-    if (size > sizeof(using_page_t::block)) {
-      if (free_page_list == nullptr) [[unlikely]] {
-        return mapped_address_t::null();
-      }
+    if (size > sizeof(using_page_t::blocks)) {
       return fetch();
     }
     if (current_using_page == nullptr) [[unlikely]] {
       return mapped_address_t::null();
     }
 
-    for (int i = arch::PAGE_SIZE / sizeof(max_align_t) / 8 - 1; i >= 0; --i) {
-      for (int bit = 7; bit >= 0; --bit) {
-        if (current_using_page->used_flags[i] & (1 << bit)) {
-          uintptr_t allocate_point = round_up(sizeof(max_align_t) * (i * 8 + bit), align);
-          uintptr_t next_point     = allocate_point + size;
-          if (sizeof(using_page_t::block) > next_point) {
-            current_using_page->used_flags[next_point / sizeof(using_page_t) / 8] |= 1 << (next_point % 8);
-            return mapped_address_t::from(reinterpret_cast<uintptr_t>(current_using_page->block) + allocate_point);
+    for (int i = array_size_of(current_using_page->header) - 1; i >= 0; --i) {
+      int bit = 7;
+      if (i == static_cast<int>(array_size_of(current_using_page->header)) - 1) [[unlikely]] {
+        bit = 7 - array_size_of(current_using_page->header) / alignof(max_align_t);
+      }
+      for (; bit >= 0; --bit) {
+        if (current_using_page->header[i] & (1 << bit)) {
+          uintptr_t allocate_point = round_up(alignof(max_align_t) * (i * 8 + bit), align);
+          uintptr_t next_point     = round_up(allocate_point + size, alignof(max_align_t));
+          if (sizeof(using_page_t::blocks) > next_point) {
+            current_using_page->header[next_point / alignof(max_align_t) / 8] |= 1 << (next_point / alignof(max_align_t) % 8);
+            return mapped_address_t::from(reinterpret_cast<uintptr_t>(current_using_page->blocks) + allocate_point);
           } else if (sizeof(using_page_t) == next_point) {
-            mapped_address_t result = mapped_address_t::from(reinterpret_cast<uintptr_t>(current_using_page->block) + allocate_point);
+            mapped_address_t result = mapped_address_t::from(reinterpret_cast<uintptr_t>(current_using_page->blocks) + allocate_point);
             new_current_using_page();
             return result;
           } else {
@@ -198,18 +230,19 @@ namespace caprese::memory {
   void deallocate(mapped_address_t addr) {
     if (addr.value & (arch::PAGE_SIZE - 1)) {
       using_page_t* using_page = reinterpret_cast<using_page_t*>(addr.value & ~(arch::PAGE_SIZE - 1));
-      uintptr_t     point      = addr.value & (arch::PAGE_SIZE - 1);
-      uintptr_t     index      = point / sizeof(using_page_t) / 8;
+      uintptr_t     point      = (addr.value & (arch::PAGE_SIZE - 1)) - offsetof(using_page_t, blocks);
+      uintptr_t     index      = point / alignof(max_align_t) / 8;
+      uintptr_t     bit        = point / alignof(max_align_t) % 8;
 
-      if ((using_page->used_flags[index] & (1 << (point % 8))) == 0) [[unlikely]] {
+      if ((using_page->header[index] & (1 << bit)) == 0) [[unlikely]] {
         panic("Attempted to free an invalid pointer: %p", addr.as<void>());
       }
 
-      using_page->used_flags[index] &= ~(1 << (point % 8));
+      using_page->header[index] &= ~(1 << bit);
 
       if (current_using_page != using_page) {
         for (int i = arch::PAGE_SIZE / sizeof(max_align_t) / 8 - 1; i >= 0; --i) {
-          if (current_using_page->used_flags[i]) {
+          if (current_using_page->header[i]) {
             return;
           }
         }

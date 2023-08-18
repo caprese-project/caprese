@@ -156,6 +156,11 @@ namespace caprese::task {
         return 0;
       }
 
+      // If this cap is used in aligned_alloc or map, this cap is invalid
+      if (cap->ccid == 0) [[unlikely]] {
+        return 0;
+      }
+
       capability::cid_t* base       = page.as<capability::cid_t>();
       cap_list_index_t   base_index = arch::PAGE_SIZE / sizeof(capability::cid_t) * task->used_cap_space_count;
       for (cap_list_index_t offset = 0; offset < arch::PAGE_SIZE / sizeof(capability::cid_t); ++offset) {
@@ -209,6 +214,9 @@ namespace caprese::task {
     memory::virtual_address_t cid_page        = memory::virtual_address_t::from(CONFIG_CAPABILITY_LIST_SPACE_BASE + arch::PAGE_SIZE * (index / (arch::PAGE_SIZE / sizeof(capability::cid_t))));
 
     memory::mapped_address_t base = memory::get_mapped_address(root_page_table, cid_page);
+    if (base.is_null()) [[unlikely]] {
+      return nullptr;
+    }
     return base.as<capability::cid_t>() + index % (arch::PAGE_SIZE / sizeof(capability::cid_t));
   }
 
