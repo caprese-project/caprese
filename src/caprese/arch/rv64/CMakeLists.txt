@@ -26,7 +26,7 @@ add_custom_target(
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds
   BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/linker.ld
 )
-add_dependencies(linker kernel_payload_base)
+add_dependencies(linker kernel_payload_base user_payload_size)
 add_dependencies(kernel linker)
 
 target_link_options(
