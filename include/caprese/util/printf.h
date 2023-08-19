@@ -43,18 +43,7 @@ namespace caprese::inline util {
     }
 
     template<typename T, typename PutFn>
-    static void print_int(bool         left_align,
-                          bool         sign,
-                          bool         space,
-                          bool         zero,
-                          bool         apostrophe,
-                          bool         hash,
-                          int          width,
-                          int          precision,
-                          T            value,
-                          int          base,
-                          bool         upper_char,
-                          const PutFn& callback) {
+    static void print_int(bool left_align, bool sign, bool space, bool zero, bool apostrophe, bool hash, int width, int precision, T value, int base, bool upper_char, const PutFn& callback) {
       bool minus = false;
 
       if (value < static_cast<T>(0)) {

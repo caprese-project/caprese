@@ -18,8 +18,8 @@
 #include <caprese/main.h>
 
 namespace {
-    caprese::arch::boot_info_t boot_info;
-}
+  caprese::arch::boot_info_t boot_info;
+} // namespace
 
 extern "C" [[noreturn]] void start(uint64_t hartid, const char* device_tree_blob) {
   using namespace caprese;

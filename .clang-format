@@ -48,14 +48,16 @@ ForEachMacros: []
 IfMacros: []
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: ^<[^/]+(\.h)?>$
+  - Regex: ^<[^/.]+>$
     Priority: 1
   - Regex: ^<caprese/.*\.h>$
     Priority: 2
   - Regex: ^<caprese/arch/.*\.h>$
     Priority: 3
-  - Regex: ^<.*>$
+  - Regex: ^<.*\.h>$
     Priority: 4
+  - Regex: .*
+    Priority: 5
 IndentAccessModifiers: false
 IndentCaseBlocks: false
 IndentCaseLabels: true

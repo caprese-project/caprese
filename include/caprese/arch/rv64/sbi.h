@@ -234,13 +234,11 @@ namespace caprese::arch::inline rv64 {
         return sbicall4(EID, 1, hart_mask, hart_mask_base, start_addr, size);
       }
 
-      inline sbiret
-          sbi_remote_sfence_vma_asid(unsigned long hart_mask, unsigned long hart_mask_base, unsigned long start_addr, unsigned long size, unsigned long asid) {
+      inline sbiret sbi_remote_sfence_vma_asid(unsigned long hart_mask, unsigned long hart_mask_base, unsigned long start_addr, unsigned long size, unsigned long asid) {
         return sbicall5(EID, 2, hart_mask, hart_mask_base, start_addr, size, asid);
       }
 
-      inline sbiret
-          sbi_remote_hfence_gvma_vmid(unsigned long hart_mask, unsigned long hart_mask_base, unsigned long start_addr, unsigned long size, unsigned long vmid) {
+      inline sbiret sbi_remote_hfence_gvma_vmid(unsigned long hart_mask, unsigned long hart_mask_base, unsigned long start_addr, unsigned long size, unsigned long vmid) {
         return sbicall5(EID, 3, hart_mask, hart_mask_base, start_addr, size, vmid);
       }
 
@@ -248,8 +246,7 @@ namespace caprese::arch::inline rv64 {
         return sbicall4(EID, 4, hart_mask, hart_mask_base, start_addr, size);
       }
 
-      inline sbiret
-          sbi_remote_hfence_vvma_asid(unsigned long hart_mask, unsigned long hart_mask_base, unsigned long start_addr, unsigned long size, unsigned long asid) {
+      inline sbiret sbi_remote_hfence_vvma_asid(unsigned long hart_mask, unsigned long hart_mask_base, unsigned long start_addr, unsigned long size, unsigned long asid) {
         return sbicall5(EID, 5, hart_mask, hart_mask_base, start_addr, size, asid);
       }
 
@@ -297,8 +294,7 @@ namespace caprese::arch::inline rv64 {
         return sbicall1(EID, 1, counter_idx);
       }
 
-      inline sbiret sbi_pmu_counter_config_matching(
-          unsigned long counter_idx_base, unsigned long counter_idx_mask, unsigned long config_flags, unsigned long event_idx, uint64_t event_data) {
+      inline sbiret sbi_pmu_counter_config_matching(unsigned long counter_idx_base, unsigned long counter_idx_mask, unsigned long config_flags, unsigned long event_idx, uint64_t event_data) {
         return sbicall5(EID, 2, counter_idx_base, counter_idx_mask, config_flags, event_idx, event_data);
       }
 
@@ -364,7 +360,7 @@ namespace caprese::arch::inline rv64 {
     } // namespace collaborative_processor_performance_control_extension
   }   // namespace sbi
 
-} // namespace caprese::arch
+} // namespace caprese::arch::inline rv64
 
 #endif // defined(CONFIG_ARCH_RISCV) && defined(CONFIG_XLEN_64)
 
