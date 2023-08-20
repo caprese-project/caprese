@@ -50,8 +50,8 @@ namespace caprese::capability {
           }
 
           if (free_capability_list != nullptr) {
-            new_capability_block->management.prev_free_list = get_cid(free_capability_list).index;
-            free_capability_list->management.next_free_list = get_cid(new_capability_block).index;
+            new_capability_block->management.prev_free_list = make_ref(free_capability_list);
+            free_capability_list->management.next_free_list = make_ref(new_capability_block);
           } else {
             new_capability_block->management.prev_free_list = 0;
           }
@@ -182,8 +182,8 @@ namespace caprese::capability {
       free(capability_block);
     } else if (count == 0) [[unlikely]] {
       if (free_capability_list != nullptr) {
-        capability->management.prev_free_list           = get_cid(free_capability_list).index;
-        free_capability_list->management.next_free_list = get_cid(capability).index;
+        capability->management.prev_free_list           = make_ref(free_capability_list);
+        free_capability_list->management.next_free_list = make_ref(capability);
       } else {
         capability->management.prev_free_list = 0;
       }
@@ -207,29 +207,12 @@ namespace caprese::capability {
     return cap_class;
   }
 
-  capability_t* lookup(cid_t cid) {
-    capability_t* cap  = reinterpret_cast<capability_t*>(CONFIG_CAPABILITY_SPACE_BASE) + cid.index;
-    uintptr_t     page = reinterpret_cast<uintptr_t>(cap) & ~(arch::PAGE_SIZE - 1);
-
-    memory::mapped_address_t root_page_table = task::get_kernel_root_page_table();
-    if (!memory::is_mapped(root_page_table, memory::virtual_address_t::from(page))) [[unlikely]] {
-      return nullptr;
-    }
-
-    if (cap->info.ccid == 0) [[unlikely]] {
-      return nullptr;
-    }
-    if (cap->info.cid_generation != cid.generation) [[unlikely]] {
-      return nullptr;
-    }
-
-    return cap;
+  ccid_t make_ccid(class_t* cap_class) {
+    return static_cast<ccid_t>((reinterpret_cast<uintptr_t>(cap_class) - CONFIG_CAPABILITY_CLASS_SPACE_BASE) / CONFIG_CAPABILITY_CLASS_SIZE);
   }
 
-  cid_t get_cid(capability_t* capability) {
-    return { .ccid       = capability->ccid,
-             .generation = capability->info.cid_generation,
-             .index      = static_cast<uint32_t>((reinterpret_cast<uintptr_t>(capability) - CONFIG_CAPABILITY_SPACE_BASE) >> CONFIG_CAPABILITY_SIZE_BIT) };
+  cap_ref_t make_ref(capability_t* capability) {
+    return static_cast<cap_ref_t>((reinterpret_cast<uintptr_t>(capability) - CONFIG_CAPABILITY_SPACE_BASE) >> CONFIG_CAPABILITY_SIZE_BIT);
   }
 
   cap_ret_t call_method(capability_t* capability, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3) {

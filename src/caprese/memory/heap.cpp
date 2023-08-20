@@ -21,10 +21,11 @@
 #include <caprese/arch/builtin_capability.h>
 #include <caprese/arch/device.h>
 #include <caprese/arch/memory.h>
+#include <caprese/capability/bic/memory.h>
 #include <caprese/memory/heap.h>
 #include <caprese/task/task.h>
 #include <caprese/util/align.h>
-#include <caprese/util/array_size.h>
+#include <caprese/util/array.h>
 #include <caprese/util/panic.h>
 
 extern "C" {
@@ -103,22 +104,22 @@ namespace caprese::memory {
       if (free_page_list == nullptr) [[unlikely]] {
         task::task_t* kernel_task = task::get_kernel_task();
         size_t        size        = task::allocated_cap_list_size(kernel_task);
-        for (uintptr_t index = 0; index < size; ++index) {
+        for (task::cid_handle_t handle = 0; handle < size; ++handle) {
           if (free_page_count >= CONFIG_KERNEL_RESERVED_PAGES) [[unlikely]] {
             break;
           }
 
-          capability::cid_t* cid = task::get_cid(kernel_task, index);
-          if (cid->ccid != arch::MEMORY_CAP_CCID) {
+          task::cid_t* cid = task::lookup_cid(kernel_task, handle);
+          if (cid == nullptr || cid->ccid != capability::bic::memory::CCID) [[unlikely]] {
             continue;
           }
 
-          capability::capability_t* cap = capability::lookup(*cid);
-          if (capability::get_field(cap, arch::MEMORY_CAP_FIELD_VIRTUAL_ADDRESS).result != 0) {
+          capability::capability_t* cap = task::lookup_capability(kernel_task, *cid);
+          if (capability::get_field(cap, capability::bic::memory::field::VIRTUAL_ADDRESS).result != 0) {
             continue;
           }
 
-          physical_address_t physical_address = physical_address_t::from(capability::get_field(cap, arch::MEMORY_CAP_FIELD_PHYSICAL_ADDRESS).result);
+          physical_address_t physical_address = physical_address_t::from(capability::get_field(cap, capability::bic::memory::field::PHYSICAL_ADDRESS).result);
           capability::delete_capability(cap);
           cid->ccid = 0;
 

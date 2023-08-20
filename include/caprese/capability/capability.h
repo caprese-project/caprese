@@ -38,16 +38,6 @@ namespace caprese::capability {
 
   constexpr size_t CAP_REF_SIZE_BIT = std::countr_zero<size_t>(CONFIG_MAX_CAPABILITIES);
 
-  struct cid_t {
-    ccid_t    ccid;
-    cap_gen_t generation;
-    // ccid != 0: index of capability space
-    // ccid == 0: index of previous free capability list
-    cap_ref_t index: CAP_REF_SIZE_BIT;
-  };
-
-  static_assert(sizeof(cid_t) == CONFIG_CID_SIZE);
-
   struct cap_ret_t {
     uintptr_t result;
     uintptr_t error;
@@ -63,10 +53,7 @@ namespace caprese::capability {
     uint8_t     num_permissions;
     uint8_t     num_fields;
     uint8_t     num_methods;
-    uint8_t     idx_construct;
-    uint8_t     idx_move;
-    uint8_t     idx_copy;
-    uint8_t     reserved;
+    uint32_t    reserved;
     method_t*   methods;
   };
 
@@ -101,17 +88,13 @@ namespace caprese::capability {
   [[nodiscard]] capability_t* create_capability(ccid_t ccid);
   void                        delete_capability(capability_t* capability);
   [[nodiscard]] class_t*      lookup_class(ccid_t ccid);
-  [[nodiscard]] capability_t* lookup(cid_t cid);
-  [[nodiscard]] cid_t         get_cid(capability_t* capability);
+  ccid_t                      make_ccid(class_t* cap_class);
+  cap_ref_t                   make_ref(capability_t* capability);
   [[nodiscard]] cap_ret_t     call_method(capability_t* capability, uint8_t method, uintptr_t arg0 = 0, uintptr_t arg1 = 0, uintptr_t arg2 = 0, uintptr_t arg3 = 0);
   void                        set_field(capability_t* capability, uint8_t field, uintptr_t value);
   [[nodiscard]] cap_ret_t     get_field(capability_t* capability, uint8_t field);
   void                        set_permission(capability_t* capability, uint8_t permission, bool value);
   [[nodiscard]] cap_ret_t     is_permitted(capability_t* capability, uint8_t permission);
-
-  constexpr cid_t null_cid() {
-    return { .ccid = 0, .generation = 0, .index = 0 };
-  }
 } // namespace caprese::capability
 
 #endif // CAPRESE_CAPABILITY_H_
