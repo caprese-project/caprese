@@ -266,7 +266,13 @@ namespace caprese::task {
       return null_cid();
     }
 
-    // TODO: check movablity
+    capability::class_t* cap_class = capability::lookup_class(cap->ccid);
+    if (cap_class == nullptr) [[unlikely]] {
+      return null_cid();
+    }
+    if ((cap_class->flags & capability::CLASS_FLAG_MOVABLE) == 0) [[unlikely]] {
+      return null_cid();
+    }
 
     cap->info.tid           = 0;
     cid_handle_t dst_handle = insert_capability(dst_task, cap);
