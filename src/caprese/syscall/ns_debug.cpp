@@ -1,14 +1,14 @@
 #include <cstdio>
 
 #include <caprese/syscall/ns_debug.h>
-#include <caprese/util/array_size.h>
+#include <caprese/util/array.h>
 
 namespace caprese::syscall::debug {
   namespace {
     using handler_t = sysret_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
     constexpr handler_t handler_table[] = {
-      [SYS_PUTCHAR_FID] = sys_putchar,
+      [PUTCHAR_FID] = sys_putchar,
     };
   } // namespace
 

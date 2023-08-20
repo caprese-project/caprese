@@ -2,7 +2,8 @@
 #include <caprese/syscall/ns_base.h>
 #include <caprese/syscall/ns_cap.h>
 #include <caprese/syscall/ns_debug.h>
-#include <caprese/util/array_size.h>
+#include <caprese/syscall/ns_task.h>
+#include <caprese/util/array.h>
 
 namespace caprese::syscall {
   namespace {
@@ -12,6 +13,7 @@ namespace caprese::syscall {
       [base::NAMESPACE_ID]  = base::handle_system_call,
       [debug::NAMESPACE_ID] = debug::handle_system_call,
       [cap::NAMESPACE_ID]   = cap::handle_system_call,
+      [task::NAMESPACE_ID]  = task::handle_system_call,
     };
   } // namespace
 

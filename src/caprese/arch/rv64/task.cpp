@@ -23,6 +23,8 @@
 #include <caprese/arch/rv64/csr.h>
 #include <caprese/arch/rv64/task.h>
 #include <caprese/arch/system.h>
+#include <caprese/capability/bic/memory.h>
+#include <caprese/capability/bic/task.h>
 #include <caprese/memory/address.h>
 #include <caprese/memory/kernel_space.h>
 #include <caprese/syscall/handler.h>
@@ -111,68 +113,83 @@ namespace caprese::arch::inline rv64 {
     return result;
   }
 
-  bool load_init_task_payload(task_t* init_task, const arch::boot_info_t* boot_info) {
-    uintptr_t start           = reinterpret_cast<uintptr_t>(_payload_start);
-    uintptr_t end             = reinterpret_cast<uintptr_t>(_payload_end);
-    uintptr_t payload_size    = round_up(end - start, PAGE_SIZE);
-    uintptr_t root_page_table = memory::physical_address_t::from(get_root_page_table(init_task)).mapped_address().value;
+  bool load_init_task_payload(uint32_t init_task_cid_handle, const arch::boot_info_t* boot_info) {
+    task::task_t* kernel_task = task::get_kernel_task();
 
-    task::task_t* task = task::lookup(std::bit_cast<task::tid_t>(1));
+    task::cid_t* init_task_cid = task::lookup_cid(kernel_task, init_task_cid_handle);
+    if (init_task_cid == nullptr || init_task_cid->ccid != capability::bic::task::CCID) [[unlikely]] {
+      return false;
+    }
+
+    capability::capability_t* init_task_cap = task::lookup_capability(kernel_task, *init_task_cid);
+    if (init_task_cap == nullptr) [[unlikely]] {
+      return false;
+    }
+
+    auto [init_task_tid, init_task_tid_error] = capability::get_field(init_task_cap, capability::bic::task::field::TID);
+    if (init_task_tid_error) [[unlikely]] {
+      return false;
+    }
+
+    task::task_t* init_task = task::lookup(std::bit_cast<task::tid_t>(static_cast<uint32_t>(init_task_tid)));
+    if (init_task == nullptr) [[unlikely]] {
+      return false;
+    }
+
+    uintptr_t start        = reinterpret_cast<uintptr_t>(_payload_start);
+    uintptr_t end          = reinterpret_cast<uintptr_t>(_payload_end);
+    uintptr_t payload_size = round_up(end - start, PAGE_SIZE);
 
     for (uintptr_t page = 0; page < payload_size; page += PAGE_SIZE) {
-      memory::mapped_address_t mapped_page = memory::mapped_address_t::from(start + page);
-
-      bool result = map_page(root_page_table,
-                             CONFIG_USER_PAYLOAD_BASE_ADDRESS + page,
-                             mapped_page.physical_address().value,
-                             { .readable = true, .writable = true, .executable = true, .user = true, .global = false },
-                             true);
-      if (!result) [[unlikely]] {
+      memory::physical_address_t phys_page = memory::mapped_address_t::from(start + page).physical_address();
+      capability::capability_t*  cap       = capability::bic::memory::create(phys_page,
+                                                                      capability::bic::memory::constant::READABLE | capability::bic::memory::constant::WRITABLE
+                                                                          | capability::bic::memory::constant::EXECUTABLE);
+      if (cap == nullptr) [[unlikely]] {
         return false;
       }
-      printf("Init task page mapped(RWX): virtual address=0x%016lx, physical address=0x%016lx\n", CONFIG_USER_PAYLOAD_BASE_ADDRESS + page, mapped_page.physical_address().value);
 
-      capability::capability_t* cap = capability::create_capability(MEMORY_CAP_CCID);
-      set_permission(cap, MEMORY_CAP_PERMISSION_READABLE, true);
-      set_permission(cap, MEMORY_CAP_PERMISSION_WRITABLE, true);
-      set_permission(cap, MEMORY_CAP_PERMISSION_EXECUTABLE, true);
-      set_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS, mapped_page.physical_address().value);
-      set_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS, CONFIG_USER_PAYLOAD_BASE_ADDRESS + page);
-      set_field(cap, MEMORY_CAP_FIELD_TID, 1);
+      capability::cap_ret_t result = capability::call_method(cap,
+                                                             capability::bic::memory::method::MAP,
+                                                             init_task_cid_handle,
+                                                             CONFIG_USER_PAYLOAD_BASE_ADDRESS + page,
+                                                             capability::bic::memory::constant::READABLE | capability::bic::memory::constant::WRITABLE | capability::bic::memory::constant::EXECUTABLE);
+      if (result.error) [[unlikely]] {
+        return false;
+      }
 
-      if (task::insert_capability(task, cap) == 0) [[unlikely]] {
+      if (task::insert_capability(init_task, cap) == 0) [[unlikely]] {
         return false;
       }
     }
 
     auto [dtb_base, dtb_size] = get_dtb_space(boot_info);
     for (uintptr_t page = 0; page < dtb_size; page += PAGE_SIZE) {
-      bool result = map_page(root_page_table,
-                             CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page,
-                             dtb_base + page,
-                             { .readable = true, .writable = false, .executable = false, .user = true, .global = false },
-                             true);
-      if (!result) [[unlikely]] {
+      memory::physical_address_t phys_page = memory::mapped_address_t::from(dtb_base + page).physical_address();
+      capability::capability_t*  cap       = capability::bic::memory::create(phys_page,
+                                                                      capability::bic::memory::constant::READABLE | capability::bic::memory::constant::WRITABLE
+                                                                          | capability::bic::memory::constant::EXECUTABLE);
+      if (cap == nullptr) [[unlikely]] {
         return false;
       }
-      printf("Init task page mapped(R  ): virtual address=0x%016lx, physical address=0x%016lx\n", CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page, dtb_base + page);
 
-      capability::capability_t* cap = capability::create_capability(MEMORY_CAP_CCID);
-      set_permission(cap, MEMORY_CAP_PERMISSION_READABLE, true);
-      set_permission(cap, MEMORY_CAP_PERMISSION_WRITABLE, true);
-      set_permission(cap, MEMORY_CAP_PERMISSION_EXECUTABLE, true);
-      set_field(cap, MEMORY_CAP_FIELD_PHYSICAL_ADDRESS, CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page);
-      set_field(cap, MEMORY_CAP_FIELD_VIRTUAL_ADDRESS, CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page);
-      set_field(cap, MEMORY_CAP_FIELD_TID, 1);
+      capability::cap_ret_t result = capability::call_method(cap,
+                                                             capability::bic::memory::method::MAP,
+                                                             init_task_cid_handle,
+                                                             CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page,
+                                                             capability::bic::memory::constant::READABLE);
+      if (result.error) [[unlikely]] {
+        return false;
+      }
 
-      if (task::insert_capability(task, cap) == 0) [[unlikely]] {
+      if (task::insert_capability(init_task, cap) == 0) [[unlikely]] {
         return false;
       }
     }
 
-    init_task->trap_frame.a0   = boot_info->hartid;
-    init_task->trap_frame.a1   = CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size;
-    init_task->trap_frame.sepc = CONFIG_USER_PAYLOAD_BASE_ADDRESS;
+    init_task->arch_task.trap_frame.a0   = boot_info->hartid;
+    init_task->arch_task.trap_frame.a1   = CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size;
+    init_task->arch_task.trap_frame.sepc = CONFIG_USER_PAYLOAD_BASE_ADDRESS;
 
     return true;
   }
@@ -183,33 +200,6 @@ namespace caprese::arch::inline rv64 {
 
     task->context.ra = reinterpret_cast<uint64_t>(return_to_user_mode);
     task->context.sp = stack_address + arch::PAGE_SIZE;
-
-    auto root_page_table = memory::mapped_address_t::from(aligned_alloc(PAGE_SIZE, PAGE_SIZE));
-    if (root_page_table.is_null()) [[unlikely]] {
-      return false;
-    }
-    memset(root_page_table.as<void>(), 0, PAGE_SIZE);
-
-    bool result = memory::copy_kernel_space_mapping(root_page_table, task::get_kernel_root_page_table());
-    if (!result) [[unlikely]] {
-      return false;
-    }
-
-    memory::mapped_address_t stack = memory::mapped_address_t::from(aligned_alloc(PAGE_SIZE, PAGE_SIZE));
-    if (stack.is_null()) [[unlikely]] {
-      return false;
-    }
-
-    result = map_page(root_page_table.value, stack_address, stack.physical_address().value, { .readable = true, .writable = true, .executable = false, .user = false, .global = true }, true);
-    if (!result) [[unlikely]] {
-      return false;
-    }
-
-#if defined(CONFIG_MMU_SV39)
-    task->trap_frame.satp = SATP_MODE_SV39 | (root_page_table.physical_address().value >> PAGE_SIZE_BIT);
-#elif defined(CONFIG_MMU_SV48)
-    task->trap_frame.satp = SATP_MODE_SV48 | (root_page_table.physical_address().value >> PAGE_SIZE_BIT);
-#endif
 
     return true;
   }
@@ -222,7 +212,25 @@ namespace caprese::arch::inline rv64 {
     _load_context(nullptr, task);
   }
 
+  void set_root_page_table(task_t* task, uintptr_t root_page_table) {
+#if defined(CONFIG_MMU_SV39)
+    task->trap_frame.satp = SATP_MODE_SV39 | (root_page_table >> PAGE_SIZE_BIT);
+#elif defined(CONFIG_MMU_SV48)
+    task->trap_frame.satp = SATP_MODE_SV48 | (root_page_table >> PAGE_SIZE_BIT);
+#endif
+  }
+
   uintptr_t get_root_page_table(task_t* task) {
     return (task->trap_frame.satp & SATP_PPN) << PAGE_SIZE_BIT;
+  }
+
+  void set_register(task_t* task, uintptr_t reg, uintptr_t value) {
+    if (reg > REGISTER_SATP) [[unlikely]] {
+      return;
+    }
+    if (reg & (sizeof(uintptr_t) - 1)) [[unlikely]] {
+      return;
+    }
+    reinterpret_cast<uintptr_t*>(&task->trap_frame)[reg >> std::countr_zero(sizeof(uintptr_t))] = value;
   }
 } // namespace caprese::arch::inline rv64

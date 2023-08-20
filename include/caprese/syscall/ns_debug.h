@@ -4,8 +4,8 @@
 #include <caprese/syscall/handler.h>
 
 namespace caprese::syscall::debug {
-  constexpr uintptr_t NAMESPACE_ID    = 1;
-  constexpr uintptr_t SYS_PUTCHAR_FID = 0;
+  constexpr uintptr_t NAMESPACE_ID = 1;
+  constexpr uintptr_t PUTCHAR_FID  = 0;
 
   sysret_t sys_putchar(uintptr_t ch, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t);
 

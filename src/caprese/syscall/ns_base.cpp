@@ -1,14 +1,16 @@
+#include <caprese/arch/memory.h>
 #include <caprese/memory/cls.h>
 #include <caprese/syscall/ns_base.h>
-#include <caprese/util/array_size.h>
+#include <caprese/util/array.h>
 
 namespace caprese::syscall::base {
   namespace {
     using handler_t = sysret_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
     constexpr handler_t handler_table[] = {
-      [SYS_NULL_FID]    = sys_null,
-      [SYS_CORE_ID_FID] = sys_core_id,
+      [NULL_FID]      = sys_null,
+      [CORE_ID_FID]   = sys_core_id,
+      [PAGE_SIZE_FID] = sys_page_size,
     };
   } // namespace
 
@@ -18,6 +20,10 @@ namespace caprese::syscall::base {
 
   sysret_t sys_core_id([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
     return { .result = memory::get_cls()->core_id, .error = 0 };
+  }
+
+  sysret_t sys_page_size([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
+    return { .result = arch::PAGE_SIZE, .error = 0 };
   }
 
   sysret_t handle_system_call(uintptr_t function_id, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {

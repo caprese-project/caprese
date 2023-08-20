@@ -76,7 +76,7 @@ namespace caprese::arch::inline rv64 {
         } else if (pte->r || pte->w || pte->x) [[unlikely]] {
           return nullptr;
         }
-        page_table = reinterpret_cast<page_table_entry_t*>(pte->next_page_number << PAGE_SIZE_BIT);
+        page_table = memory::physical_address_t::from(pte->next_page_number << PAGE_SIZE_BIT).mapped_address().as<page_table_entry_t>();
       }
 
       return page_table + get_pte_index(virtual_address, 0);
@@ -137,10 +137,11 @@ namespace caprese::arch::inline rv64 {
       return true;
     }
 
-    memory::mapped_address_t page = memory::mapped_address_t::from(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
+    memory::mapped_address_t page = memory::mapped_address_t::from(aligned_alloc(PAGE_SIZE, PAGE_SIZE));
     if (page.is_null()) [[unlikely]] {
       return false;
     }
+    memset(page.as<void>(), 0, PAGE_SIZE);
 
     *pte                  = {};
     pte->v                = 1;
