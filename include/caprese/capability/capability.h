@@ -24,7 +24,7 @@
 namespace caprese::capability {
   constexpr uint8_t CLASS_FLAG_VALID         = 1 << 0;
   constexpr uint8_t CLASS_FLAG_BUILTIN       = 1 << 1;
-  constexpr uint8_t CLASS_FLAG_CONSTRUCTABLE = 1 << 2;
+  constexpr uint8_t CLASS_FLAG_CONSTRUCTIBLE = 1 << 2;
   constexpr uint8_t CLASS_FLAG_MOVABLE       = 1 << 3;
   constexpr uint8_t CLASS_FLAG_COPYABLE      = 1 << 4;
 
