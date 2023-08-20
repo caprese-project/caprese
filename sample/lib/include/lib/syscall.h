@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#include <lib/capability.h>
+
 extern "C" {
   struct sysret_t {
     uintptr_t result;
@@ -11,16 +13,21 @@ extern "C" {
 
   sysret_t sys_base_null();
   sysret_t sys_base_core_id();
+  sysret_t sys_base_page_size();
 
   sysret_t sys_debug_putchar(char ch);
 
   sysret_t sys_cap_create_class();
   sysret_t sys_cap_create();
-  sysret_t sys_cap_call_method(uint64_t cid, uint8_t method, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
-  sysret_t sys_cap_get_field(uint64_t cid, uint8_t field);
-  sysret_t sys_cap_is_permitted(uint64_t cid, uint8_t permission);
+  sysret_t sys_cap_call_method(cap_handle_t handle, uint8_t method, uintptr_t arg0 = 0, uintptr_t arg1 = 0, uintptr_t arg2 = 0, uintptr_t arg3 = 0);
+  sysret_t sys_cap_get_field(cap_handle_t handle, uint8_t field);
+  sysret_t sys_cap_is_permitted(cap_handle_t handle, uint8_t permission);
   sysret_t sys_cap_list_base();
   sysret_t sys_cap_list_size();
+  sysret_t sys_cap_move(cap_handle_t handle, cap_handle_t dst_task_cap_handle);
+
+  sysret_t sys_task_tid();
+  sysret_t sys_task_create();
 }
 
 #endif // LIB_SYSCALL_H_

@@ -30,3 +30,7 @@ spin:
 .p2align 12
 .space 4096
 _stack:
+
+.section .mm, "a", @progbits
+.section .plic, "a", @progbits
+.section .fs, "a", @progbits

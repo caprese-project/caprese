@@ -12,6 +12,8 @@ add_library(lib)
 target_sources(
   lib PRIVATE
   src/syscall.S
+  src/capability.cpp
+  src/elf.cpp
   src/debug.cpp
   src/libc/string.cpp
 )

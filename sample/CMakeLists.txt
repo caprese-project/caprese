@@ -7,12 +7,17 @@
 
 cmake_minimum_required(VERSION 3.0)
 
+set(SAMPLE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/lib)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/init)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mm)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/dev)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/fs)
 
 add_custom_target(
   user_payload
-  COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:init> $<TARGET_FILE_DIR:init>/payload
+  COMMAND ${CMAKE_OBJCOPY} -O binary ${INIT_SECTIONS} $<TARGET_FILE:init> $<TARGET_FILE_DIR:init>/payload
 )
 add_dependencies(user_payload init)
 
