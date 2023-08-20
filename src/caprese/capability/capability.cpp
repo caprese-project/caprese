@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cstring>
 
 #include <caprese/capability/capability.h>
 #include <caprese/memory/page.h>
@@ -113,15 +114,19 @@ namespace caprese::capability {
     return cap_class;
   }
 
+  size_t instance_size(class_t* cap_class) {
+    size_t permissions_size = round_up(round_up(cap_class->num_permissions, 8) / 8, sizeof(uintptr_t));
+    size_t fields_size      = cap_class->num_fields * sizeof(uintptr_t);
+    return permissions_size + fields_size;
+  }
+
   capability_t* create_capability(ccid_t ccid) {
     class_t* cap_class = lookup_class(ccid);
     if (cap_class == nullptr) [[unlikely]] {
       return nullptr;
     }
 
-    size_t permissions_size = round_up(round_up(cap_class->num_permissions, 8) / 8, sizeof(uintptr_t));
-    size_t fields_size      = cap_class->num_fields * sizeof(uintptr_t);
-    void*  instance         = malloc(permissions_size + fields_size);
+    void* instance = malloc(instance_size(cap_class));
     if (instance == nullptr) [[unlikely]] {
       return nullptr;
     }
@@ -189,6 +194,32 @@ namespace caprese::capability {
       }
       free_capability_list = capability;
     }
+  }
+
+  [[nodiscard]] capability_t* copy_capability(capability_t* capability, uint64_t permissions) {
+    class_t* cap_class = lookup_class(capability->ccid);
+    if (cap_class == nullptr) [[unlikely]] {
+      return nullptr;
+    }
+
+    if ((cap_class->flags & CLASS_FLAG_COPYABLE) == 0) [[unlikely]] {
+      return nullptr;
+    }
+
+    capability_t* cap = create_capability(capability->ccid);
+    if (cap == nullptr) [[unlikely]] {
+      return nullptr;
+    }
+
+    memcpy(cap->info.instance.as<void>(), capability->info.instance.as<void>(), instance_size(cap_class));
+    for (size_t i = 0; i < cap_class->num_permissions; ++i) {
+      if (permissions & (1 << i)) {
+        continue;
+      }
+      set_permission(cap, i, false);
+    }
+
+    return cap;
   }
 
   class_t* lookup_class(ccid_t ccid) {

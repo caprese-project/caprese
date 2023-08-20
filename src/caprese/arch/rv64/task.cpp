@@ -72,6 +72,7 @@ extern "C" {
         task->trap_frame.sepc += 4;
       } else {
         printf("scause-exception: 0x%lx\n", scause & SCAUSE_EXCEPTION_CODE);
+        panic("TRAP");
       }
     }
 
@@ -165,7 +166,7 @@ namespace caprese::arch::inline rv64 {
 
     auto [dtb_base, dtb_size] = get_dtb_space(boot_info);
     for (uintptr_t page = 0; page < dtb_size; page += PAGE_SIZE) {
-      memory::physical_address_t phys_page = memory::mapped_address_t::from(dtb_base + page).physical_address();
+      memory::physical_address_t phys_page = memory::physical_address_t::from(dtb_base + page);
       capability::capability_t*  cap       = capability::bic::memory::create(phys_page,
                                                                       capability::bic::memory::constant::READABLE | capability::bic::memory::constant::WRITABLE
                                                                           | capability::bic::memory::constant::EXECUTABLE);
@@ -187,8 +188,18 @@ namespace caprese::arch::inline rv64 {
       }
     }
 
+    capability::capability_t* init_task_cap_copy = capability::copy_capability(init_task_cap, capability::bic::task::permission::ALL);
+    if (init_task_cap_copy == nullptr) [[unlikely]] {
+      return false;
+    }
+    task::cid_handle_t init_task_cid_handle_copy = task::insert_capability(init_task, init_task_cap_copy);
+    if (init_task_cid_handle_copy == 0) [[unlikely]] {
+      return false;
+    }
+
     init_task->arch_task.trap_frame.a0   = boot_info->hartid;
     init_task->arch_task.trap_frame.a1   = CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size;
+    init_task->arch_task.trap_frame.a2   = init_task_cid_handle_copy;
     init_task->arch_task.trap_frame.sepc = CONFIG_USER_PAYLOAD_BASE_ADDRESS;
 
     return true;

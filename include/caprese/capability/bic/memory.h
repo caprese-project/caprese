@@ -13,6 +13,8 @@ namespace caprese::capability::bic::memory {
     constexpr uint8_t READABLE   = 0;
     constexpr uint8_t WRITABLE   = 1;
     constexpr uint8_t EXECUTABLE = 2;
+
+    constexpr uint64_t ALL = 0b111;
   } // namespace permission
 
   namespace field {

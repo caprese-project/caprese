@@ -12,6 +12,8 @@ namespace caprese::capability::bic::task {
   namespace permission {
     constexpr uint8_t SWITCHABLE = 0;
     constexpr uint8_t KILLABLE   = 1;
+
+    constexpr uint64_t ALL = 0b11;
   } // namespace permission
 
   namespace field {

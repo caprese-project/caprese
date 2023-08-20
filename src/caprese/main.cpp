@@ -14,6 +14,7 @@
 #include <bit>
 #include <cstdio>
 
+#include <caprese/capability/bic/memory.h>
 #include <caprese/capability/bic/task.h>
 #include <caprese/capability/builtin.h>
 #include <caprese/main.h>
@@ -59,6 +60,9 @@ namespace caprese {
       }
       printf("Moving capabilities to init task...\n");
       for (task::cid_handle_t handle = 0, size = task::allocated_cap_list_size(kernel_task); handle < size; ++handle) {
+        if (task::lookup_cid(kernel_task, handle)->ccid != capability::bic::memory::CCID) [[unlikely]] {
+          continue;
+        }
         task::move_capability(init_task, kernel_task, handle);
       }
       printf("Capabilities have been moved to init task.\n");

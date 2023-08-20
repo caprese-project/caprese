@@ -85,8 +85,10 @@ namespace caprese::capability {
   [[nodiscard]] bool          init_capability_class_space();
   [[nodiscard]] bool          init_capability_space();
   [[nodiscard]] class_t*      create_capability_class();
+  [[nodiscard]] size_t        instance_size(class_t* cap_class);
   [[nodiscard]] capability_t* create_capability(ccid_t ccid);
   void                        delete_capability(capability_t* capability);
+  [[nodiscard]] capability_t* copy_capability(capability_t* capability, uint64_t permissions);
   [[nodiscard]] class_t*      lookup_class(ccid_t ccid);
   ccid_t                      make_ccid(class_t* cap_class);
   cap_ref_t                   make_ref(capability_t* capability);
