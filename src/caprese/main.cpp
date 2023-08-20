@@ -14,6 +14,7 @@
 #include <bit>
 #include <cstdio>
 
+#include <caprese/capability/bic/task.h>
 #include <caprese/capability/builtin.h>
 #include <caprese/main.h>
 #include <caprese/memory/cls.h>
@@ -43,16 +44,24 @@ namespace caprese {
       if (init_task == nullptr) [[unlikely]] {
         panic("Failed to create init task.");
       }
-      printf("Init task creation completed. tid: 0x%x\n", std::bit_cast<uint32_t>(init_task->tid));
-      printf("Moving capabilities to init task...\n");
-      for (task::cap_list_index_t i = 0, size = task::allocated_cap_list_size(kernel_task); i < size; ++i) {
-        task::move_capability(init_task, kernel_task, i);
+      capability::capability_t* init_task_cap = capability::bic::task::create(init_task->tid);
+      if (init_task_cap == nullptr) [[unlikely]] {
+        panic("Failed to create init task capability.");
       }
-      printf("Capabilities have been moved to init task.\n");
+      task::cid_handle_t init_task_cid_handle = task::insert_capability(kernel_task, init_task_cap);
+      if (!init_task_cid_handle) [[unlikely]] {
+        panic("Failed to insert capability.");
+      }
+      printf("Init task creation completed. tid: 0x%x\n", std::bit_cast<uint32_t>(init_task->tid));
       printf("Loading the payload for the init task...\n");
-      if (!task::load_init_task_payload(init_task, boot_info)) [[unlikely]] {
+      if (!task::load_init_task_payload(init_task_cid_handle, boot_info)) [[unlikely]] {
         panic("Failed to load init task payload.");
       }
+      printf("Moving capabilities to init task...\n");
+      for (task::cid_handle_t handle = 0, size = task::allocated_cap_list_size(kernel_task); handle < size; ++handle) {
+        task::move_capability(init_task, kernel_task, handle);
+      }
+      printf("Capabilities have been moved to init task.\n");
       printf("Ready to execute the init task.\n");
 
       printf(LOGO_TEXT);

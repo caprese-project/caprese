@@ -23,8 +23,11 @@ target_sources(
   syscall/ns_base.cpp
   syscall/ns_debug.cpp
   syscall/ns_cap.cpp
+  syscall/ns_task.cpp
   capability/capability.cpp
   capability/builtin.cpp
+  capability/bic/memory.cpp
+  capability/bic/task.cpp
 )
 target_compile_features(kernel PRIVATE cxx_std_23)
 target_compile_options(kernel PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${CONFIG_CXX_OPTIONS}>)

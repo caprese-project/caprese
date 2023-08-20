@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdarg>
+#include <cstdint>
 #include <cstring>
 
 namespace caprese::inline util {
