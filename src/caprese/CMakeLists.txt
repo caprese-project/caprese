@@ -19,6 +19,9 @@ target_sources(
   memory/kernel_space.cpp
   task/init.cpp
   task/task.cpp
+  task/cap.cpp
+  task/ipc.cpp
+  task/sched.cpp
   syscall/handler.cpp
   syscall/ns_base.cpp
   syscall/ns_debug.cpp

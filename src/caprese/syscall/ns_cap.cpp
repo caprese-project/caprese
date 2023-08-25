@@ -2,6 +2,7 @@
 #include <caprese/capability/bic/task.h>
 #include <caprese/capability/capability.h>
 #include <caprese/syscall/ns_cap.h>
+#include <caprese/task/cap.h>
 #include <caprese/task/task.h>
 #include <caprese/util/array.h>
 
@@ -10,8 +11,15 @@ namespace caprese::syscall::cap {
     using handler_t = sysret_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
     constexpr handler_t handler_table[] = {
-      [CREATE_CLASS_FID] = sys_create_class, [CREATE_FID] = sys_create,       [CALL_METHOD_FID] = sys_call_method, [GET_FIELD_FID] = sys_get_field,
-      [IS_PERMITTED_FID] = sys_is_permitted, [LIST_BASE_FID] = sys_list_base, [LIST_SIZE_FID] = sys_list_size,     [MOVE_FID] = sys_move,
+      [CREATE_CLASS_FID] = sys_create_class,
+      [CREATE_FID]       = sys_create,
+      [CALL_METHOD_FID]  = sys_call_method,
+      [GET_FIELD_FID]    = sys_get_field,
+      [IS_PERMITTED_FID] = sys_is_permitted,
+      [LIST_BASE_FID]    = sys_list_base,
+      [LIST_SIZE_FID]    = sys_list_size,
+      [MOVE_FID]         = sys_move,
+      [COPY_FID]         = sys_copy,
     };
   } // namespace
 
@@ -108,12 +116,34 @@ namespace caprese::syscall::cap {
       return { .result = 0, .error = 1 };
     }
 
-    task::cid_t new_cid = task::move_capability(dst_task, task, cid_handle);
-    if (new_cid.ccid == 0) [[unlikely]] {
+    task::cid_handle_t new_cid_handle = task::move_capability(dst_task, task, cid_handle);
+    if (new_cid_handle == 0) [[unlikely]] {
       return { .result = 0, .error = 1 };
     }
 
-    return { .result = 0, .error = 0 };
+    return { .result = new_cid_handle, .error = 0 };
+  }
+
+  sysret_t sys_copy(uintptr_t cid_handle, uintptr_t permissions, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
+    task::task_t* task = task::get_current_task();
+
+    task::cid_t* cid = task::lookup_cid(task, cid_handle);
+    if (cid == nullptr) [[unlikely]] {
+      return { .result = 0, .error = 1 };
+    }
+
+    capability::capability_t* cap = task::lookup_capability(task, *cid);
+    if (cap == nullptr) [[unlikely]] {
+      return { .result = 0, .error = 1 };
+    }
+
+    capability::capability_t* new_cap = capability::copy_capability(cap, permissions);
+    if (new_cap == nullptr) [[unlikely]] {
+      return { .result = 0, .error = 1 };
+    }
+
+    task::cid_handle_t handle = task::insert_capability(task, new_cap);
+    return { .result = handle, .error = 0 };
   }
 
   sysret_t handle_system_call(uintptr_t function_id, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {

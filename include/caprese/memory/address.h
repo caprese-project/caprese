@@ -18,6 +18,8 @@
 #include <cstdint>
 #include <type_traits>
 
+#include <caprese/arch/memory.h>
+#include <caprese/util/align.h>
 #include <caprese/util/concepts.h>
 
 namespace caprese::memory {
@@ -57,6 +59,18 @@ namespace caprese::memory {
 
     [[nodiscard]] constexpr bool is_null() const {
       return value == 0;
+    }
+
+    [[nodiscard]] constexpr Derived page() const {
+      return Derived::from(round_down(value, arch::PAGE_SIZE));
+    }
+
+    [[nodiscard]] constexpr Derived add(std::ptrdiff_t offset) const {
+      return Derived::from(static_cast<uintptr_t>(static_cast<std::ptrdiff_t>(value) + offset));
+    }
+
+    [[nodiscard]] constexpr std::ptrdiff_t page_offset() const {
+      return value & (arch::PAGE_SIZE - 1);
     }
 
     /**
@@ -133,6 +147,8 @@ namespace caprese::memory {
     return mapped_address_t::from(CONFIG_MAPPED_SPACE_BASE + value);
   };
 
+  struct user_address_t: public base_address_t<user_address_t> { };
+
   static_assert(std::is_trivially_copyable_v<physical_address_t>);
   static_assert(std::is_standard_layout_v<physical_address_t>);
   static_assert(sizeof(physical_address_t) == sizeof(uintptr_t));
@@ -142,6 +158,9 @@ namespace caprese::memory {
   static_assert(std::is_trivially_copyable_v<mapped_address_t>);
   static_assert(std::is_standard_layout_v<mapped_address_t>);
   static_assert(sizeof(mapped_address_t) == sizeof(uintptr_t));
+  static_assert(std::is_trivially_copyable_v<user_address_t>);
+  static_assert(std::is_standard_layout_v<user_address_t>);
+  static_assert(sizeof(user_address_t) == sizeof(uintptr_t));
 } // namespace caprese::memory
 
 #endif // CAPRESE_MEMORY_ADDRESS_H_

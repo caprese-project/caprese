@@ -6,6 +6,7 @@
 #include <caprese/capability/bic/task.h>
 #include <caprese/capability/builtin.h>
 #include <caprese/memory/heap.h>
+#include <caprese/task/cap.h>
 
 namespace caprese::capability {
   bool create_builtin_capability_classes() {

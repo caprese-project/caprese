@@ -16,9 +16,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <utility>
 
 #include <caprese/arch/builtin_capability.h>
 #include <caprese/arch/device.h>
+#include <caprese/arch/init_task_args.h>
 #include <caprese/arch/memory.h>
 #include <caprese/arch/rv64/csr.h>
 #include <caprese/arch/rv64/task.h>
@@ -28,8 +30,10 @@
 #include <caprese/memory/address.h>
 #include <caprese/memory/kernel_space.h>
 #include <caprese/syscall/handler.h>
+#include <caprese/task/cap.h>
 #include <caprese/task/task.h>
 #include <caprese/util/align.h>
+#include <caprese/util/panic.h>
 
 namespace {
   void return_to_user_mode();
@@ -45,6 +49,16 @@ extern "C" {
   extern const char _payload_end[];
   extern const char _stack[];
 
+  void _kernel_trap() {
+    uintptr_t sstatus, scause, stval, sepc;
+    asm volatile("csrr %0, sstatus" : "=r"(sstatus));
+    asm volatile("csrr %0, scause" : "=r"(scause));
+    asm volatile("csrr %0, stval" : "=r"(stval));
+    asm volatile("csrr %0, sepc" : "=r"(sepc));
+
+    caprese::panic("kernel trap: sstatus=0x%lx, scause=0x%lx, stval=0x%lx, sepc=0x%lx\n", sstatus, scause, stval, sepc);
+  }
+
   void _user_trap() {
     using namespace caprese;
     using namespace caprese::arch;
@@ -56,6 +70,7 @@ extern "C" {
 
     if (scause & SCAUSE_INTERRUPT) {
       printf("scause-interrupt: 0x%lx\n", scause & SCAUSE_EXCEPTION_CODE);
+      panic("TRAP");
     } else {
       if (scause & SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE) {
         uint64_t          code   = task->trap_frame.a7;
@@ -71,12 +86,16 @@ extern "C" {
         task->trap_frame.a1 = result.error;
         task->trap_frame.sepc += 4;
       } else {
-        printf("scause-exception: 0x%lx\n", scause & SCAUSE_EXCEPTION_CODE);
+        uintptr_t stval, sepc;
+        asm volatile("csrr %0, stval" : "=r"(stval));
+        asm volatile("csrr %0, sepc" : "=r"(sepc));
+        printf("scause-exception: 0x%lx, stval=0x%lx, sepc=0x%lx\n", scause & SCAUSE_EXCEPTION_CODE, stval, sepc);
         panic("TRAP");
       }
     }
 
     return_to_user_mode();
+    std::unreachable();
   }
 }
 
@@ -89,6 +108,7 @@ namespace {
 
     task_t* task = &task::get_current_task()->arch_task;
     _return_to_user_mode(&task->trap_frame);
+    std::unreachable();
   };
 } // namespace
 
@@ -137,55 +157,9 @@ namespace caprese::arch::inline rv64 {
       return false;
     }
 
-    uintptr_t start        = reinterpret_cast<uintptr_t>(_payload_start);
-    uintptr_t end          = reinterpret_cast<uintptr_t>(_payload_end);
-    uintptr_t payload_size = round_up(end - start, PAGE_SIZE);
-
-    for (uintptr_t page = 0; page < payload_size; page += PAGE_SIZE) {
-      memory::physical_address_t phys_page = memory::mapped_address_t::from(start + page).physical_address();
-      capability::capability_t*  cap       = capability::bic::memory::create(phys_page,
-                                                                      capability::bic::memory::constant::READABLE | capability::bic::memory::constant::WRITABLE
-                                                                          | capability::bic::memory::constant::EXECUTABLE);
-      if (cap == nullptr) [[unlikely]] {
-        return false;
-      }
-
-      capability::cap_ret_t result = capability::call_method(cap,
-                                                             capability::bic::memory::method::MAP,
-                                                             init_task_cid_handle,
-                                                             CONFIG_USER_PAYLOAD_BASE_ADDRESS + page,
-                                                             capability::bic::memory::constant::READABLE | capability::bic::memory::constant::WRITABLE | capability::bic::memory::constant::EXECUTABLE);
-      if (result.error) [[unlikely]] {
-        return false;
-      }
-
-      if (task::insert_capability(init_task, cap) == 0) [[unlikely]] {
-        return false;
-      }
-    }
-
-    auto [dtb_base, dtb_size] = get_dtb_space(boot_info);
-    for (uintptr_t page = 0; page < dtb_size; page += PAGE_SIZE) {
-      memory::physical_address_t phys_page = memory::physical_address_t::from(dtb_base + page);
-      capability::capability_t*  cap       = capability::bic::memory::create(phys_page,
-                                                                      capability::bic::memory::constant::READABLE | capability::bic::memory::constant::WRITABLE
-                                                                          | capability::bic::memory::constant::EXECUTABLE);
-      if (cap == nullptr) [[unlikely]] {
-        return false;
-      }
-
-      capability::cap_ret_t result = capability::call_method(cap,
-                                                             capability::bic::memory::method::MAP,
-                                                             init_task_cid_handle,
-                                                             CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + page,
-                                                             capability::bic::memory::constant::READABLE);
-      if (result.error) [[unlikely]] {
-        return false;
-      }
-
-      if (task::insert_capability(init_task, cap) == 0) [[unlikely]] {
-        return false;
-      }
+    init_task_args_t* args = static_cast<init_task_args_t*>(aligned_alloc(arch::PAGE_SIZE, arch::PAGE_SIZE));
+    if (args == nullptr) {
+      return false;
     }
 
     capability::capability_t* init_task_cap_copy = capability::copy_capability(init_task_cap, capability::bic::task::permission::ALL);
@@ -197,9 +171,64 @@ namespace caprese::arch::inline rv64 {
       return false;
     }
 
-    init_task->arch_task.trap_frame.a0   = boot_info->hartid;
-    init_task->arch_task.trap_frame.a1   = CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size;
-    init_task->arch_task.trap_frame.a2   = init_task_cid_handle_copy;
+    args->init_task_cid_handle = init_task_cid_handle_copy;
+
+    const auto create_and_map_mem_cap = [&](memory::virtual_address_t virtual_address, memory::physical_address_t physical_address, uint8_t flags) -> task::cid_handle_t {
+      capability::capability_t* cap = capability::bic::memory::create(physical_address,
+                                                                      capability::bic::memory::constant::READABLE | capability::bic::memory::constant::WRITABLE
+                                                                          | capability::bic::memory::constant::EXECUTABLE);
+      if (cap == nullptr) [[unlikely]] {
+        return 0;
+      }
+
+      capability::cap_ret_t result = capability::call_method(cap, capability::bic::memory::method::MAP, init_task_cid_handle, virtual_address.value, flags);
+      if (result.error) [[unlikely]] {
+        return 0;
+      }
+
+      task::cid_handle_t handle = task::insert_capability(init_task, cap);
+      if (handle == 0) [[unlikely]] {
+        return 0;
+      }
+
+      return handle;
+    };
+
+    uintptr_t start        = reinterpret_cast<uintptr_t>(_payload_start);
+    uintptr_t end          = reinterpret_cast<uintptr_t>(_payload_end);
+    uintptr_t payload_size = round_up(end - start, PAGE_SIZE);
+
+    for (uintptr_t offset = 0; offset < payload_size; offset += arch::PAGE_SIZE) {
+      task::cid_handle_t handle = create_and_map_mem_cap(memory::virtual_address_t::from(CONFIG_USER_PAYLOAD_BASE_ADDRESS + offset),
+                                                         memory::mapped_address_t::from(start + offset).physical_address(),
+                                                         capability::bic::memory::constant::READABLE | capability::bic::memory::constant::WRITABLE | capability::bic::memory::constant::EXECUTABLE);
+      if (handle == 0) [[unlikely]] {
+        return false;
+      }
+    }
+
+    auto [dtb_base, dtb_size]              = get_dtb_space(boot_info);
+    args->num_device_tree_blob_cid_handles = (dtb_size + PAGE_SIZE - 1) / PAGE_SIZE;
+    for (uintptr_t offset = 0; offset < dtb_size; offset += PAGE_SIZE) {
+      task::cid_handle_t handle = create_and_map_mem_cap(memory::virtual_address_t::from(CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + offset),
+                                                         memory::physical_address_t::from(dtb_base + offset),
+                                                         capability::bic::memory::constant::READABLE);
+      if (handle == 0) [[unlikely]] {
+        return false;
+      }
+      args->device_tree_blob_cid_handles[offset / PAGE_SIZE] = handle;
+    }
+
+    task::cid_handle_t args_handle = create_and_map_mem_cap(memory::virtual_address_t::from(CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + dtb_size),
+                                                            memory::mapped_address_t::from(args).physical_address(),
+                                                            capability::bic::memory::constant::READABLE);
+    if (args_handle == 0) [[unlikely]] {
+      return false;
+    }
+
+    args->free_address_start = CONFIG_USER_PAYLOAD_BASE_ADDRESS + payload_size + dtb_size + arch::PAGE_SIZE;
+
+    init_task->arch_task.trap_frame.a0   = args_handle;
     init_task->arch_task.trap_frame.sepc = CONFIG_USER_PAYLOAD_BASE_ADDRESS;
 
     return true;

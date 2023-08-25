@@ -1,7 +1,6 @@
-#include <lib/debug.h>
+#include <cstdio>
 
 int main() {
-  printd("Hello, fs!\n");
-  while (true) { }
+  printf("Hello, fs!\n");
   return 0;
 }

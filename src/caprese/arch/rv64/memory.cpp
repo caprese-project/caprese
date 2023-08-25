@@ -97,6 +97,8 @@ namespace caprese::arch::inline rv64 {
     pte->g                = flags.global;
     pte->next_page_number = physical_address >> PAGE_SIZE_BIT;
 
+    asm volatile("sfence.vma zero, zero");
+
     return true;
   }
 
@@ -107,6 +109,8 @@ namespace caprese::arch::inline rv64 {
     }
 
     *pte = {};
+
+    asm volatile("sfence.vma zero, zero");
 
     return true;
   }
@@ -129,6 +133,11 @@ namespace caprese::arch::inline rv64 {
   bool is_mapped_page(uintptr_t root_page_table, uintptr_t virtual_address) {
     page_table_entry_t* pte = walk_page(root_page_table, virtual_address, false);
     return pte != nullptr && pte->v;
+  }
+
+  bool is_user_page(uintptr_t root_page_table, uintptr_t virtual_address) {
+    page_table_entry_t* pte = walk_page(root_page_table, virtual_address, false);
+    return pte != nullptr && pte->v && pte->u;
   }
 
   bool shallow_map_page(uintptr_t root_page_table, uintptr_t virtual_address) {

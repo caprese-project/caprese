@@ -52,6 +52,17 @@ namespace caprese::memory {
     return arch::is_mapped_page(root_page_table.value, virtual_address.value);
   }
 
+  bool is_user_page(mapped_address_t root_page_table, user_address_t virtual_address) {
+    assert((root_page_table.value & (arch::PAGE_SIZE - 1)) == 0);
+    assert((virtual_address.value & (arch::PAGE_SIZE - 1)) == 0);
+
+    if (virtual_address.value < CONFIG_USER_SPACE_BASE || virtual_address.value >= (CONFIG_USER_SPACE_BASE + CONFIG_USER_SPACE_SIZE)) [[unlikely]] {
+      return false;
+    }
+
+    return arch::is_user_page(root_page_table.value, virtual_address.value);
+  }
+
   bool shallow_map(mapped_address_t root_page_table, virtual_address_t virtual_address) {
     assert((root_page_table.value & (arch::PAGE_SIZE - 1)) == 0);
     assert((virtual_address.value & (arch::MAX_PAGE_SIZE - 1)) == 0);

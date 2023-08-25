@@ -1,61 +1,56 @@
-#include <init/early_memory.h>
-#include <init/main.h>
-#include <lib/debug.h>
-#include <lib/elf.h>
-#include <lib/syscall.h>
+#include <cstdio>
+#include <cstdlib>
 
-namespace init {
-  void main(boot_t* boot) {
-    if (!init_early_memory(boot)) {
-      printd("Failed to initialize early memories.\n");
-      return;
+#include <runtime/cap.h>
+#include <runtime/elf.h>
+#include <runtime/memory.h>
+#include <runtime/syscall.h>
+#include <runtime/task.h>
+#include <runtime/types.h>
+
+extern "C" {
+  extern const char _apm_start[];
+  extern const char _apm_end[];
+}
+
+int main(memory_handle_t boot_info) {
+  printf("Hello, init task! boot_info: %d\n", boot_info);
+
+  task_handle_t apm_handle = create_task();
+  if (apm_handle == 0) [[unlikely]] {
+    printf("Failed to create apm task.\n");
+    abort();
+  }
+
+  if (!load_elf(apm_handle, _apm_start)) [[unlikely]] {
+    printf("Failed to load apm task.\n");
+    abort();
+  }
+
+  sysret_t sysret = sys_cap_list_size();
+  if (sysret.error) [[unlikely]] {
+    printf("Failed to load cap list size.\n");
+    abort();
+  }
+
+  for (handle_t handle = 0; handle < sysret.result; ++handle) {
+    if (get_handle_type(handle) != HANDLE_TYPE_MEMORY) {
+      continue;
     }
 
-    for (size_t i = 0; i < NUM_INIT_TASKS; ++i) {
-      auto& task = boot->tasks[i];
-
-      size_t num_pages = elf_needed_pages(task.start, task.end - task.start);
-      if (num_pages == 0) [[unlikely]] {
-        printd("Failed to load elf.\n");
-        return;
+    if (!is_mapped(handle)) {
+      if (sys_cap_move(handle, apm_handle).error) [[unlikely]] {
+        printf("Failed to move memory cap.\n");
+        abort();
       }
-
-      auto [task_cap, task_cap_error] = sys_task_create();
-      if (task_cap_error) [[unlikely]] {
-        printd("Failed to create task.\n");
-        return;
-      }
-
-      cap_handle_t* mem_caps = static_cast<cap_handle_t*>(early_alloc(sizeof(cap_handle_t) * num_pages));
-      if (mem_caps == nullptr) [[unlikely]] {
-        printd("Out of memory.\n");
-        return;
-      }
-      for (size_t i = 0; i < num_pages; ++i) {
-        mem_caps[i] = fetch_mem_cap();
-        if (get_cap_type(mem_caps[i]) == CAP_TYPE_NULL) [[unlikely]] {
-          printd("Out of memory.\n");
-          return;
-        }
-      }
-
-      if (!load_elf(task_cap, mem_caps, task.start, task.end - task.start)) [[unlikely]] {
-        printd("Failed to load elf.\n");
-        return;
-      }
-
-      task.task_cap = task_cap;
-    }
-
-    early_free_all();
-
-    for (size_t i = 0; i < NUM_INIT_TASKS; ++i) {
-      boot->tasks[i].run(boot, boot->tasks[i].task_cap);
-    }
-
-    while (true) {
-      // msg_t msg = sys_task_ipc_receive();
-      // (void)msg;
     }
   }
-} // namespace init
+
+  switch_task(apm_handle);
+
+  while (true) {
+    yield();
+  }
+
+  return 0;
+}

@@ -1,8 +1,6 @@
-#include <lib/debug.h>
-#include <lib/syscall.h>
+#include <cstdio>
 
-int main() {
-  printd("Hello, mm! tid=%d\n", sys_task_tid().result);
-  while (true) { }
+int main(int argc, char** argv) {
+  printf("Hello, mm! argc=%d, argv=%p\n", argc, argv);
   return 0;
 }

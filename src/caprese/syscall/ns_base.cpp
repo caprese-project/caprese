@@ -8,9 +8,7 @@ namespace caprese::syscall::base {
     using handler_t = sysret_t (*)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 
     constexpr handler_t handler_table[] = {
-      [NULL_FID]      = sys_null,
-      [CORE_ID_FID]   = sys_core_id,
-      [PAGE_SIZE_FID] = sys_page_size,
+      [NULL_FID] = sys_null, [CORE_ID_FID] = sys_core_id, [PAGE_SIZE_FID] = sys_page_size, [USER_SPACE_START_FID] = sys_user_space_start, [USER_SPACE_END_FID] = sys_user_space_end,
     };
   } // namespace
 
@@ -24,6 +22,14 @@ namespace caprese::syscall::base {
 
   sysret_t sys_page_size([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
     return { .result = arch::PAGE_SIZE, .error = 0 };
+  }
+
+  sysret_t sys_user_space_start([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
+    return { .result = CONFIG_USER_SPACE_BASE, .error = 0 };
+  }
+
+  sysret_t sys_user_space_end([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
+    return { .result = CONFIG_USER_SPACE_BASE + CONFIG_USER_SPACE_SIZE, .error = 0 };
   }
 
   sysret_t handle_system_call(uintptr_t function_id, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {

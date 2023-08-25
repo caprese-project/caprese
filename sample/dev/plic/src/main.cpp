@@ -1,7 +1,6 @@
-#include <lib/debug.h>
+#include <cstdio>
 
 int main() {
-  printd("Hello, plic!\n");
-  while (true) { }
+  printf("Hello, plic!\n");
   return 0;
 }

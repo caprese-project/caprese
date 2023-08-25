@@ -9,11 +9,17 @@ namespace caprese::syscall::debug {
 
     constexpr handler_t handler_table[] = {
       [PUTCHAR_FID] = sys_putchar,
+      [GETCHAR_FID] = sys_getchar,
     };
   } // namespace
 
   sysret_t sys_putchar(uintptr_t ch, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
     int res = putchar(ch);
+    return { .result = static_cast<uintptr_t>(res), .error = 0 };
+  }
+
+  sysret_t sys_getchar([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t) {
+    int res = getchar();
     return { .result = static_cast<uintptr_t>(res), .error = 0 };
   }
 

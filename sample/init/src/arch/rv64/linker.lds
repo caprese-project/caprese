@@ -11,9 +11,7 @@
  * @see https://github.com/cosocaf/caprese/blob/master/LICENSE
  */
 
-#include <caprese/generated/mm_size.h>
-#include <caprese/generated/plic_size.h>
-#include <caprese/generated/fs_size.h>
+#include <init/generated/apm_size.h>
 
 OUTPUT_ARCH( "riscv" )
 ENTRY( _start )
@@ -24,7 +22,7 @@ SECTIONS
 
   .text :
   {
-    KEEP(*(.text.entry))
+    *(.text.entry)
     *(.text)
     *(.text.*)
   }
@@ -52,46 +50,31 @@ SECTIONS
     *(.sbss*)
     *(.bss)
     *(.bss.*)
+    . = ALIGN(16);
+    __init_array_start = .;
+    KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*)
+           SORT_BY_INIT_PRIORITY(.ctors.*)))
+    KEEP(*(.init_array .ctors))
+    __init_array_end = .;
+    __fini_array_start = .;
+    KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*)
+           SORT_BY_INIT_PRIORITY(.dtors.*)))
+    KEEP(*(.fini_array .dtors))
+    __fini_array_end = .;
   }
 
   . = ALIGN(16);
 
-  _mm_start = .;
+  _apm_start = .;
 
-  .mm :
+  .apm :
   {
-    *(.mm)
-    KEEP(*(.mm))
-    . += CONFIG_MM_SIZE;
+    *(.apm)
+    KEEP(*(.apm))
+    . += CONFIG_APM_SIZE;
   }
 
-  _mm_end = .;
-
-  . = ALIGN(16);
-
-  _plic_start = .;
-
-  .plic :
-  {
-    *(.plic)
-    KEEP(*(.plic))
-    . += CONFIG_PLIC_SIZE;
-  }
-
-  _plic_end = .;
-
-  . = ALIGN(16);
-
-  _fs_start = .;
-
-  .fs :
-  {
-    *(.fs)
-    KEEP(*(.fs))
-    . += CONFIG_FS_SIZE;
-  }
-
-  _fs_end = .;
+  _apm_end = .;
 
   . = ALIGN(0x1000);
 

@@ -7,6 +7,7 @@
 #include <caprese/capability/bic/task.h>
 #include <caprese/capability/builtin.h>
 #include <caprese/memory/page.h>
+#include <caprese/task/cap.h>
 
 namespace caprese::capability::bic::memory {
   class_t* create_class() {

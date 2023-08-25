@@ -152,7 +152,7 @@ namespace caprese::capability {
 
     result->info.ccid = ccid;
     ++result->info.cid_generation;
-    result->info.tid      = 0;
+    result->info.tid      = std::bit_cast<uint32_t>(task::null_tid);
     result->info.instance = memory::mapped_address_t::from(instance);
 
     return result;

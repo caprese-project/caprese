@@ -13,6 +13,7 @@ namespace caprese::syscall::cap {
   constexpr uintptr_t LIST_BASE_FID    = 5;
   constexpr uintptr_t LIST_SIZE_FID    = 6;
   constexpr uintptr_t MOVE_FID         = 7;
+  constexpr uintptr_t COPY_FID         = 8;
 
   sysret_t sys_create_class([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t);
   sysret_t sys_create([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t);
@@ -22,6 +23,7 @@ namespace caprese::syscall::cap {
   sysret_t sys_list_base([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t);
   sysret_t sys_list_size([[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t);
   sysret_t sys_move(uintptr_t cid_handle, uintptr_t dst_task_cid_handle, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t);
+  sysret_t sys_copy(uintptr_t cid_handle, uintptr_t permissions, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t, [[maybe_unused]] uintptr_t);
 
   sysret_t handle_system_call(uintptr_t function_id, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
 } // namespace caprese::syscall::cap

@@ -6,6 +6,7 @@
 namespace caprese::arch::inline rv64 {
   [[nodiscard]] size_t get_core_id();
   void                 dump_system_context();
+  void                 wait_for_interrupt();
 } // namespace caprese::arch::inline rv64
 
 #endif // CAPRESE_ARCH_RV64_SYSTEM_H_

@@ -23,6 +23,7 @@
 #include <caprese/arch/memory.h>
 #include <caprese/capability/bic/memory.h>
 #include <caprese/memory/heap.h>
+#include <caprese/task/cap.h>
 #include <caprese/task/task.h>
 #include <caprese/util/align.h>
 #include <caprese/util/array.h>

@@ -42,6 +42,14 @@ namespace caprese::task {
 
     kernel_task->tid.generation++;
     kernel_task->state = TASK_STATE_CREATING;
+    kernel_task->free_cap_list        = 0;
+    kernel_task->used_cap_space_count = 0;
+    kernel_task->prev_ready_task      = null_tid;
+    kernel_task->next_ready_task      = null_tid;
+    kernel_task->prev_waiting_queue   = null_tid;
+    kernel_task->next_waiting_queue   = null_tid;
+    kernel_task->next_sender_task     = null_tid;
+    kernel_task->msg                  = {};
 
     bool result = arch::create_kernel_task(&kernel_task->arch_task, entry, boot_info);
     if (!result) [[unlikely]] {

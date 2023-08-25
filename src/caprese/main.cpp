@@ -13,6 +13,7 @@
 
 #include <bit>
 #include <cstdio>
+#include <utility>
 
 #include <caprese/capability/bic/memory.h>
 #include <caprese/capability/bic/task.h>
@@ -21,7 +22,9 @@
 #include <caprese/memory/cls.h>
 #include <caprese/memory/heap.h>
 #include <caprese/memory/kernel_space.h>
+#include <caprese/task/cap.h>
 #include <caprese/task/init.h>
+#include <caprese/task/sched.h>
 #include <caprese/task/task.h>
 #include <caprese/util/panic.h>
 
@@ -63,7 +66,9 @@ namespace caprese {
         if (task::lookup_cid(kernel_task, handle)->ccid != capability::bic::memory::CCID) [[unlikely]] {
           continue;
         }
-        task::move_capability(init_task, kernel_task, handle);
+        if (task::move_capability(init_task, kernel_task, handle) == 0) [[unlikely]] {
+          panic("Failed to move capabilities to init task.");
+        }
       }
       printf("Capabilities have been moved to init task.\n");
       printf("Ready to execute the init task.\n");
@@ -73,7 +78,11 @@ namespace caprese {
       printf("Switching to init task...\n\n");
       task::switch_to(init_task);
 
-      while (true) { }
+      while (true) {
+        if (!task::schedule()) [[unlikely]] {
+          arch::wait_for_interrupt();
+        }
+      }
     }
   } // namespace
 
@@ -132,6 +141,6 @@ namespace caprese {
     printf("Switching to kernel task...\n\n");
     task::switch_to_kernel_task(kernel_task);
 
-    panic("UNREACHABLE");
+    std::unreachable();
   }
 } // namespace caprese

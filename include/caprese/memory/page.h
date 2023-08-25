@@ -22,6 +22,7 @@ namespace caprese::memory {
   [[nodiscard]] bool map(mapped_address_t root_page_table, virtual_address_t virtual_address, physical_address_t physical_address, arch::page_flags_t flags, bool allocate);
   [[nodiscard]] bool unmap(mapped_address_t root_page_table, virtual_address_t virtual_address);
   [[nodiscard]] bool is_mapped(mapped_address_t root_page_table, virtual_address_t virtual_address);
+  [[nodiscard]] bool is_user_page(mapped_address_t root_page_table, user_address_t virtual_address);
 
   [[nodiscard]] bool shallow_map(mapped_address_t root_page_table, virtual_address_t virtual_address);
   [[nodiscard]] bool copy_shallow_mapping(mapped_address_t dst_page_table, mapped_address_t src_page_table, virtual_address_t virtual_address);

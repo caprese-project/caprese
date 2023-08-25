@@ -74,4 +74,8 @@ namespace caprese::arch::inline rv64 {
     printf("t5:  %p\n", t5);
     printf("t6:  %p\n", t6);
   }
+
+  void wait_for_interrupt() {
+    asm volatile("wfi");
+  }
 } // namespace caprese::arch::inline rv64

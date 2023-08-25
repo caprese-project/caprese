@@ -65,4 +65,8 @@ extern "C" {
     dst[size] = '\0';
     return size;
   }
+
+  int getchar() {
+    return caprese::arch::sbi_console_getchar();
+  }
 }

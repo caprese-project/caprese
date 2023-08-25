@@ -1,27 +1,25 @@
 .extern __global_pointer$
 .type __global_pointer$, @object
-.extern start
-.type start, @function
+.extern _start
+.type _start, @function
+.extern __init_startup_routine
+.type __init_startup_routine, @function
+.extern exit
+.type exit, @function
 
 .section .text.entry
 
-.global _start
-.type _start, @function
-_start:
-  # Without norelax option, "auipc gp, %pcrel_hi(__global_pointer$)" is optimized to "auipc gp, gp".
-  .option push
-  .option norelax
-    1:
-      auipc gp, %pcrel_hi(__global_pointer$)
-      addi  gp, gp, %pcrel_lo(1b)
-  .option pop
-
+.global _entry
+.type _entry, @function
+_entry:
+  mv s0, a0
   la sp, _stack
-  call start
-
-spin:
-  wfi
-  j spin
+  call __init_startup_routine
+  beqz a0, exit
+  mv a3, a1
+  mv a1, a0
+  li a2, 0
+  j _start
 
 .section .data
 
@@ -31,6 +29,4 @@ spin:
 .space 4096
 _stack:
 
-.section .mm, "a", @progbits
-.section .plic, "a", @progbits
-.section .fs, "a", @progbits
+.section .apm, "a", @progbits
