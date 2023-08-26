@@ -34,10 +34,6 @@ namespace caprese::task {
   [[nodiscard]] task_t*                  get_kernel_task();
   [[nodiscard]] memory::mapped_address_t get_root_page_table(task_t* task);
   [[nodiscard]] memory::mapped_address_t get_kernel_root_page_table();
-
-  constexpr cid_t null_cid() {
-    return { .ccid = 0, .generation = 0, .prev_free_cap_list = 0 };
-  }
 } // namespace caprese::task
 
 #endif // CAPRESE_TASK_TASK_H_
