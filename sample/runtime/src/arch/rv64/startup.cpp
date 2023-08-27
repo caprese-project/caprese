@@ -72,9 +72,9 @@ extern "C" int __runtime_startup_routine(task_handle_t init_task_handle, task_ha
   }
 
   if (apm_task_handle != 0) {
-    __console_task_handle = lookup_task("console");
-    __mm_task_handle      = lookup_task("mm");
-    __fs_task_handle      = lookup_task("fs");
+    // __console_task_handle = lookup_task("console");
+    // __mm_task_handle      = lookup_task("mm");
+    // __fs_task_handle      = lookup_task("fs");
   }
 
   for (void (**constructor)() = __init_array_start; constructor != __init_array_end; ++constructor) {

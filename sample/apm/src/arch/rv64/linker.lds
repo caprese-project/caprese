@@ -14,6 +14,7 @@
 #include <apm/generated/console_size.h>
 #include <apm/generated/shell_size.h>
 #include <apm/generated/echo_size.h>
+#include <apm/generated/pingpong_size.h>
 
 OUTPUT_ARCH( "riscv" )
 ENTRY( _start )
@@ -95,5 +96,14 @@ SECTIONS
     *(.echo)
     KEEP(*(.echo))
     . += CONFIG_ECHO_SIZE;
+  }
+
+  _pingpong_start = .;
+
+  .pingpong :
+  {
+    *(.pingpong)
+    KEEP(*(.pingpong))
+    . += CONFIG_PINGPONG_SIZE;
   }
 }

@@ -9,7 +9,7 @@ add_custom_target(
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/linker.lds
   BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/linker.ld
 )
-add_dependencies(apm_linker console_size shell_size echo_size)
+add_dependencies(apm_linker console_size shell_size echo_size pingpong_size)
 add_dependencies(apm apm_linker)
 
 target_link_options(

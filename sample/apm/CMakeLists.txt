@@ -48,10 +48,19 @@ add_custom_target(
 )
 add_dependencies(echo_size echo)
 
+
+add_custom_target(
+  pingpong_size
+  COMMAND sh "-c" "ls -l $<TARGET_FILE:pingpong> | awk '{print \"#define CONFIG_PINGPONG_SIZE \"$5}' > ${GEN_DIR}/pingpong_size.h"
+  BYPRODUCTS ${GEN_DIR}/pingpong_size.h
+  VERBATIM
+)
+add_dependencies(pingpong_size pingpong)
+
 add_custom_target(
   apm_payload
-  COMMAND ${CMAKE_OBJCOPY} --update-section .console=$<TARGET_FILE:console> --update-section .shell=$<TARGET_FILE:shell> --update-section .echo=$<TARGET_FILE:echo> $<TARGET_FILE:apm> $<TARGET_FILE_DIR:apm>/payload
+  COMMAND ${CMAKE_OBJCOPY} --update-section .console=$<TARGET_FILE:console> --update-section .shell=$<TARGET_FILE:shell> --update-section .echo=$<TARGET_FILE:echo> --update-section .pingpong=$<TARGET_FILE:pingpong> $<TARGET_FILE:apm> $<TARGET_FILE_DIR:apm>/payload
 )
-add_dependencies(apm_payload apm console shell echo)
+add_dependencies(apm_payload apm console shell echo pingpong)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src/arch/${CONFIG_ARCH})
