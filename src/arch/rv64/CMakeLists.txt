@@ -42,8 +42,11 @@ add_dependencies(boot_linker kernel_payload_size)
 
 target_sources(
   kernel PRIVATE
+  kernel/core_id.cpp
   kernel/entry.S
   kernel/start.cpp
+  kernel/trap.cpp
+  kernel/trap.S
 )
 
 add_custom_target(

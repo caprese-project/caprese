@@ -4,9 +4,10 @@
 #include <cstdint>
 
 #include <kernel/address.h>
+#include <kernel/core_id.h>
 
 struct boot_info_t {
-  uintptr_t  hartid;
+  core_id_t  core_id;
   map_addr_t dtb;
 };
 
