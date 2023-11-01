@@ -46,6 +46,7 @@ enum struct log_level_t {
 
 void log(log_level_t level, const char* tag, const char* fmt, va_list ap);
 void lognl();
+void dump();
 
 inline void logd(const char* tag, const char* fmt, ...) {
   if constexpr (CONFIG_LOG_DEBUG) {
@@ -96,19 +97,19 @@ inline void logf(const char* tag, const char* fmt, ...) {
 #define panic(fmt, ...)                        \
 do {                                           \
 if constexpr (CONFIG_LOG_FATAL) {              \
-logf("panic", fmt __VA_OPT__(, ) __VA_ARGS__); \
+logf("log/panic", fmt __VA_OPT__(, ) __VA_ARGS__); \
 dump();                                        \
 }                                              \
-abort();                                       \
+_Exit(0);                                      \
 } while (false)
 #else // ^^^ NDEBUG
 #define panic(fmt, ...)                                                                     \
 do {                                                                                        \
 if constexpr (CONFIG_LOG_FATAL) {                                                           \
-logf("panic", fmt " at %s:%d %s" __VA_OPT__(, ) __VA_ARGS__, __FILE__, __LINE__, __func__); \
+logf("log/panic", fmt " at %s:%d %s" __VA_OPT__(, ) __VA_ARGS__, __FILE__, __LINE__, __func__); \
 dump();                                                                                     \
 }                                                                                           \
-abort();                                                                                    \
+_Exit(0);                                                                                   \
 } while (false)
 #endif // !NDEBUG
 

@@ -46,13 +46,6 @@ SECTIONS
 
   _kernel_end = .;
 
-  .init :
-  {
-    *(.init.*)
-  }
-
-  . = ALIGN(0x1000);
-
   _payload_start = .;
 
   .payload :
@@ -68,5 +61,12 @@ SECTIONS
   }
 
   _payload_end = .;
+
+  . = ALIGN(16);
+
+  .init :
+  {
+    *(.init.*)
+  }
 }
 

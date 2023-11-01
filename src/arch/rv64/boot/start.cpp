@@ -5,7 +5,7 @@
 #include <kernel/csr.h>
 #include <log/log.h>
 
-constexpr const char* tag = "boot";
+constexpr const char* tag = "boot/start";
 
 struct page_table_entry_t {
   uint64_t v  : 1;
@@ -81,7 +81,6 @@ extern "C" [[noreturn]] void start(uintptr_t hartid, uintptr_t dtb) {
   asm volatile("csrw stvec, %0" : : "r"(CONFIG_MAPPED_SPACE_BASE + _payload_start));
 
   logi(tag, "Jumping to kernel...");
-  lognl();
 
   asm volatile("mv a0, %0" : : "r"(hartid));
   asm volatile("mv a1, %0" : : "r"(CONFIG_MAPPED_SPACE_BASE + dtb));

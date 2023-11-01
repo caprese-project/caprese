@@ -4,6 +4,12 @@ target_sources(
   libc PRIVATE
   libc/errno.cpp
   libc/stdio.cpp
+  libc/stdlib.cpp
+)
+
+target_sources(
+  log PRIVATE
+  log/dump.cpp
 )
 
 function(declare_boot name)

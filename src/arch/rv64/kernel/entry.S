@@ -1,7 +1,7 @@
 .extern __global_pointer$
 .type __global_pointer$, @object
-.extern start
-.type start, @function
+.extern arch_start
+.type arch_start, @function
 
 .section .text.entry
 
@@ -17,7 +17,7 @@ _start:
   .option pop
 
   la sp, _stack
-  j start
+  j arch_start
 
 spin:
   wfi

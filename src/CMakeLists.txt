@@ -50,11 +50,10 @@ declare_executable(boot_stub)
 declare_executable(kernel)
 declare_executable(boot)
 
-# target_sources(
-# kernel PRIVATE
-# kernel/
-# cap/
-# )
+target_sources(
+  kernel PRIVATE
+  kernel/start.cpp
+)
 add_subdirectory(arch/${CONFIG_ARCH})
 
 add_custom_target(
