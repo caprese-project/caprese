@@ -1,13 +1,15 @@
-# Caprese
-#
-# (c) 2023 cosocaf
-#
-# This project is released under the MIT License.
-# See https://github.com/cosocaf/caprese/blob/master/LICENSE
-
 cmake_minimum_required(VERSION 3.0)
 
 function(declare_deps)
+  include(FetchContent)
+
+  set(LIBC_COMPILE_OPTIONS ${CONFIG_C_OPTIONS})
+  FetchContent_Declare(
+    caprese_libc
+    GIT_REPOSITORY https://github.com/caprese-project/libc.git
+  )
+  FetchContent_MakeAvailable(caprese_libc)
+
   if(${CONFIG_ARCH} STREQUAL rv64)
     execute_process(
       COMMAND sh "-c" "grep cpu.cores /proc/cpuinfo | sort -u | sed 's/[^0-9]//g'"

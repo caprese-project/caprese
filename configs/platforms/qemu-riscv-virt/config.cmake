@@ -8,3 +8,7 @@
 cmake_minimum_required(VERSION 3.0)
 
 declare_arch(ARCH rv64 MMU sv39)
+
+add_compile_definitions(
+  CONFIG_ANSI_ESC_SEQ=1
+)

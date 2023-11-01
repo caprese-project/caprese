@@ -1,17 +1,6 @@
-# Caprese
-#
-# (c) 2023 cosocaf
-#
-# This project is released under the MIT License.
-# See https://github.com/cosocaf/caprese/blob/master/LICENSE
-
 cmake_minimum_required(VERSION 3.12)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(GEN_DIR ${CMAKE_BINARY_DIR}/generated/caprese/generated)
-file(MAKE_DIRECTORY ${GEN_DIR})
 
 include(configs/helpers/declare_arch.cmake)
 include(configs/helpers/check_config.cmake)
@@ -26,19 +15,39 @@ endif(DEFINED PLATFORM)
 
 declare_deps()
 
+set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include/arch/${CONFIG_ARCH})
+set(GENERATE_DIR ${CMAKE_BINARY_DIR}/generated)
+file(MAKE_DIRECTORY ${GENERATE_DIR})
+
 project(
   caprese
   VERSION 0.0.1
-  HOMEPAGE_URL https://github.com/cosocaf/caprese
+  HOMEPAGE_URL https://github.com/caprese-project/caprese
   LANGUAGES CXX ASM
 )
 
-if(NOT DEFINED CONFIG_USER_PAYLOAD OR NOT DEFINED CONFIG_USER_PAYLOAD_BASE_ADDRESS)
-  add_subdirectory(${ROOT_DIR}/sample)
+if(CMAKE_BUILD_TYPE STREQUAL Debug)
+  add_definitions(-DCONFIG_LOG_DEBUG=1)
+endif()
 
-  if(NOT DEFINED CONFIG_USER_PAYLOAD OR NOT DEFINED CONFIG_USER_PAYLOAD_BASE_ADDRESS)
-    message(FATAL_ERROR "Invalid configuration.")
+if(DEFINED CONFIG_LOG_LEVEL)
+  string(TOLOWER "${CONFIG_LOG_LEVEL}" LOG_LEVEL)
+
+  if(LOG_LEVEL STREQUAL all)
+    add_definitions(-DCONFIG_LOG_DEBUG=1 -DCONFIG_LOG_INFO=1 -DCONFIG_LOG_WARNING=1 -DCONFIG_LOG_ERROR=1 -DCONFIG_LOG_FATAL=1)
+  elseif(LOG_LEVEL STREQUAL debug)
+    add_definitions(-DCONFIG_LOG_DEBUG=1 -DCONFIG_LOG_INFO=1 -DCONFIG_LOG_WARNING=1 -DCONFIG_LOG_ERROR=1 -DCONFIG_LOG_FATAL=1)
+  elseif(LOG_LEVEL STREQUAL info)
+    add_definitions(-DCONFIG_LOG_INFO=1 -DCONFIG_LOG_WARNING=1 -DCONFIG_LOG_ERROR=1 -DCONFIG_LOG_FATAL=1)
+  elseif(LOG_LEVEL STREQUAL warning)
+    add_definitions(-DCONFIG_LOG_WARNING=1 -DCONFIG_LOG_ERROR=1 -DCONFIG_LOG_FATAL=1)
+  elseif(LOG_LEVEL STREQUAL error)
+    add_definitions(-DCONFIG_LOG_ERROR=1 -DCONFIG_LOG_FATAL=1)
+  elseif(LOG_LEVEL STREQUAL fatal)
+    add_definitions(-DCONFIG_LOG_FATAL=1)
+  else()
+    message(WARNING "Unknown log level: ${CONFIG_LOG_LEVEL}")
   endif()
 endif()
 
-add_subdirectory(${ROOT_DIR}/src)
+add_subdirectory(src)

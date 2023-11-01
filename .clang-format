@@ -45,19 +45,17 @@ EmptyLineAfterAccessModifier: Never
 EmptyLineBeforeAccessModifier: LogicalBlock
 FixNamespaceComments: true
 ForEachMacros: []
-IfMacros: []
+IfMacros:
+  - __if_likely
+  - __if_unlikely
 IncludeBlocks: Regroup
 IncludeCategories:
   - Regex: ^<[^/.]+>$
     Priority: 1
-  - Regex: ^<caprese/.*\.h>$
-    Priority: 2
-  - Regex: ^<caprese/arch/.*\.h>$
-    Priority: 3
   - Regex: ^<.*\.h>$
-    Priority: 4
+    Priority: 2
   - Regex: .*
-    Priority: 5
+    Priority: 3
 IndentAccessModifiers: false
 IndentCaseBlocks: false
 IndentCaseLabels: true
