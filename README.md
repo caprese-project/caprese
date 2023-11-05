@@ -6,35 +6,11 @@ Caprese is a microkernel that protects resources with capability-based security.
 
 ## Fetching, Configuring and Building
 
-1. Clone Caprese from GitHub
-```sh
-git clone https://github.com/cosocaf/caprese
-cd caprese
-```
-
-2. Configure CMake
-```sh
-# <YOUR_PLATFORM> is the target platform, see configs/platforms.
-cmake -B build -G Ninja -DPLATFORM=<YOUR_PLATFORM> -DDCONFIG_USER_PAYLOAD=<YOUR_USER_PAYLOAD> -DDCONFIG_USER_PAYLOAD_BASE_ADDRESS=<0x00000000>
-```
-
-3. Build
-```sh
-cmake --build build
-```
-
-If the target is qemu-riscv-virt, you can run the kernel with the following command.
-```sh
-./scripts/simulate
-```
+todo
 
 ## Sample OS
 
-```sh
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE:STRING=Debug -DPLATFORM=qemu-riscv-virt
-cmake --build build
-./scripts/simulate
-```
+todo
 
 ## Lisence
 
