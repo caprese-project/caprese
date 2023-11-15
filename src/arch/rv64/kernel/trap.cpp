@@ -59,6 +59,8 @@ extern "C" {
   sstatus |= SSTATUS_SPIE;
   asm volatile("csrw sstatus, %0" : : "r"(sstatus));
 
+  task->frame.stack = reinterpret_cast<uintptr_t>(task) + PAGE_SIZE;
+
   _return_to_user_mode(&task->frame);
 }
 
