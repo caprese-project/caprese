@@ -4,17 +4,17 @@
 #include <log/log.h>
 
 namespace {
-  __signal_handler_t __signal_handlers[NSIG];
+  void (*__signal_handlers[NSIG])(int);
 } // namespace
 
 extern "C" {
-  int __raise(int sig) {
+  int raise(int sig) {
     if (sig < 0 || sig >= NSIG) {
       errno = EINVAL;
       return -1;
     }
 
-    __signal_handler_t handler = __signal_handlers[sig];
+    void (*handler)(int) = __signal_handlers[sig];
     if (handler == SIG_DFL) {
       panic("Unhandled signal.");
     } else if (handler == SIG_IGN) {
@@ -30,14 +30,14 @@ extern "C" {
     return 0;
   }
 
-  __signal_handler_t __signal(int sig, __signal_handler_t handler) {
+  void (*signal(int sig, void (*handler)(int)))(int) {
     if (sig < 0 || sig >= NSIG) {
       errno = EINVAL;
       return SIG_ERR;
     }
 
-    __signal_handler_t old_handler = __signal_handlers[sig];
-    __signal_handlers[sig]         = handler;
+    void (*old_handler)(int) = __signal_handlers[sig];
+    __signal_handlers[sig]   = handler;
     return old_handler;
   }
 }
