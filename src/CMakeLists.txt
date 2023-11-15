@@ -34,25 +34,25 @@ function(declare_executable name)
   target_link_libraries(${name} ${COMMON_LIBRARIES})
 endfunction(declare_executable)
 
-declare_library(libc TRUE)
-declare_library(log TRUE)
+declare_library(caprese_kernel_libc TRUE)
+declare_library(caprese_log TRUE)
 
 target_sources(
-  log PRIVATE
+  caprese_log PRIVATE
   log/log.cpp
 )
 
-target_link_libraries(caprese_libc_stdio PUBLIC libc)
-target_link_libraries(caprese_libc_signal PUBLIC libc)
-target_link_libraries(libc PUBLIC caprese_libc caprese_libcxx)
-target_link_libraries(log PUBLIC caprese_libc caprese_libcxx)
+target_link_libraries(caprese_libc_stdio PUBLIC caprese_kernel_libc)
+target_link_libraries(caprese_libc_signal PUBLIC caprese_kernel_libc)
+target_link_libraries(caprese_kernel_libc PUBLIC caprese_libc caprese_libcxx)
+target_link_libraries(caprese_log PUBLIC caprese_libc caprese_libcxx)
 
-declare_executable(boot_stub)
-declare_executable(kernel)
-declare_executable(boot)
+declare_executable(caprese_boot_stub)
+declare_executable(caprese_kernel)
+declare_executable(caprese_boot)
 
 target_sources(
-  kernel PRIVATE
+  caprese_kernel PRIVATE
   kernel/cls.cpp
   kernel/lock.cpp
   kernel/start.cpp
@@ -62,12 +62,12 @@ target_sources(
 add_subdirectory(arch/${CONFIG_ARCH})
 
 add_custom_target(
-  kernel_payload_base
-  COMMAND sh "-c" "${CMAKE_OBJDUMP} $<TARGET_FILE:boot_stub> -h | awk '/.payload/{print \"#define CONFIG_KERNEL_PAYLOAD_BASE 0x\"$4}' > ${GENERATE_DIR}/kernel_payload_base.h"
+  caprese_kernel_payload_base
+  COMMAND sh "-c" "${CMAKE_OBJDUMP} $<TARGET_FILE:caprese_boot_stub> -h | awk '/.payload/{print \"#define CONFIG_KERNEL_PAYLOAD_BASE 0x\"$4}' > ${GENERATE_DIR}/kernel_payload_base.h"
   BYPRODUCTS ${GENERATE_DIR}/kernel_payload_base.h
   VERBATIM
 )
-add_dependencies(kernel_payload_base boot_stub)
+add_dependencies(caprese_kernel_payload_base caprese_boot_stub)
 
 add_custom_target(
   root_task_payload_size
@@ -75,31 +75,31 @@ add_custom_target(
   BYPRODUCTS ${GENERATE_DIR}/root_task_payload_size.h
   VERBATIM
 )
-add_dependencies(kernel root_task_payload_size)
+add_dependencies(caprese_kernel root_task_payload_size)
 
 add_custom_target(
-  kernel_payload
-  COMMAND ${CMAKE_OBJCOPY} -O binary --update-section .payload=${CONFIG_ROOT_TASK_PAYLOAD} $<TARGET_FILE:kernel> $<TARGET_FILE_DIR:kernel>/payload
+  caprese_kernel_payload
+  COMMAND ${CMAKE_OBJCOPY} -O binary --update-section .payload=${CONFIG_ROOT_TASK_PAYLOAD} $<TARGET_FILE:caprese_kernel> $<TARGET_FILE_DIR:caprese_kernel>/payload
 )
-add_dependencies(kernel_payload kernel)
+add_dependencies(caprese_kernel_payload caprese_kernel)
 
 add_custom_target(
-  kernel_payload_size
-  COMMAND sh "-c" "ls -l $<TARGET_FILE_DIR:kernel>/payload | awk '{print \"#define CONFIG_KERNEL_PAYLOAD_SIZE \"$5}' > ${GENERATE_DIR}/kernel_payload_size.h"
+  caprese_kernel_payload_size
+  COMMAND sh "-c" "ls -l $<TARGET_FILE_DIR:caprese_kernel>/payload | awk '{print \"#define CONFIG_KERNEL_PAYLOAD_SIZE \"$5}' > ${GENERATE_DIR}/kernel_payload_size.h"
   BYPRODUCTS ${GENERATE_DIR}/kernel_payload_size.h
   VERBATIM
 )
-add_dependencies(kernel_payload_size kernel_payload)
+add_dependencies(caprese_kernel_payload_size caprese_kernel_payload)
 
 if(TARGET root_task_payload)
   add_dependencies(root_task_payload_size root_task_payload)
-  add_dependencies(kernel_payload root_task_payload)
+  add_dependencies(caprese_kernel_payload root_task_payload)
 endif()
 
 add_custom_target(
-  boot_payload
-  COMMAND ${CMAKE_OBJCOPY} -O binary --update-section .payload=$<TARGET_FILE_DIR:kernel>/payload $<TARGET_FILE:boot> $<TARGET_FILE_DIR:boot>/payload
+  caprese_boot_payload
+  COMMAND ${CMAKE_OBJCOPY} -O binary --update-section .payload=$<TARGET_FILE_DIR:caprese_kernel>/payload $<TARGET_FILE:caprese_boot> $<TARGET_FILE_DIR:caprese_boot>/payload
 )
-add_dependencies(boot_payload boot)
+add_dependencies(caprese_boot_payload caprese_boot)
 
-add_dependencies(boot kernel_payload)
+add_dependencies(caprese_boot caprese_kernel_payload)

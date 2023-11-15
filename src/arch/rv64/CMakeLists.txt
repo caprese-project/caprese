@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 target_sources(
-  libc PRIVATE
+  caprese_kernel_libc PRIVATE
   libc/errno.cpp
   libc/signal.cpp
   libc/stdio.cpp
@@ -9,7 +9,7 @@ target_sources(
 )
 
 target_sources(
-  log PRIVATE
+  caprese_log PRIVATE
   log/dump.cpp
 )
 
@@ -37,12 +37,12 @@ function(declare_boot name)
   set_target_properties(${name} PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/boot/linker.ldS)
 endfunction(declare_boot)
 
-declare_boot(boot_stub)
-declare_boot(boot)
-add_dependencies(boot_linker kernel_payload_size)
+declare_boot(caprese_boot_stub)
+declare_boot(caprese_boot)
+add_dependencies(caprese_boot_linker caprese_kernel_payload_size)
 
 target_sources(
-  kernel PRIVATE
+  caprese_kernel PRIVATE
   kernel/arch/dtb.cpp
   kernel/context.cpp
   kernel/context.S
@@ -56,19 +56,19 @@ target_sources(
 )
 
 add_custom_target(
-  kernel_linker
+  caprese_kernel_linker
   COMMAND ${CMAKE_C_COMPILER} -DCONFIG_MAPPED_SPACE_BASE=${CONFIG_MAPPED_SPACE_BASE} -I ${GENERATE_DIR} -E -P -x c ${CMAKE_CURRENT_SOURCE_DIR}/kernel/linker.ldS >${CMAKE_CURRENT_BINARY_DIR}/kernel/linker.ld
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/kernel/linker.ldS
   BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/kernel/linker.ld
 )
-add_dependencies(kernel_linker kernel_payload_base)
-add_dependencies(kernel kernel_linker)
+add_dependencies(caprese_kernel_linker caprese_kernel_payload_base)
+add_dependencies(caprese_kernel caprese_kernel_linker)
 
 target_link_options(
-  kernel
+  caprese_kernel
   PRIVATE
   -T ${CMAKE_CURRENT_BINARY_DIR}/kernel/linker.ld
   -nostdlib
   -z max-page-size=4096
 )
-set_target_properties(kernel PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/kernel/linker.ldS)
+set_target_properties(caprese_kernel PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/kernel/linker.ldS)

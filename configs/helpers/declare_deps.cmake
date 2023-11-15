@@ -54,10 +54,10 @@ function(declare_deps)
 
     add_custom_target(
       opensbi ALL
-      COMMAND ${MAKE_COMMAND} FW_PAYLOAD_PATH=$<TARGET_FILE_DIR:boot>/payload O=build
+      COMMAND ${MAKE_COMMAND} FW_PAYLOAD_PATH=$<TARGET_FILE_DIR:caprese_boot>/payload O=build
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/opensbi
     )
-    add_dependencies(opensbi boot_payload)
+    add_dependencies(opensbi caprese_boot_payload)
 
     add_custom_command(
       TARGET opensbi POST_BUILD
