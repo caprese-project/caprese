@@ -8,6 +8,7 @@
 
 struct boot_info_t {
   core_id_t  core_id;
+  size_t     cap_count;
   map_addr_t dtb;
 };
 

@@ -1,5 +1,5 @@
 #include <kernel_payload_base.h>
-#include <init_task_payload_size.h>
+#include <root_task_payload_size.h>
 
 OUTPUT_ARCH( "riscv" )
 ENTRY( _start )
@@ -52,12 +52,12 @@ SECTIONS
   {
     *(.payload)
     KEEP(*(.payload))
-    . += CONFIG_INIT_TASK_PAYLOAD_SIZE;
+    . += CONFIG_ROOT_TASK_PAYLOAD_SIZE;
     . = ALIGN(0x1000);
-    _init_task_stack_start = .;
+    _root_task_stack_start = .;
     /* TODO: Make the stack size configurable. */
     . += 0x1000;
-    _init_task_stack_end = .;
+    _root_task_stack_end = .;
   }
 
   _payload_end = .;

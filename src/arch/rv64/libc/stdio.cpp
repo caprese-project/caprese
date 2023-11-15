@@ -1,4 +1,4 @@
-#include <kernel/sbi.h>
+#include <kernel/arch/sbi.h>
 
 extern "C" {
   struct __FILE {
@@ -12,6 +12,10 @@ extern "C" {
   } // namespace
 
   struct __FILE* __stdout() {
+    return &__stdout_file;
+  }
+
+  struct __FILE* __stderr() {
     return &__stdout_file;
   }
 

@@ -15,8 +15,9 @@ extern "C" {
     logd(tag, "Boot args: hartid=%lu, dtb=%p", hartid, dtb);
 
     boot_info_t boot_info;
-    boot_info.core_id = hartid;
-    boot_info.dtb     = dtb;
+    boot_info.core_id   = hartid;
+    boot_info.cap_count = 0;
+    boot_info.dtb       = dtb;
 
     start(&boot_info);
   }

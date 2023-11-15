@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <utility>
 
-#include <kernel/csr.h>
+#include <kernel/arch/csr.h>
 #include <log/log.h>
 
 constexpr const char* tag = "boot/start";

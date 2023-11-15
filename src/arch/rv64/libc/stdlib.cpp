@@ -1,4 +1,4 @@
-#include <kernel/sbi.h>
+#include <kernel/arch/sbi.h>
 
 extern "C" {
   [[noreturn]] void _Exit([[maybe_unused]] int status) {

@@ -1,7 +1,9 @@
 #ifndef KERNEL_ADDRESS_H_
 #define KERNEL_ADDRESS_H_
 
+#include <compare>
 #include <cstddef>
+#include <cstdint>
 #include <type_traits>
 
 template<typename Derived>
@@ -37,6 +39,14 @@ struct _addr_t {
 
   [[nodiscard]] constexpr bool operator!=(nullptr_t) const {
     return value != 0;
+  }
+
+  [[nodiscard]] constexpr Derived operator+(size_t n) const {
+    return Derived::from(value + n);
+  }
+
+  [[nodiscard]] constexpr Derived operator+(ptrdiff_t n) const {
+    return Derived::from(value + n);
   }
 };
 

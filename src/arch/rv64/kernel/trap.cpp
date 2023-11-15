@@ -1,7 +1,7 @@
 #include <cstdint>
 
+#include <kernel/arch/csr.h>
 #include <kernel/cls.h>
-#include <kernel/csr.h>
 #include <kernel/syscall.h>
 #include <kernel/task.h>
 #include <kernel/trap.h>
@@ -13,7 +13,7 @@ namespace {
 
 extern "C" {
   // Defined in src/arch/rv64/kernel/trap.S
-  [[noreturn]] void _return_to_user_mode();
+  [[noreturn]] void _return_to_user_mode(frame_t*);
 
   [[noreturn]] void _kernel_trap() {
     panic("Kernel trap!");
@@ -34,10 +34,10 @@ extern "C" {
     } else {
       if (scause & SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE) {
         enable_trap();
-        sysret_t sysret               = invoke_syscall();
-        task->arch_task.trap_frame.a0 = sysret.result;
-        task->arch_task.trap_frame.a1 = sysret.error;
-        task->arch_task.trap_frame.sepc += 4;
+        sysret_t sysret = invoke_syscall();
+        task->frame.a0  = sysret.result;
+        task->frame.a1  = sysret.error;
+        task->frame.sepc += 4;
       } else {
         panic("User trap!");
       }
@@ -50,6 +50,8 @@ extern "C" {
 [[noreturn]] void return_to_user_mode() {
   logd(tag, "Return to user mode.");
 
+  task_t* task = get_cls()->current_task;
+
   uint64_t sstatus;
   asm volatile("csrr %0, sstatus" : "=r"(sstatus));
   sstatus &= ~SSTATUS_SIE;
@@ -57,12 +59,25 @@ extern "C" {
   sstatus |= SSTATUS_SPIE;
   asm volatile("csrw sstatus, %0" : : "r"(sstatus));
 
-  _return_to_user_mode();
+  _return_to_user_mode(&task->frame);
 }
 
-[[noreturn]] void default_trap_handler() {
-  logd(tag, "Handle trap!");
-  return_to_user_mode();
+void arch_init_task(task_t* task) {
+  assert(task != nullptr);
+
+  task->context = {};
+  task->frame   = {};
+
+  task->context.ra = reinterpret_cast<uintptr_t>(return_to_user_mode);
+  task->context.sp = reinterpret_cast<uintptr_t>(task) + PAGE_SIZE;
+
+#if defined(CONFIG_MMU_SV39)
+  task->frame.satp = SATP_MODE_SV39;
+#elif defined(CONFIG_MMU_SV48)
+  task->frame.satp = SATP_MODE_SV48;
+#endif
+
+  task->frame.satp |= map_addr_t::from(task->root_page_table).as_phys().as<uintptr_t>() >> PAGE_SIZE_BIT;
 }
 
 void set_trap_handler(void (*handler)()) {

@@ -1,9 +1,11 @@
 #ifndef ARCH_RV64_KERNEL_TRAP_H_
 #define ARCH_RV64_KERNEL_TRAP_H_
 
+#include <kernel/task.h>
+
 [[noreturn]] void return_to_user_mode();
 
-[[noreturn]] void default_trap_handler();
+void arch_init_task(task_t* task);
 
 void set_trap_handler(void (*handler)());
 

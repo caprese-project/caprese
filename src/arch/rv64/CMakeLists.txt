@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 target_sources(
   libc PRIVATE
   libc/errno.cpp
+  libc/signal.cpp
   libc/stdio.cpp
   libc/stdlib.cpp
 )
@@ -42,8 +43,13 @@ add_dependencies(boot_linker kernel_payload_size)
 
 target_sources(
   kernel PRIVATE
+  kernel/arch/dtb.cpp
+  kernel/context.cpp
+  kernel/context.S
   kernel/core_id.cpp
   kernel/entry.S
+  kernel/frame.cpp
+  kernel/setup.cpp
   kernel/start.cpp
   kernel/trap.cpp
   kernel/trap.S

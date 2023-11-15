@@ -32,4 +32,4 @@ spin:
 _stack:
 
 .section .payload, "ax", %progbits
-.section .init_task_stack, "a", %progbits
+.section .root_task_stack, "a", %progbits

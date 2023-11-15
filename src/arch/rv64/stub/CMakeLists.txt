@@ -17,10 +17,10 @@ target_link_options(
 set_target_properties(stub PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/linker.ld)
 
 add_custom_target(
-  init_task_payload
+  root_task_payload
   COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:stub> $<TARGET_FILE_DIR:stub>/payload
 )
-add_dependencies(init_task_payload stub)
+add_dependencies(root_task_payload stub)
 
-set(CONFIG_INIT_TASK_PAYLOAD $<TARGET_FILE_DIR:stub>/payload PARENT_SCOPE)
-set(CONFIG_INIT_TASK_PAYLOAD_BASE_ADDRESS 0xa0000000 PARENT_SCOPE)
+set(CONFIG_ROOT_TASK_PAYLOAD $<TARGET_FILE_DIR:stub>/payload PARENT_SCOPE)
+set(CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS 0xa0000000 PARENT_SCOPE)
