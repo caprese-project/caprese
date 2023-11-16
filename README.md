@@ -10,7 +10,7 @@ todo
 
 ## Sample OS
 
-todo
+repo: [https://github.com/caprese-project/sample-os](https://github.com/caprese-project/sample-os)
 
 ## Lisence
 
