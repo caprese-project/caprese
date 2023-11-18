@@ -8,7 +8,11 @@ function(declare_deps)
     caprese_libc
     GIT_REPOSITORY https://github.com/caprese-project/libc.git
   )
-  FetchContent_MakeAvailable(caprese_libc)
+  FetchContent_GetProperties(caprese_libc)
+
+  if(NOT caprese_libc_POPULATED)
+    FetchContent_MakeAvailable(caprese_libc)
+  endif()
 
   if(${CONFIG_ARCH} STREQUAL rv64)
     execute_process(
@@ -59,9 +63,13 @@ function(declare_deps)
     )
     add_dependencies(opensbi caprese_boot_payload)
 
+    if(NOT CONFIG_OUTPUT)
+      set(CONFIG_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/image.elf)
+    endif()
+
     add_custom_command(
       TARGET opensbi POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/external/opensbi/build/${PAYLOAD_PATH} ${CMAKE_BINARY_DIR}/image.elf
+      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/external/opensbi/build/${PAYLOAD_PATH} ${CONFIG_OUTPUT}
     )
   endif()
 endfunction(declare_deps)
