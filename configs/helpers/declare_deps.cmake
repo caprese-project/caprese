@@ -34,22 +34,22 @@ function(declare_deps)
     )
     set(PAYLOAD_PATH platform/generic/firmware/fw_payload.elf)
 
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/external)
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external)
 
-    if(NOT EXISTS ${CMAKE_BINARY_DIR}/external/opensbi)
+    if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/external/opensbi)
       execute_process(
         COMMAND git clone https://github.com/riscv/opensbi -b v1.3.1 --depth 1
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external
       )
       execute_process(
         COMMAND ${MAKE_COMMAND} O=prebuild
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/opensbi
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/opensbi
       )
     endif()
 
     execute_process(
-      COMMAND sh "-c" "${CMAKE_OBJDUMP} ${CMAKE_BINARY_DIR}/external/opensbi/prebuild/${PAYLOAD_PATH} -h | awk '/\\.payload/{print $4}'"
-      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/opensbi
+      COMMAND sh "-c" "${CMAKE_OBJDUMP} ${CMAKE_CURRENT_BINARY_DIR}/external/opensbi/prebuild/${PAYLOAD_PATH} -h | awk '/\\.payload/{print $4}'"
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/opensbi
       OUTPUT_VARIABLE PAYLOAD_BASE
     )
 
@@ -59,7 +59,7 @@ function(declare_deps)
     add_custom_target(
       opensbi ALL
       COMMAND ${MAKE_COMMAND} FW_PAYLOAD_PATH=$<TARGET_FILE_DIR:caprese_boot>/payload O=build
-      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/external/opensbi
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/opensbi
     )
     add_dependencies(opensbi caprese_boot_payload)
 
@@ -69,7 +69,7 @@ function(declare_deps)
 
     add_custom_command(
       TARGET opensbi POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/external/opensbi/build/${PAYLOAD_PATH} ${CONFIG_OUTPUT}
+      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/external/opensbi/build/${PAYLOAD_PATH} ${CONFIG_OUTPUT}
     )
   endif()
 endfunction(declare_deps)
