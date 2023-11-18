@@ -100,7 +100,7 @@ __init_code void setup_root_task_payload() {
   }
 
   set_register(&root_task.frame, REG_PROGRAM_COUNTER, CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS);
-  set_register(&root_task.frame, REG_STACK_POINTER, reinterpret_cast<uintptr_t>(_root_task_stack_end));
+  set_register(&root_task.frame, REG_STACK_POINTER, CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS + (_root_task_stack_end - _payload_start));
 
   logi(tag, "Setting up the root task payload... done");
 }
