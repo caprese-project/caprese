@@ -45,7 +45,7 @@ namespace {
   page_table_t root_task_page_tables[NUM_PAGE_TABLE_LEVEL - 1];
   page_table_t root_task_cap_space_page_tables[MAX_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL + 1];
 
-  __init_data root_boot_info_t alignas(PAGE_SIZE) root_boot_info;
+  __init_data alignas(PAGE_SIZE) root_boot_info_t root_boot_info;
 } // namespace
 
 __init_code [[noreturn]] void early_trap_handler() {
