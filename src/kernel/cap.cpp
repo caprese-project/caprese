@@ -13,8 +13,6 @@ cap_slot_t* create_memory_object(cap_slot_t* dst, cap_slot_t* src, bool readable
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(dst->next == nullptr);
-  assert(dst->prev == nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
   auto& mem_cap = src->cap.memory;
@@ -48,6 +46,8 @@ cap_slot_t* create_memory_object(cap_slot_t* dst, cap_slot_t* src, bool readable
   if (src->next != nullptr) [[unlikely]] {
     src->next->prev = dst;
     dst->next       = src->next;
+  } else {
+    dst->next = nullptr;
   }
 
   src->next = dst;
@@ -63,8 +63,6 @@ cap_slot_t* create_task_object(
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(dst->next == nullptr);
-  assert(dst->prev == nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
   assert(cap_space_slot != nullptr);
   assert(get_cap_type(cap_space_slot->cap) == CAP_CAP_SPACE);
@@ -121,8 +119,6 @@ cap_slot_t* create_page_table_object(cap_slot_t* dst, cap_slot_t* src, uint64_t 
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(dst->next == nullptr);
-  assert(dst->prev == nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
   if (level >= MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
@@ -148,8 +144,6 @@ cap_slot_t* create_virt_page_object(cap_slot_t* dst, cap_slot_t* src, bool reada
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(dst->next == nullptr);
-  assert(dst->prev == nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
   if (level >= MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
@@ -172,8 +166,6 @@ cap_slot_t* create_cap_space_object(cap_slot_t* dst, cap_slot_t* src) {
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(dst->next == nullptr);
-  assert(dst->prev == nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
   auto& mem_cap = src->cap.memory;

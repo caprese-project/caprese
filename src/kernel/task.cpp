@@ -92,6 +92,8 @@ cap_slot_t* insert_cap(task_t* task, capability_t cap) {
   cap_slot_t* slot = task->free_slots;
   task->free_slots = slot->prev;
 
+  slot->prev = nullptr;
+  slot->next = nullptr;
   slot->cap = cap;
 
   return slot;
