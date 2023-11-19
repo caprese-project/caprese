@@ -51,8 +51,11 @@ declare_executable(caprese_boot_stub)
 declare_executable(caprese_kernel)
 declare_executable(caprese_boot)
 
+target_link_libraries(caprese_kernel libcaprese)
+
 target_sources(
   caprese_kernel PRIVATE
+  kernel/cap.cpp
   kernel/cls.cpp
   kernel/lock.cpp
   kernel/start.cpp

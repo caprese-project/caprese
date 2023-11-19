@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstring>
+#include <iterator>
 
 #include <kernel/attribute.h>
 #include <kernel/cap_space.h>
@@ -61,7 +62,13 @@ __init_code void setup_root_task() {
   logi(tag, "Setting up the root task...");
 
   get_cls()->current_task = &root_task;
-  init_task(&root_task, &root_task_first_cap_space, &root_task_root_page_table, root_task_cap_space_page_tables);
+
+  page_table_t* tables[std::size(root_task_cap_space_page_tables)];
+  for (size_t i = 0; i < std::size(root_task_cap_space_page_tables); ++i) {
+    tables[i] = &root_task_cap_space_page_tables[i];
+  }
+
+  init_task(&root_task, &root_task_first_cap_space, &root_task_root_page_table, tables);
 
   logi(tag, "Setting up the root task... done");
 }

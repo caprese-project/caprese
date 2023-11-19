@@ -51,6 +51,7 @@ target_sources(
   kernel/frame.cpp
   kernel/setup.cpp
   kernel/start.cpp
+  kernel/syscall.cpp
   kernel/trap.cpp
   kernel/trap.S
 )

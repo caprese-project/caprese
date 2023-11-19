@@ -61,7 +61,7 @@ struct alignas(PAGE_SIZE) task_t {
 
 static_assert(sizeof(task_t) == PAGE_SIZE);
 
-void init_task(task_t* task, cap_space_t* cap_space, page_table_t* root_page_table, page_table_t (&cap_space_page_tables)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]);
+void init_task(task_t* task, cap_space_t* cap_space, page_table_t* root_page_table, page_table_t* (&cap_space_page_tables)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]);
 
 [[nodiscard]] bool insert_cap(task_t* task, cap_t cap);
 
@@ -73,6 +73,8 @@ void switch_task(task_t* task);
 void suspend_task(task_t* task);
 void resume_task(task_t* task);
 
-task_t* lookup_tid(tid_t tid);
+task_t*     lookup_tid(tid_t tid);
+cap_slot_t* lookup_cap(task_t* task, uintptr_t cap_desc);
+size_t      get_cap_slot_index(cap_slot_t* cap_slot);
 
 #endif // KERNEL_TASK_H_

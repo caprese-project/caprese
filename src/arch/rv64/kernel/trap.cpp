@@ -34,7 +34,7 @@ extern "C" {
     } else {
       if (scause & SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE) {
         enable_trap();
-        sysret_t sysret = invoke_syscall();
+        sysret_t sysret = invoke_syscall(task);
         task->frame.a0  = sysret.result;
         task->frame.a1  = sysret.error;
         task->frame.sepc += 4;

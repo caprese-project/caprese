@@ -25,7 +25,7 @@ namespace {
   }
 } // namespace
 
-void init_task(task_t* task, cap_space_t* cap_space, page_table_t* root_page_table, page_table_t (&cap_space_page_tables)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]) {
+void init_task(task_t* task, cap_space_t* cap_space, page_table_t* root_page_table, page_table_t* (&cap_space_page_tables)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]) {
   assert(task != nullptr);
   assert(cap_space != nullptr);
   assert(root_page_table != nullptr);
@@ -55,19 +55,21 @@ void init_task(task_t* task, cap_space_t* cap_space, page_table_t* root_page_tab
     pte->enable();
   }
 
-  memset(cap_space_page_tables, 0, sizeof(cap_space_page_tables));
+  for (auto& table : cap_space_page_tables) {
+    memset(table, 0, sizeof(page_table_t));
+  }
 
   page_table_t* page_table = root_page_table;
   pte_t*        pte        = nullptr;
   for (size_t level = MAX_PAGE_TABLE_LEVEL; level >= GIGA_PAGE_TABLE_LEVEL; --level) {
     pte = page_table->walk(virt_addr_t::from(CONFIG_CAPABILITY_SPACE_BASE), level);
     assert(pte->is_disabled());
-    pte->set_next_page(map_addr_t::from(&cap_space_page_tables[level - MEGA_PAGE_TABLE_LEVEL]));
+    pte->set_next_page(map_addr_t::from(cap_space_page_tables[level - MEGA_PAGE_TABLE_LEVEL]));
     pte->set_flags({ .readable = 1, .writable = 1, .executable = 0, .user = 0, .global = 0 });
     pte->enable();
     page_table = pte->get_next_page().as<page_table_t*>();
   }
-  if (!extend_cap_space(task, map_addr_t::from(cap_space_page_tables))) {
+  if (!extend_cap_space(task, map_addr_t::from(cap_space_page_tables[0]))) {
     panic("Failed to extend cap space.");
   }
 
@@ -267,4 +269,27 @@ task_t* lookup_tid(tid_t tid) {
 
   signal(SIGSEGV, old_handler);
   return task;
+}
+
+cap_slot_t* lookup_cap(task_t* task, uintptr_t cap_desc) {
+  assert(task != nullptr);
+  assert(task == get_cls()->current_task);
+
+  std::lock_guard<recursive_spinlock_t> lock(task->lock);
+
+  if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+    return nullptr;
+  }
+
+  uintptr_t size = task->cap_count.num_cap_space * std::size(static_cast<cap_space_t*>(nullptr)->slots);
+  if (cap_desc >= size) [[unlikely]] {
+    return nullptr;
+  }
+
+  return &reinterpret_cast<cap_slot_t*>(CONFIG_CAPABILITY_SPACE_BASE)[cap_desc];
+}
+
+size_t get_cap_slot_index(cap_slot_t* cap_slot) {
+  assert(cap_slot != nullptr);
+  return cap_slot - reinterpret_cast<cap_slot_t*>(CONFIG_CAPABILITY_SPACE_BASE);
 }
