@@ -67,7 +67,7 @@ sysret_t invoke_syscall_mem_cap(task_t* task, uint16_t id, syscall_args_t* args)
   if (cap_slot == nullptr) [[unlikely]] {
     return sysret_e_invalid_argument();
   }
-  if (get_cap_type(cap_slot->cap) != cap_type_t::memory) [[unlikely]] {
+  if (get_cap_type(cap_slot->cap) != CAP_MEM) [[unlikely]] {
     return sysret_e_invalid_argument();
   }
 
@@ -105,7 +105,7 @@ sysret_t invoke_syscall_task_cap(task_t* task, uint16_t id, syscall_args_t* args
   if (cap_slot == nullptr) [[unlikely]] {
     return sysret_e_invalid_argument();
   }
-  if (get_cap_type(cap_slot->cap) != cap_type_t::task) [[unlikely]] {
+  if (get_cap_type(cap_slot->cap) != CAP_TASK) [[unlikely]] {
     return sysret_e_invalid_argument();
   }
 

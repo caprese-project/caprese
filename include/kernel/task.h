@@ -4,6 +4,7 @@
 #include <bit>
 #include <cstddef>
 
+#include <kernel/cap.h>
 #include <kernel/cap_space.h>
 #include <kernel/context.h>
 #include <kernel/frame.h>
@@ -63,7 +64,7 @@ static_assert(sizeof(task_t) == PAGE_SIZE);
 
 void init_task(task_t* task, cap_space_t* cap_space, page_table_t* root_page_table, page_table_t* (&cap_space_page_tables)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]);
 
-[[nodiscard]] bool insert_cap(task_t* task, cap_t cap);
+[[nodiscard]] cap_slot_t* insert_cap(task_t* task, capability_t cap);
 
 [[nodiscard]] bool insert_cap_space(task_t* task, cap_space_t* cap_space);
 [[nodiscard]] bool extend_cap_space(task_t* task, map_addr_t page);

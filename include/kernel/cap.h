@@ -6,24 +6,14 @@
 
 #include <kernel/address.h>
 #include <kernel/page.h>
+#include <libcaprese/cap.h>
 
 struct task_t;
 struct page_table_t;
 struct cap_space_t;
 struct cap_slot_t;
 
-enum struct cap_type_t : uint64_t {
-  null       = 0,
-  memory     = 1,
-  task       = 2,
-  endpoint   = 3,
-  page_table = 4,
-  virt_page  = 5,
-  cap_space  = 6,
-  zombie     = 7,
-};
-
-union cap_t {
+union capability_t {
   struct {
     uint64_t type   : 5;
     uint64_t unused1: 59;
@@ -84,16 +74,16 @@ union cap_t {
   } zombie;
 };
 
-static_assert(sizeof(cap_t) == sizeof(uint64_t) * 2);
+static_assert(sizeof(capability_t) == sizeof(uint64_t) * 2);
 
-constexpr cap_type_t get_cap_type(cap_t cap) {
+constexpr cap_type_t get_cap_type(capability_t cap) {
   return static_cast<cap_type_t>(cap.null.type);
 }
 
-constexpr cap_t make_null_cap() {
+constexpr capability_t make_null_cap() {
   return {
     .null = {
-      .type = static_cast<uint64_t>(cap_type_t::null),
+      .type = static_cast<uint64_t>(CAP_NULL),
       .unused1 = 0,
       .unused2 = 0,
     },
@@ -105,13 +95,13 @@ constexpr int MEMORY_CAP_READABLE   = 1 << 1;
 constexpr int MEMORY_CAP_WRITABLE   = 1 << 2;
 constexpr int MEMORY_CAP_EXECUTABLE = 1 << 3;
 
-inline cap_t make_memory_cap(int flags, unsigned size_bit, phys_addr_t base_addr) {
+inline capability_t make_memory_cap(int flags, unsigned size_bit, phys_addr_t base_addr) {
   assert(base_addr.as<uintptr_t>() < CONFIG_MAX_PHYSICAL_ADDRESS);
   assert(size_bit < (1 << 6));
 
   return {
     .memory = {
-      .type       = static_cast<uint64_t>(cap_type_t::memory),
+      .type       = static_cast<uint64_t>(CAP_MEM),
       .device     = static_cast<uint64_t>((flags & MEMORY_CAP_DEVICE) >> 0),
       .readable   = static_cast<uint64_t>((flags & MEMORY_CAP_READABLE) >> 1),
       .writable   = static_cast<uint64_t>((flags & MEMORY_CAP_WRITABLE) >> 2),
@@ -131,12 +121,12 @@ constexpr int TASK_CAP_REGISTER_GETTABLE = 1 << 4;
 constexpr int TASK_CAP_REGISTER_SETTABLE = 1 << 5;
 constexpr int TASK_CAP_KILL_NOTIFIABLE   = 1 << 6;
 
-inline cap_t make_task_cap(int flags, task_t* task) {
+inline capability_t make_task_cap(int flags, task_t* task) {
   assert(task != nullptr);
 
   return {
     .task = {
-      .type              = static_cast<uint64_t>(cap_type_t::task),
+      .type              = static_cast<uint64_t>(CAP_TASK),
       .killable          = static_cast<uint64_t>((flags & TASK_CAP_KILLABLE) >> 0),
       .switchable        = static_cast<uint64_t>((flags & TASK_CAP_SWITCHABLE) >> 1),
       .suspendable       = static_cast<uint64_t>((flags & TASK_CAP_SUSPENDABLE) >> 2),
@@ -149,13 +139,13 @@ inline cap_t make_task_cap(int flags, task_t* task) {
   };
 }
 
-inline cap_t make_page_table_cap(uint64_t level, page_table_t* page_table) {
+inline capability_t make_page_table_cap(uint64_t level, page_table_t* page_table) {
   assert(page_table != nullptr);
   assert(level <= MAX_PAGE_TABLE_LEVEL);
 
   return {
     .page_table = {
-      .type  = static_cast<uint64_t>(cap_type_t::page_table),
+      .type  = static_cast<uint64_t>(CAP_PAGE_TABLE),
       .level = level,
       .table = page_table,
     },
@@ -166,13 +156,13 @@ constexpr int VIRT_PAGE_CAP_READABLE   = 1 << 0;
 constexpr int VIRT_PAGE_CAP_WRITABLE   = 1 << 1;
 constexpr int VIRT_PAGE_CAP_EXECUTABLE = 1 << 2;
 
-inline cap_t make_virt_page_cap(int flags, uint64_t level, uint64_t phys_addr) {
+inline capability_t make_virt_page_cap(int flags, uint64_t level, uint64_t phys_addr) {
   assert(phys_addr < CONFIG_MAX_PHYSICAL_ADDRESS);
   assert(level <= MAX_PAGE_TABLE_LEVEL);
 
   return {
     .virt_page = {
-      .type       = static_cast<uint64_t>(cap_type_t::virt_page),
+      .type       = static_cast<uint64_t>(CAP_VIRT_PAGE),
       .readable   = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_READABLE) >> 0),
       .writable   = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_WRITABLE) >> 1),
       .executable = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_EXECUTABLE) >> 2),
@@ -183,12 +173,12 @@ inline cap_t make_virt_page_cap(int flags, uint64_t level, uint64_t phys_addr) {
   };
 }
 
-inline cap_t make_cap_space_cap(cap_space_t* cap_space) {
+inline capability_t make_cap_space_cap(cap_space_t* cap_space) {
   assert(cap_space != nullptr);
 
   return {
     .cap_space = {
-      .type  = static_cast<uint64_t>(cap_type_t::cap_space),
+      .type  = static_cast<uint64_t>(CAP_CAP_SPACE),
       .space = cap_space,
     },
   };

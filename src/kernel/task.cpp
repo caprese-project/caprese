@@ -80,13 +80,13 @@ void init_task(task_t* task, cap_space_t* cap_space, page_table_t* root_page_tab
   arch_init_task(task);
 }
 
-bool insert_cap(task_t* task, cap_t cap) {
+cap_slot_t* insert_cap(task_t* task, capability_t cap) {
   assert(task != nullptr);
 
   std::lock_guard<recursive_spinlock_t> lock(task->lock);
 
   if (task->free_slots == nullptr) [[unlikely]] {
-    return false;
+    return nullptr;
   }
 
   cap_slot_t* slot = task->free_slots;
@@ -94,7 +94,7 @@ bool insert_cap(task_t* task, cap_t cap) {
 
   slot->cap = cap;
 
-  return true;
+  return slot;
 }
 
 bool insert_cap_space(task_t* task, cap_space_t* cap_space) {

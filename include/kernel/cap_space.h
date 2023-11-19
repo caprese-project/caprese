@@ -5,9 +5,9 @@
 #include <kernel/page.h>
 
 struct cap_slot_t {
-  cap_t       cap;
-  cap_slot_t* prev;
-  cap_slot_t* next;
+  capability_t cap;
+  cap_slot_t*  prev;
+  cap_slot_t*  next;
 };
 
 struct alignas(PAGE_SIZE) cap_space_t {

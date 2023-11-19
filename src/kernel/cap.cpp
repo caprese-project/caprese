@@ -11,11 +11,11 @@
 
 cap_slot_t* create_memory_object(cap_slot_t* dst, cap_slot_t* src, bool readable, bool writable, bool executable, size_t size, size_t alignment) {
   assert(src != nullptr);
-  assert(get_cap_type(src->cap) == cap_type_t::memory);
+  assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(dst->next == nullptr);
   assert(dst->prev == nullptr);
-  assert(get_cap_type(dst->cap) == cap_type_t::null);
+  assert(get_cap_type(dst->cap) == CAP_NULL);
 
   auto& mem_cap = src->cap.memory;
 
@@ -61,26 +61,26 @@ cap_slot_t* create_memory_object(cap_slot_t* dst, cap_slot_t* src, bool readable
 cap_slot_t* create_task_object(
     cap_slot_t* dst, cap_slot_t* src, cap_slot_t* cap_space_slot, cap_slot_t* root_page_table_slot, cap_slot_t* (&cap_space_page_table_slots)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]) {
   assert(src != nullptr);
-  assert(get_cap_type(src->cap) == cap_type_t::memory);
+  assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(dst->next == nullptr);
   assert(dst->prev == nullptr);
-  assert(get_cap_type(dst->cap) == cap_type_t::null);
+  assert(get_cap_type(dst->cap) == CAP_NULL);
   assert(cap_space_slot != nullptr);
-  assert(get_cap_type(cap_space_slot->cap) == cap_type_t::cap_space);
+  assert(get_cap_type(cap_space_slot->cap) == CAP_CAP_SPACE);
   assert(root_page_table_slot != nullptr);
-  assert(get_cap_type(root_page_table_slot->cap) == cap_type_t::page_table);
+  assert(get_cap_type(root_page_table_slot->cap) == CAP_PAGE_TABLE);
   if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 1) {
     assert(cap_space_page_table_slots[0] != nullptr);
-    assert(get_cap_type(cap_space_page_table_slots[0]->cap) == cap_type_t::page_table);
+    assert(get_cap_type(cap_space_page_table_slots[0]->cap) == CAP_PAGE_TABLE);
   }
   if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 2) {
     assert(cap_space_page_table_slots[1] != nullptr);
-    assert(get_cap_type(cap_space_page_table_slots[1]->cap) == cap_type_t::page_table);
+    assert(get_cap_type(cap_space_page_table_slots[1]->cap) == CAP_PAGE_TABLE);
   }
   if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 3) {
     assert(cap_space_page_table_slots[2] != nullptr);
-    assert(get_cap_type(cap_space_page_table_slots[2]->cap) == cap_type_t::page_table);
+    assert(get_cap_type(cap_space_page_table_slots[2]->cap) == CAP_PAGE_TABLE);
   }
 
   auto& mem_cap = src->cap.memory;
@@ -119,11 +119,11 @@ cap_slot_t* create_task_object(
 
 cap_slot_t* create_page_table_object(cap_slot_t* dst, cap_slot_t* src, uint64_t level) {
   assert(src != nullptr);
-  assert(get_cap_type(src->cap) == cap_type_t::memory);
+  assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(dst->next == nullptr);
   assert(dst->prev == nullptr);
-  assert(get_cap_type(dst->cap) == cap_type_t::null);
+  assert(get_cap_type(dst->cap) == CAP_NULL);
 
   if (level >= MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
     return nullptr;
@@ -146,11 +146,11 @@ cap_slot_t* create_page_table_object(cap_slot_t* dst, cap_slot_t* src, uint64_t 
 
 cap_slot_t* create_virt_page_object(cap_slot_t* dst, cap_slot_t* src, bool readable, bool writable, bool executable, uint64_t level) {
   assert(src != nullptr);
-  assert(get_cap_type(src->cap) == cap_type_t::memory);
+  assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(dst->next == nullptr);
   assert(dst->prev == nullptr);
-  assert(get_cap_type(dst->cap) == cap_type_t::null);
+  assert(get_cap_type(dst->cap) == CAP_NULL);
 
   if (level >= MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
     return nullptr;
@@ -170,11 +170,11 @@ cap_slot_t* create_virt_page_object(cap_slot_t* dst, cap_slot_t* src, bool reada
 
 cap_slot_t* create_cap_space_object(cap_slot_t* dst, cap_slot_t* src) {
   assert(src != nullptr);
-  assert(get_cap_type(src->cap) == cap_type_t::memory);
+  assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(dst->next == nullptr);
   assert(dst->prev == nullptr);
-  assert(get_cap_type(dst->cap) == cap_type_t::null);
+  assert(get_cap_type(dst->cap) == CAP_NULL);
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
@@ -195,7 +195,7 @@ cap_slot_t* create_object(task_t* task, cap_slot_t* cap_slot, cap_type_t type, u
   assert(task == get_cls()->current_task);
   assert(cap_slot != nullptr);
 
-  if (get_cap_type(cap_slot->cap) != cap_type_t::memory) [[unlikely]] {
+  if (get_cap_type(cap_slot->cap) != CAP_MEM) [[unlikely]] {
     return nullptr;
   }
 
@@ -212,17 +212,17 @@ cap_slot_t* create_object(task_t* task, cap_slot_t* cap_slot, cap_type_t type, u
   cap_slot_t* result = nullptr;
 
   switch (type) {
-    case cap_type_t::memory:
+    case CAP_MEM:
       result = create_memory_object(task->free_slots, cap_slot, arg0, arg1, arg2, arg3, arg4);
       break;
-    case cap_type_t::task: {
+    case CAP_TASK: {
       cap_slot_t* cap_space_slot = lookup_cap(task, arg0);
-      if (cap_space_slot == nullptr || get_cap_type(cap_space_slot->cap) != cap_type_t::cap_space) [[unlikely]] {
+      if (cap_space_slot == nullptr || get_cap_type(cap_space_slot->cap) != CAP_CAP_SPACE) [[unlikely]] {
         return nullptr;
       }
 
       cap_slot_t* root_page_table_slot = lookup_cap(task, arg1);
-      if (root_page_table_slot == nullptr || get_cap_type(root_page_table_slot->cap) != cap_type_t::page_table) [[unlikely]] {
+      if (root_page_table_slot == nullptr || get_cap_type(root_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
         return nullptr;
       }
 
@@ -231,21 +231,21 @@ cap_slot_t* create_object(task_t* task, cap_slot_t* cap_slot, cap_type_t type, u
 
       if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 1) {
         cap_space_page_table_slots[0] = lookup_cap(task, arg2);
-        if (cap_space_page_table_slots[0] == nullptr || get_cap_type(cap_space_page_table_slots[0]->cap) != cap_type_t::page_table) [[unlikely]] {
+        if (cap_space_page_table_slots[0] == nullptr || get_cap_type(cap_space_page_table_slots[0]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
           return nullptr;
         }
       }
 
       if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 2) {
         cap_space_page_table_slots[1] = lookup_cap(task, arg3);
-        if (cap_space_page_table_slots[1] == nullptr || get_cap_type(cap_space_page_table_slots[1]->cap) != cap_type_t::page_table) [[unlikely]] {
+        if (cap_space_page_table_slots[1] == nullptr || get_cap_type(cap_space_page_table_slots[1]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
           return nullptr;
         }
       }
 
       if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 3) {
         cap_space_page_table_slots[2] = lookup_cap(task, arg4);
-        if (cap_space_page_table_slots[2] == nullptr || get_cap_type(cap_space_page_table_slots[2]->cap) != cap_type_t::page_table) [[unlikely]] {
+        if (cap_space_page_table_slots[2] == nullptr || get_cap_type(cap_space_page_table_slots[2]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
           return nullptr;
         }
       }
@@ -253,15 +253,15 @@ cap_slot_t* create_object(task_t* task, cap_slot_t* cap_slot, cap_type_t type, u
       result = create_task_object(task->free_slots, cap_slot, cap_space_slot, root_page_table_slot, cap_space_page_table_slots);
       break;
     }
-    case cap_type_t::endpoint:
+    case CAP_ENDPOINT:
       break;
-    case cap_type_t::page_table:
+    case CAP_PAGE_TABLE:
       result = create_page_table_object(task->free_slots, cap_slot, arg0);
       break;
-    case cap_type_t::virt_page:
+    case CAP_VIRT_PAGE:
       result = create_virt_page_object(task->free_slots, cap_slot, arg0, arg1, arg2, arg3);
       break;
-    case cap_type_t::cap_space:
+    case CAP_CAP_SPACE:
       result = create_cap_space_object(task->free_slots, cap_slot);
       break;
     default:

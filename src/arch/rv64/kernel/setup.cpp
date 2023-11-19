@@ -3,7 +3,9 @@
 #include <iterator>
 #include <utility>
 
+#include <kernel/align.h>
 #include <kernel/arch/dtb.h>
+#include <kernel/cap.h>
 #include <kernel/setup.h>
 #include <log/log.h>
 
@@ -182,7 +184,7 @@ namespace {
     device_region[device_region_count++] = region;
   }
 
-  __init_code void insert_memory_region_caps(task_t* root_task, region_t region, int flags, size_t index = 0) {
+  __init_code void insert_memory_region_caps(task_t* root_task, root_boot_info_t* root_boot_info, region_t region, int flags, size_t index = 0) {
     if (region.start >= region.end) [[unlikely]] {
       return;
     }
@@ -192,7 +194,7 @@ namespace {
       subtract_region(region, reserved_region[index], dst);
       for (region_t reg : dst) {
         if (reg.start < reg.end) {
-          insert_memory_region_caps(root_task, reg, flags, index + 1);
+          insert_memory_region_caps(root_task, root_boot_info, reg, flags, index + 1);
         }
       }
 
@@ -206,12 +208,14 @@ namespace {
 
       if (region.start.as<uintptr_t>() & (1ull << size_bit)) {
         if (size >= (1ull << size_bit)) {
-          cap_t cap = make_memory_cap(flags, size_bit, region.start);
+          capability_t cap = make_memory_cap(flags, size_bit, region.start);
           logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, flags & MEMORY_CAP_DEVICE ? "device" : "memory");
 
-          if (!insert_cap(root_task, cap)) [[unlikely]] {
+          cap_slot_t* cap_slot = insert_cap(root_task, cap);
+          if (cap_slot == nullptr) [[unlikely]] {
             panic("Failed to insert cap.");
           }
+          root_boot_info->mem_caps[root_boot_info->num_mem_caps++] = get_cap_slot_index(cap_slot);
 
           region.start.value += 1ull << size_bit;
         } else {
@@ -226,12 +230,14 @@ namespace {
       size_t size = region.end.as<uintptr_t>() - region.start.as<uintptr_t>();
 
       if (size >= (1ull << size_bit)) {
-        cap_t cap = make_memory_cap(flags, size_bit, region.start);
+        capability_t cap = make_memory_cap(flags, size_bit, region.start);
         logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, flags & MEMORY_CAP_DEVICE ? "device" : "memory");
 
-        if (!insert_cap(root_task, cap)) [[unlikely]] {
+        cap_slot_t* cap_slot = insert_cap(root_task, cap);
+        if (cap_slot == nullptr) [[unlikely]] {
           panic("Failed to insert cap.");
         }
+        root_boot_info->mem_caps[root_boot_info->num_mem_caps++] = get_cap_slot_index(cap_slot);
 
         region.start.value += 1ull << size_bit;
       } else {
@@ -241,7 +247,7 @@ namespace {
   }
 } // namespace
 
-__init_code void setup_memory_capabilities(task_t* root_task, boot_info_t* boot_info) {
+__init_code void setup_memory_capabilities(task_t* root_task, boot_info_t* boot_info, root_boot_info_t* root_boot_info) {
   assert(root_task != nullptr);
   assert(boot_info != nullptr);
 
@@ -289,10 +295,22 @@ __init_code void setup_memory_capabilities(task_t* root_task, boot_info_t* boot_
   });
 
   for (size_t i = 0; i < memory_region_count; ++i) {
-    insert_memory_region_caps(root_task, memory_region[i], MEMORY_CAP_READABLE | MEMORY_CAP_WRITABLE | MEMORY_CAP_EXECUTABLE);
+    insert_memory_region_caps(root_task, root_boot_info, memory_region[i], MEMORY_CAP_READABLE | MEMORY_CAP_WRITABLE | MEMORY_CAP_EXECUTABLE);
   }
 
   for (size_t i = 0; i < device_region_count; ++i) {
-    insert_memory_region_caps(root_task, device_region[i], MEMORY_CAP_DEVICE | MEMORY_CAP_READABLE | MEMORY_CAP_WRITABLE);
+    insert_memory_region_caps(root_task, root_boot_info, device_region[i], MEMORY_CAP_DEVICE | MEMORY_CAP_READABLE | MEMORY_CAP_WRITABLE);
   }
+}
+
+__init_code void* bake_stack(void* stack, void* data, size_t size) {
+  assert(stack != nullptr);
+  assert(data != nullptr);
+  assert(size > 0);
+
+  uintptr_t top = round_down(reinterpret_cast<uintptr_t>(stack) - size, 16);
+
+  memcpy(reinterpret_cast<void*>(top), data, size);
+
+  return reinterpret_cast<void*>(top);
 }
