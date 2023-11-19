@@ -9,47 +9,47 @@
 #include <log/log.h>
 
 namespace {
-  uint32_t _dtb_to_u32(const char* ptr) {
-    return std::byteswap(*reinterpret_cast<const uint32_t*>(ptr));
+  uint32_t _dtb_to_u32(map_ptr<char> ptr) {
+    return std::byteswap(*ptr.as<uint32_t>());
   }
 
-  uint64_t _dtb_to_u64(const char* ptr) {
-    return std::byteswap(*reinterpret_cast<const uint64_t*>(ptr));
+  uint64_t _dtb_to_u64(map_ptr<char> ptr) {
+    return std::byteswap(*ptr.as<uint32_t>());
   }
 
-  uint32_t _dtb_next_u32(const char** ptr) {
+  uint32_t _dtb_next_u32(map_ptr<char>* ptr) {
     uint32_t result = _dtb_to_u32(*ptr);
     *ptr += sizeof(uint32_t);
     return result;
   }
 
-  const char* _dtb_next_str(const char** ptr) {
-    const char* result = *ptr;
+  const char* _dtb_next_str(map_ptr<char>* ptr) {
+    const char* result = ptr->get();
     *ptr += strlen(result) + 1;
     return result;
   }
 
-  void _dtb_align(const char** ptr) {
-    *ptr = reinterpret_cast<const char*>(round_up(reinterpret_cast<uintptr_t>(*ptr), sizeof(uint32_t)));
+  void _dtb_align(map_ptr<char>* ptr) {
+    *ptr = make_map_ptr(round_up(ptr->raw(), sizeof(uint32_t)));
   }
 
-  void _dtb_skip_nop(const char** ptr) {
+  void _dtb_skip_nop(map_ptr<char>* ptr) {
     while (_dtb_to_u32(*ptr) == FDT_NOP) {
       *ptr += sizeof(uint32_t);
     }
   }
 
-  void _parse_dtb_node(const char** src, const char* end, const fdt_header_t* header, uint32_t address_cells, uint32_t size_cells, bool (*callback)(const dtb_node_t*)) {
+  void _parse_dtb_node(map_ptr<char>* src, map_ptr<char> end, map_ptr<fdt_header_t> header, uint32_t address_cells, uint32_t size_cells, bool (*callback)(map_ptr<dtb_node_t>)) {
     assert(src != nullptr);
     assert(*src != nullptr);
     assert(end != nullptr);
     assert(header != nullptr);
     assert(address_cells > 0);
     assert(callback != nullptr);
-    assert(reinterpret_cast<uintptr_t>(*src) % sizeof(uint32_t) == 0);
+    assert(src->raw() % sizeof(uint32_t) == 0);
 
-    const char* str_start = reinterpret_cast<const char*>(header) + std::byteswap(header->off_dt_strings);
-    const char* str_end   = str_start + std::byteswap(header->size_dt_strings);
+    map_ptr<char> str_start = header.as<char>() + std::byteswap(header->off_dt_strings);
+    map_ptr<char> str_end   = str_start + std::byteswap(header->size_dt_strings);
 
     uint32_t token = _dtb_next_u32(src);
     if (token != FDT_BEGIN_NODE) [[unlikely]] {
@@ -58,7 +58,7 @@ namespace {
     }
 
     dtb_node_t node {
-      ._next         = nullptr,
+      ._next         = 0_map,
       .unit_address  = 0,
       .header        = header,
       .address_cells = address_cells,
@@ -87,7 +87,7 @@ namespace {
 
     node._next = *src;
 
-    bool should_continue = callback(&node);
+    bool should_continue = callback(make_map_ptr(&node));
 
     uint32_t child_address_cells = 2;
     uint32_t child_size_cells    = 1;
@@ -103,8 +103,8 @@ namespace {
       uint32_t len     = _dtb_next_u32(src);
       uint32_t nameoff = _dtb_next_u32(src);
 
-      const char* name = str_start + nameoff;
-      if (name >= str_end) [[unlikely]] {
+      const char* name = (str_start + nameoff).get();
+      if (name >= str_end.get()) [[unlikely]] {
         loge("arch/dtb", "Invalid FDT string offset: %x", nameoff);
       } else if (strcmp(name, "#address-cells") == 0) [[unlikely]] {
         child_address_cells = _dtb_to_u32(*src);
@@ -126,7 +126,7 @@ namespace {
       if (should_continue) {
         _parse_dtb_node(src, end, header, child_address_cells, child_size_cells, callback);
       } else {
-        _parse_dtb_node(src, end, header, child_address_cells, child_size_cells, []([[maybe_unused]] const dtb_node_t*) { return false; });
+        _parse_dtb_node(src, end, header, child_address_cells, child_size_cells, []([[maybe_unused]] map_ptr<dtb_node_t>) { return false; });
       }
     }
 
@@ -168,33 +168,33 @@ dtb_prop_type_t find_prop_type(const char* name) {
   return dtb_prop_type_t::unknown;
 }
 
-void for_each_dtb_node(map_addr_t dtb, bool (*callback)(const dtb_node_t*)) {
+void for_each_dtb_node(map_ptr<char> dtb, bool (*callback)(map_ptr<dtb_node_t>)) {
   assert(dtb != nullptr);
   assert(callback != nullptr);
 
-  const fdt_header_t* header = dtb.as<const fdt_header_t*>();
+  map_ptr<fdt_header_t> header = dtb.as<fdt_header_t>();
   if (header->magic != std::byteswap(FDT_HEADER_MAGIC)) [[unlikely]] {
     loge("arch/dtb", "Invalid FDT magic: %x", header->magic);
     return;
   }
 
-  const char* src = dtb.as<const char*>() + std::byteswap(header->off_dt_struct);
-  const char* end = src + std::byteswap(header->size_dt_struct);
+  map_ptr<char> src = dtb + std::byteswap(header->off_dt_struct);
+  map_ptr<char> end = src + std::byteswap(header->size_dt_struct);
 
   _dtb_skip_nop(&src);
 
   _parse_dtb_node(&src, end, header, 2, 1, callback);
 }
 
-void for_each_dtb_prop(const dtb_node_t* node, bool (*callback)(const dtb_node_t*, const dtb_prop_t*)) {
+void for_each_dtb_prop(map_ptr<dtb_node_t> node, bool (*callback)(map_ptr<dtb_node_t>, map_ptr<dtb_prop_t>)) {
   assert(node != nullptr);
   assert(callback != nullptr);
 
-  const char* end       = reinterpret_cast<const char*>(node->header) + std::byteswap(node->header->off_dt_struct) + std::byteswap(node->header->size_dt_struct);
-  const char* str_start = reinterpret_cast<const char*>(node->header) + std::byteswap(node->header->off_dt_strings);
-  const char* str_end   = str_start + std::byteswap(node->header->size_dt_strings);
+  map_ptr<char> end       = node->header.as<char>() + std::byteswap(node->header->off_dt_struct) + std::byteswap(node->header->size_dt_struct);
+  map_ptr<char> str_start = node->header.as<char>() + std::byteswap(node->header->off_dt_strings);
+  map_ptr<char> str_end   = str_start + std::byteswap(node->header->size_dt_strings);
 
-  const char* src = node->_next;
+  map_ptr<char> src = node->_next;
 
   while (src < end) {
     _dtb_skip_nop(&src);
@@ -207,8 +207,8 @@ void for_each_dtb_prop(const dtb_node_t* node, bool (*callback)(const dtb_node_t
     uint32_t len     = _dtb_next_u32(&src);
     uint32_t nameoff = _dtb_next_u32(&src);
 
-    const char* name = str_start + nameoff;
-    if (name >= str_end) [[unlikely]] {
+    const char* name = (str_start + nameoff).get();
+    if (name >= str_end.get()) [[unlikely]] {
       loge("arch/dtb", "Invalid FDT string offset: %x", nameoff);
     } else {
       dtb_prop_t prop;
@@ -230,25 +230,25 @@ void for_each_dtb_prop(const dtb_node_t* node, bool (*callback)(const dtb_node_t
             prop.u64 = _dtb_to_u64(src);
             break;
           case str:
-            prop.str = src;
+            prop.str = src.get();
             break;
           case array:
             prop.array.length = len;
-            prop.array.data   = reinterpret_cast<const uint8_t*>(src);
+            prop.array.data   = src.as<uint8_t>().get();
             break;
           case phandle:
             prop.phandle = _dtb_to_u32(src);
             break;
           case str_list:
             prop.str_list.length = len;
-            prop.str_list.data   = src;
+            prop.str_list.data   = src.get();
             break;
           case unknown:
             break;
         }
       }
 
-      if (!callback(node, &prop)) {
+      if (!callback(node, make_map_ptr(&prop))) {
         break;
       }
     }

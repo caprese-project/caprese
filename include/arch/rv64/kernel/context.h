@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#include <kernel/address.h>
+
 struct context_t {
   uintptr_t ra;
   uintptr_t sp;
@@ -20,7 +22,7 @@ struct context_t {
   uintptr_t s11;
 };
 
-void              switch_context(context_t* new_context, context_t* old_context);
-[[noreturn]] void load_context(context_t* context);
+void              switch_context(map_ptr<context_t> new_context, map_ptr<context_t> old_context);
+[[noreturn]] void load_context(map_ptr<context_t> context);
 
 #endif // ARCH_RV64_KERNEL_CONTEXT_H_

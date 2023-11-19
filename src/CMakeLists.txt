@@ -55,6 +55,7 @@ target_link_libraries(caprese_kernel libcaprese)
 
 target_sources(
   caprese_kernel PRIVATE
+  kernel/cap_space.cpp
   kernel/cap.cpp
   kernel/cls.cpp
   kernel/lock.cpp

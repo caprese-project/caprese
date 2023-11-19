@@ -5,7 +5,7 @@
 
 [[noreturn]] void return_to_user_mode();
 
-void arch_init_task(task_t* task);
+void arch_init_task(map_ptr<task_t> task);
 
 void set_trap_handler(void (*handler)());
 

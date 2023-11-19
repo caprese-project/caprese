@@ -32,45 +32,45 @@ union capability_t {
   } memory;
 
   struct {
-    uint64_t type             : 5;
-    uint64_t killable         : 1;
-    uint64_t switchable       : 1;
-    uint64_t suspendable      : 1;
-    uint64_t resumable        : 1;
-    uint64_t register_gettable: 1;
-    uint64_t register_settable: 1;
-    uint64_t kill_notifiable  : 1;
-    task_t*  task;
+    uint64_t        type             : 5;
+    uint64_t        killable         : 1;
+    uint64_t        switchable       : 1;
+    uint64_t        suspendable      : 1;
+    uint64_t        resumable        : 1;
+    uint64_t        register_gettable: 1;
+    uint64_t        register_settable: 1;
+    uint64_t        kill_notifiable  : 1;
+    map_ptr<task_t> task;
   } task;
 
   struct {
   } endpoint;
 
   struct {
-    uint64_t      type : 5;
-    uint64_t      level: 2;
-    page_table_t* table;
+    uint64_t              type : 5;
+    uint64_t              level: 2;
+    map_ptr<page_table_t> table;
   } page_table;
 
   struct {
-    uint64_t    type      : 5;
-    uint64_t    readable  : 1;
-    uint64_t    writable  : 1;
-    uint64_t    executable: 1;
-    uint64_t    level     : 2;
-    uint64_t    phys_addr: std::countr_zero<uintptr_t>(CONFIG_MAX_PHYSICAL_ADDRESS);
-    virt_addr_t address;
+    uint64_t       type      : 5;
+    uint64_t       readable  : 1;
+    uint64_t       writable  : 1;
+    uint64_t       executable: 1;
+    uint64_t       level     : 2;
+    uint64_t       phys_addr: std::countr_zero<uintptr_t>(CONFIG_MAX_PHYSICAL_ADDRESS);
+    virt_ptr<void> address;
   } virt_page;
 
   struct {
-    uint64_t     type: 5;
-    cap_space_t* space;
+    uint64_t             type: 5;
+    map_ptr<cap_space_t> space;
   } cap_space;
 
   struct {
-    uint64_t    type    : 5;
-    uint64_t    size_bit: 6;
-    phys_addr_t address;
+    uint64_t       type    : 5;
+    uint64_t       size_bit: 6;
+    phys_ptr<void> address;
   } zombie;
 };
 
@@ -95,8 +95,8 @@ constexpr int MEMORY_CAP_READABLE   = 1 << 1;
 constexpr int MEMORY_CAP_WRITABLE   = 1 << 2;
 constexpr int MEMORY_CAP_EXECUTABLE = 1 << 3;
 
-inline capability_t make_memory_cap(int flags, unsigned size_bit, phys_addr_t base_addr) {
-  assert(base_addr.as<uintptr_t>() < CONFIG_MAX_PHYSICAL_ADDRESS);
+inline capability_t make_memory_cap(int flags, unsigned size_bit, phys_ptr<void> base_addr) {
+  assert(base_addr.raw() < CONFIG_MAX_PHYSICAL_ADDRESS);
   assert(size_bit < (1 << 6));
 
   return {
@@ -107,7 +107,7 @@ inline capability_t make_memory_cap(int flags, unsigned size_bit, phys_addr_t ba
       .writable   = static_cast<uint64_t>((flags & MEMORY_CAP_WRITABLE) >> 2),
       .executable = static_cast<uint64_t>((flags & MEMORY_CAP_EXECUTABLE) >> 3),
       .size_bit   = size_bit,
-      .phys_addr  = base_addr.as<uintptr_t>(),
+      .phys_addr  = base_addr.raw(),
       .used_size = 0,
     },
   };
@@ -121,7 +121,7 @@ constexpr int TASK_CAP_REGISTER_GETTABLE = 1 << 4;
 constexpr int TASK_CAP_REGISTER_SETTABLE = 1 << 5;
 constexpr int TASK_CAP_KILL_NOTIFIABLE   = 1 << 6;
 
-inline capability_t make_task_cap(int flags, task_t* task) {
+inline capability_t make_task_cap(int flags, map_ptr<task_t> task) {
   assert(task != nullptr);
 
   return {
@@ -139,7 +139,7 @@ inline capability_t make_task_cap(int flags, task_t* task) {
   };
 }
 
-inline capability_t make_page_table_cap(uint64_t level, page_table_t* page_table) {
+inline capability_t make_page_table_cap(uint64_t level, map_ptr<page_table_t> page_table) {
   assert(page_table != nullptr);
   assert(level <= MAX_PAGE_TABLE_LEVEL);
 
@@ -168,12 +168,12 @@ inline capability_t make_virt_page_cap(int flags, uint64_t level, uint64_t phys_
       .executable = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_EXECUTABLE) >> 2),
       .level      = level,
       .phys_addr  = phys_addr,
-      .address    = virt_addr_t::from(nullptr),
+      .address    = 0_virt,
     },
   };
 }
 
-inline capability_t make_cap_space_cap(cap_space_t* cap_space) {
+inline capability_t make_cap_space_cap(map_ptr<cap_space_t> cap_space) {
   assert(cap_space != nullptr);
 
   return {
@@ -184,12 +184,15 @@ inline capability_t make_cap_space_cap(cap_space_t* cap_space) {
   };
 }
 
-cap_slot_t* create_memory_object(cap_slot_t* dst, cap_slot_t* src, bool readable, bool writable, bool executable, size_t size, size_t alignment);
-cap_slot_t* create_task_object(
-    cap_slot_t* dst, cap_slot_t* src, cap_slot_t* cap_space_slot, cap_slot_t* root_page_table_slot, cap_slot_t* (&cap_space_page_table_slots)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]);
-cap_slot_t* create_page_table_object(cap_slot_t* dst, cap_slot_t* src, uint64_t level);
-cap_slot_t* create_virt_page_object(cap_slot_t* dst, cap_slot_t* src, bool readable, bool writable, bool executable, uint64_t level);
-cap_slot_t* create_cap_space_object(cap_slot_t* dst, cap_slot_t* src);
-cap_slot_t* create_object(task_t* task, cap_slot_t* cap_slot, cap_type_t type, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4);
+map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, size_t size, size_t alignment);
+map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
+                                       map_ptr<cap_slot_t> src,
+                                       map_ptr<cap_slot_t> cap_space_slot,
+                                       map_ptr<cap_slot_t> root_page_table_slot,
+                                       map_ptr<cap_slot_t> (&cap_space_page_table_slots)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]);
+map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, uint64_t level);
+map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, uint64_t level);
+map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
+map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_slot, cap_type_t type, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4);
 
 #endif // KERNEL_CAP_H_

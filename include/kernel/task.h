@@ -47,35 +47,33 @@ enum struct task_state_t : uint8_t {
 };
 
 struct alignas(PAGE_SIZE) task_t {
-  context_t            context;
-  frame_t              frame;
-  tid_t                tid;
-  cap_count_t          cap_count;
-  task_queue_t         ready_queue;
-  task_queue_t         waiting_queue;
-  cap_slot_t*          free_slots;
-  page_table_t*        root_page_table;
-  task_state_t         state;
-  recursive_spinlock_t lock;
-  char                 stack[];
+  context_t             context;
+  frame_t               frame;
+  tid_t                 tid;
+  cap_count_t           cap_count;
+  task_queue_t          ready_queue;
+  task_queue_t          waiting_queue;
+  map_ptr<cap_slot_t>   free_slots;
+  map_ptr<page_table_t> root_page_table;
+  task_state_t          state;
+  recursive_spinlock_t  lock;
+  char                  stack[];
 };
 
 static_assert(sizeof(task_t) == PAGE_SIZE);
 
-void init_task(task_t* task, cap_space_t* cap_space, page_table_t* root_page_table, page_table_t* (&cap_space_page_tables)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]);
+void init_task(map_ptr<task_t>       task,
+               map_ptr<cap_space_t>  cap_space,
+               map_ptr<page_table_t> root_page_table,
+               map_ptr<page_table_t> (&cap_space_page_tables)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]);
 
-[[nodiscard]] cap_slot_t* insert_cap(task_t* task, capability_t cap);
+[[nodiscard]] map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap);
 
-[[nodiscard]] bool insert_cap_space(task_t* task, cap_space_t* cap_space);
-[[nodiscard]] bool extend_cap_space(task_t* task, map_addr_t page);
+void kill_task(map_ptr<task_t> task);
+void switch_task(map_ptr<task_t> task);
+void suspend_task(map_ptr<task_t> task);
+void resume_task(map_ptr<task_t> task);
 
-void kill_task(task_t* task);
-void switch_task(task_t* task);
-void suspend_task(task_t* task);
-void resume_task(task_t* task);
-
-task_t*     lookup_tid(tid_t tid);
-cap_slot_t* lookup_cap(task_t* task, uintptr_t cap_desc);
-size_t      get_cap_slot_index(cap_slot_t* cap_slot);
+map_ptr<task_t> lookup_tid(tid_t tid);
 
 #endif // KERNEL_TASK_H_

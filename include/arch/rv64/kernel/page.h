@@ -78,24 +78,23 @@ struct pte_t {
     this->g = flags.global;
   }
 
-  inline void set_next_page(map_addr_t next_page) {
-    assert(next_page.is_aligned_to_pow2(PAGE_SIZE));
-    this->next_page_number = next_page.as_phys().as<uint64_t>() >> PAGE_SIZE_BIT;
+  inline void set_next_page(map_ptr<void> next_page) {
+    this->next_page_number = next_page.as_phys().raw() >> PAGE_SIZE_BIT;
   }
 
-  [[nodiscard]] inline map_addr_t get_next_page() {
-    return phys_addr_t::from(this->next_page_number << PAGE_SIZE_BIT).as_map();
+  [[nodiscard]] inline map_ptr<void> get_next_page() {
+    return phys_ptr<void>::from(this->next_page_number << PAGE_SIZE_BIT);
   }
 };
 
 struct alignas(PAGE_SIZE) page_table_t {
   pte_t entries[NUM_PAGE_TABLE_ENTRY];
 
-  inline pte_t* walk(virt_addr_t va, size_t level) {
-    assert(va.as<uintptr_t>() < CONFIG_MAX_VIRTUAL_ADDRESS);
+  inline map_ptr<pte_t> walk(virt_ptr<void> va, size_t level) {
+    assert(va.raw() < CONFIG_MAX_VIRTUAL_ADDRESS);
     assert(level < NUM_PAGE_TABLE_LEVEL);
-    size_t index = (va.as<uintptr_t>() >> (9 * level + PAGE_SIZE_BIT)) & 0x1ff;
-    return &entries[index];
+    size_t index = (va.raw() >> (9 * level + PAGE_SIZE_BIT)) & 0x1ff;
+    return make_map_ptr(&entries[index]);
   }
 };
 

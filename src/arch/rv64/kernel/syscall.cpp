@@ -1,7 +1,10 @@
+#include <kernel/cls.h>
 #include <kernel/syscall.h>
 
-void get_syscall_args(task_t* task, syscall_args_t* args) {
+void get_syscall_args(map_ptr<syscall_args_t> args) {
   assert(args != nullptr);
+
+  map_ptr<task_t>& task = get_cls()->current_task;
 
   args->args[0] = task->frame.a0;
   args->args[1] = task->frame.a1;
@@ -13,8 +16,7 @@ void get_syscall_args(task_t* task, syscall_args_t* args) {
   args->code    = task->frame.a7;
 }
 
-sysret_t invoke_syscall_arch(task_t* task, uint16_t id, syscall_args_t* args) {
-  (void)task;
+sysret_t invoke_syscall_arch(uint16_t id, map_ptr<syscall_args_t> args) {
   (void)id;
   (void)args;
   return sysret_e_invalid_code();

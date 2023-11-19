@@ -10,7 +10,7 @@ namespace {
 } // namespace
 
 extern "C" {
-  [[noreturn]] void arch_start(uintptr_t hartid, map_addr_t dtb) {
+  [[noreturn]] void arch_start(uintptr_t hartid, map_ptr<char> dtb) {
     lognl();
     logd(tag, "Boot args: hartid=%lu, dtb=%p", hartid, dtb);
 
@@ -19,6 +19,6 @@ extern "C" {
     boot_info.cap_count = 0;
     boot_info.dtb       = dtb;
 
-    start(&boot_info);
+    start(make_map_ptr(&boot_info));
   }
 }

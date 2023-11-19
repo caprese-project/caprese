@@ -7,9 +7,9 @@
 #include <kernel/core_id.h>
 
 struct boot_info_t {
-  core_id_t  core_id;
-  size_t     cap_count;
-  map_addr_t dtb;
+  core_id_t     core_id;
+  size_t        cap_count;
+  map_ptr<char> dtb;
 };
 
 #endif // ARCH_RV64_KERNEL_BOOT_H_

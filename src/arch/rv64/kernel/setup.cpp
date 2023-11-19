@@ -20,14 +20,14 @@ namespace {
   constexpr const char* tag = "kernel/setup";
 
   struct region_t {
-    phys_addr_t start;
-    phys_addr_t end;
+    phys_ptr<const char> start;
+    phys_ptr<const char> end;
   };
 
   // a - b
   inline void subtract_region(region_t a, region_t b, region_t (&dst)[2]) {
-    dst[0] = { .start = phys_addr_t::from(nullptr), .end = phys_addr_t::from(nullptr) };
-    dst[1] = { .start = phys_addr_t::from(nullptr), .end = phys_addr_t::from(nullptr) };
+    dst[0] = { .start = 0_phys, .end = 0_phys };
+    dst[1] = { .start = 0_phys, .end = 0_phys };
 
     if (a.start < b.start) {
       // +-----+---+-----+---+-----+
@@ -81,11 +81,11 @@ namespace {
 
   __init_data size_t device_region_count;
 
-  __init_code void dump_devices(map_addr_t dtb) {
-    for_each_dtb_node(dtb, [](const dtb_node_t* node) {
+  __init_code void dump_devices(map_ptr<char> dtb) {
+    for_each_dtb_node(dtb, [](map_ptr<dtb_node_t> node) {
       logd(tag, "Device found: %s (%p)", node->name, node->unit_address);
 
-      for_each_dtb_prop(node, []([[maybe_unused]] const dtb_node_t*, const dtb_prop_t* prop) {
+      for_each_dtb_prop(node, []([[maybe_unused]] map_ptr<dtb_node_t>, map_ptr<dtb_prop_t> prop) {
         switch (prop->type) {
           using enum dtb_prop_type_t;
           case empty:
@@ -124,7 +124,7 @@ namespace {
     });
   }
 
-  __init_code void for_each_reg(const dtb_node_t* node, const dtb_prop_t* prop, void (*callback)(region_t)) {
+  __init_code void for_each_reg(map_ptr<dtb_node_t> node, map_ptr<dtb_prop_t> prop, void (*callback)(region_t)) {
     assert(node != nullptr);
     assert(prop != nullptr);
     assert(callback != nullptr);
@@ -149,8 +149,8 @@ namespace {
       }
 
       region_t region {
-        .start = phys_addr_t::from(base),
-        .end   = phys_addr_t::from(base + size),
+        .start = make_phys_ptr(base),
+        .end   = make_phys_ptr(base + size),
       };
 
       callback(region);
@@ -184,7 +184,7 @@ namespace {
     device_region[device_region_count++] = region;
   }
 
-  __init_code void insert_memory_region_caps(task_t* root_task, root_boot_info_t* root_boot_info, region_t region, int flags, size_t index = 0) {
+  __init_code void insert_memory_region_caps(map_ptr<task_t> root_task, map_ptr<root_boot_info_t> root_boot_info, region_t region, int flags, size_t index = 0) {
     if (region.start >= region.end) [[unlikely]] {
       return;
     }
@@ -204,20 +204,20 @@ namespace {
     uint16_t size_bit = 0;
 
     while (region.start < region.end) {
-      size_t size = region.end.as<uintptr_t>() - region.start.as<uintptr_t>();
+      size_t size = region.end.raw() - region.start.raw();
 
-      if (region.start.as<uintptr_t>() & (1ull << size_bit)) {
+      if (region.start.raw() & (1ull << size_bit)) {
         if (size >= (1ull << size_bit)) {
-          capability_t cap = make_memory_cap(flags, size_bit, region.start);
+          capability_t cap = make_memory_cap(flags, size_bit, region.start.as<void>());
           logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, flags & MEMORY_CAP_DEVICE ? "device" : "memory");
 
-          cap_slot_t* cap_slot = insert_cap(root_task, cap);
+          map_ptr<cap_slot_t> cap_slot = insert_cap(root_task, cap);
           if (cap_slot == nullptr) [[unlikely]] {
             panic("Failed to insert cap.");
           }
           root_boot_info->mem_caps[root_boot_info->num_mem_caps++] = get_cap_slot_index(cap_slot);
 
-          region.start.value += 1ull << size_bit;
+          region.start += 1ull << size_bit;
         } else {
           break;
         }
@@ -227,19 +227,19 @@ namespace {
     }
 
     while (region.start < region.end) {
-      size_t size = region.end.as<uintptr_t>() - region.start.as<uintptr_t>();
+      size_t size = region.end.raw() - region.start.raw();
 
       if (size >= (1ull << size_bit)) {
-        capability_t cap = make_memory_cap(flags, size_bit, region.start);
+        capability_t cap = make_memory_cap(flags, size_bit, region.start.as<void>());
         logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, flags & MEMORY_CAP_DEVICE ? "device" : "memory");
 
-        cap_slot_t* cap_slot = insert_cap(root_task, cap);
+        map_ptr<cap_slot_t> cap_slot = insert_cap(root_task, cap);
         if (cap_slot == nullptr) [[unlikely]] {
           panic("Failed to insert cap.");
         }
         root_boot_info->mem_caps[root_boot_info->num_mem_caps++] = get_cap_slot_index(cap_slot);
 
-        region.start.value += 1ull << size_bit;
+        region.start += 1ull << size_bit;
       } else {
         --size_bit;
       }
@@ -247,7 +247,7 @@ namespace {
   }
 } // namespace
 
-__init_code void setup_memory_capabilities(task_t* root_task, boot_info_t* boot_info, root_boot_info_t* root_boot_info) {
+__init_code void setup_memory_capabilities(map_ptr<task_t> root_task, map_ptr<boot_info_t> boot_info, map_ptr<root_boot_info_t> root_boot_info) {
   assert(root_task != nullptr);
   assert(boot_info != nullptr);
 
@@ -260,21 +260,21 @@ __init_code void setup_memory_capabilities(task_t* root_task, boot_info_t* boot_
   device_region_count   = 0;
 
   push_reserved_region(region_t {
-      .start = map_addr_t::from(_kernel_start).as_phys(),
-      .end   = map_addr_t::from(_kernel_end).as_phys(),
+      .start = make_map_ptr(_kernel_start),
+      .end   = make_map_ptr(_kernel_end),
   });
 
   push_reserved_region(region_t {
-      .start = map_addr_t::from(_payload_start).as_phys(),
-      .end   = map_addr_t::from(_payload_end).as_phys(),
+      .start = make_map_ptr(_payload_start),
+      .end   = make_map_ptr(_payload_end),
   });
 
-  for_each_dtb_node(boot_info->dtb, [](const dtb_node_t* node) {
+  for_each_dtb_node(boot_info->dtb, [](map_ptr<dtb_node_t> node) {
     if (strcmp("cpus", node->name) == 0) {
       return false;
     }
 
-    for_each_dtb_prop(node, [](const dtb_node_t* node, const dtb_prop_t* prop) {
+    for_each_dtb_prop(node, [](map_ptr<dtb_node_t> node, map_ptr<dtb_prop_t> prop) {
       if (strcmp(prop->name, "reg") != 0) [[unlikely]] {
         return true;
       }
@@ -303,14 +303,14 @@ __init_code void setup_memory_capabilities(task_t* root_task, boot_info_t* boot_
   }
 }
 
-__init_code void* bake_stack(void* stack, void* data, size_t size) {
+__init_code void* bake_stack(map_ptr<void> stack, map_ptr<void> data, size_t size) {
   assert(stack != nullptr);
   assert(data != nullptr);
   assert(size > 0);
 
-  uintptr_t top = round_down(reinterpret_cast<uintptr_t>(stack) - size, 16);
+  uintptr_t top = round_down(stack.raw() - size, 16);
 
-  memcpy(reinterpret_cast<void*>(top), data, size);
+  memcpy(reinterpret_cast<void*>(top), data.get(), size);
 
   return reinterpret_cast<void*>(top);
 }

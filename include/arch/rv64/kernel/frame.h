@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <kernel/address.h>
 #include <libcaprese/syscall.h>
 
 struct frame_t {
@@ -77,7 +78,7 @@ static_assert(ARCH_REG_T5 == offsetof(frame_t, t5) / sizeof(uintptr_t));
 static_assert(ARCH_REG_T6 == offsetof(frame_t, t6) / sizeof(uintptr_t));
 static_assert(ARCH_REG_SEPC == offsetof(frame_t, sepc) / sizeof(uintptr_t));
 
-uintptr_t               set_register(frame_t* frame, uintptr_t reg, uintptr_t value);
-[[nodiscard]] uintptr_t get_register(frame_t* frame, uintptr_t reg);
+uintptr_t               set_register(map_ptr<frame_t> frame, uintptr_t reg, uintptr_t value);
+[[nodiscard]] uintptr_t get_register(map_ptr<frame_t> frame, uintptr_t reg);
 
 #endif // ARCH_RV64_KERNEL_FRAME_H_

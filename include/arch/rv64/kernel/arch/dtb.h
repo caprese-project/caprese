@@ -103,12 +103,12 @@ constexpr const char* FDT_STR_LIST_TYPES[] = {
 // clang-format on
 
 struct dtb_node_t {
-  const char*         _next;
-  uintptr_t           unit_address;
-  const fdt_header_t* header;
-  uint32_t            address_cells;
-  uint32_t            size_cells;
-  char                name[32];
+  map_ptr<char>         _next;
+  uintptr_t             unit_address;
+  map_ptr<fdt_header_t> header;
+  uint32_t              address_cells;
+  uint32_t              size_cells;
+  char                  name[32];
 };
 
 enum struct dtb_prop_type_t {
@@ -147,7 +147,7 @@ struct dtb_prop_t {
 
 dtb_prop_type_t find_prop_type(const char* name);
 
-void for_each_dtb_node(map_addr_t dtb, bool (*callback)(const dtb_node_t*));
-void for_each_dtb_prop(const dtb_node_t* node, bool (*callback)(const dtb_node_t*, const dtb_prop_t*));
+void for_each_dtb_node(map_ptr<char> dtb, bool (*callback)(map_ptr<dtb_node_t>));
+void for_each_dtb_prop(map_ptr<dtb_node_t> node, bool (*callback)(map_ptr<dtb_node_t>, map_ptr<dtb_prop_t>));
 
 #endif // ARCH_RV64_KERNEL_ARCH_DTB_H_

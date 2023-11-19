@@ -23,8 +23,6 @@ extern "C" {
     uint64_t scause;
     asm volatile("csrr %0, scause" : "=r"(scause));
 
-    task_t* task = get_cls()->current_task;
-
     if (scause & SCAUSE_INTERRUPT) {
       logd(tag, "scause-interrupt: %p", scause & SCAUSE_EXCEPTION_CODE);
       if ((scause & SCAUSE_EXCEPTION_CODE) == SCAUSE_SUPERVISOR_EXTERNAL_INTERRUPT) {
@@ -34,9 +32,12 @@ extern "C" {
     } else {
       if (scause & SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE) {
         enable_trap();
-        sysret_t sysret = invoke_syscall(task);
-        task->frame.a0  = sysret.result;
-        task->frame.a1  = sysret.error;
+
+        sysret_t sysret = invoke_syscall();
+
+        map_ptr<task_t>& task = get_cls()->current_task;
+        task->frame.a0        = sysret.result;
+        task->frame.a1        = sysret.error;
         task->frame.sepc += 4;
       } else {
         panic("User trap!");
@@ -50,7 +51,7 @@ extern "C" {
 [[noreturn]] void return_to_user_mode() {
   logd(tag, "Return to user mode.");
 
-  task_t* task = get_cls()->current_task;
+  map_ptr<task_t>& task = get_cls()->current_task;
 
   uint64_t sstatus;
   asm volatile("csrr %0, sstatus" : "=r"(sstatus));
@@ -59,19 +60,19 @@ extern "C" {
   sstatus |= SSTATUS_SPIE;
   asm volatile("csrw sstatus, %0" : : "r"(sstatus));
 
-  task->frame.stack = reinterpret_cast<uintptr_t>(task) + PAGE_SIZE;
+  task->frame.stack = task.raw() + PAGE_SIZE;
 
   _return_to_user_mode(&task->frame);
 }
 
-void arch_init_task(task_t* task) {
+void arch_init_task(map_ptr<task_t> task) {
   assert(task != nullptr);
 
   task->context = {};
   task->frame   = {};
 
   task->context.ra = reinterpret_cast<uintptr_t>(return_to_user_mode);
-  task->context.sp = reinterpret_cast<uintptr_t>(task) + PAGE_SIZE;
+  task->context.sp = task.raw() + PAGE_SIZE;
 
 #if defined(CONFIG_MMU_SV39)
   task->frame.satp = SATP_MODE_SV39;
@@ -79,7 +80,7 @@ void arch_init_task(task_t* task) {
   task->frame.satp = SATP_MODE_SV48;
 #endif
 
-  task->frame.satp |= map_addr_t::from(task->root_page_table).as_phys().as<uintptr_t>() >> PAGE_SIZE_BIT;
+  task->frame.satp |= task->root_page_table.as_phys().raw() >> PAGE_SIZE_BIT;
 }
 
 void set_trap_handler(void (*handler)()) {

@@ -5,10 +5,10 @@ extern "C" {
   [[noreturn]] extern void _load_context(context_t*);
 }
 
-void switch_context(context_t* new_context, context_t* old_context) {
-  _switch_context(new_context, old_context);
+void switch_context(map_ptr<context_t> new_context, map_ptr<context_t> old_context) {
+  _switch_context(new_context.get(), old_context.get());
 }
 
-[[noreturn]] void load_context(context_t* context) {
-  _load_context(context);
+[[noreturn]] void load_context(map_ptr<context_t> context) {
+  _load_context(context.get());
 }
