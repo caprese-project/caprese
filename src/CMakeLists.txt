@@ -19,8 +19,8 @@ function(declare_target name)
   target_include_directories(${name} PRIVATE ${INCLUDE_DIR})
 endfunction(declare_target)
 
-function(declare_library name common)
-  add_library(${name} STATIC)
+function(declare_library name type common)
+  add_library(${name} ${type})
   declare_target(${name})
 
   if(common)
@@ -34,8 +34,8 @@ function(declare_executable name)
   target_link_libraries(${name} ${COMMON_LIBRARIES})
 endfunction(declare_executable)
 
-declare_library(caprese_kernel_libc TRUE)
-declare_library(caprese_log TRUE)
+declare_library(caprese_kernel_libc OBJECT TRUE)
+declare_library(caprese_log STATIC TRUE)
 
 target_sources(
   caprese_log PRIVATE
