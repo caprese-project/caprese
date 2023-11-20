@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cstring>
 #include <iterator>
 #include <mutex>
 
@@ -108,6 +109,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   }
 
   map_ptr<task_t> task = make_phys_ptr(dst->cap.memory.phys_addr);
+  memset(task.get(), 0, sizeof(task_t));
 
   init_task(task, cap_space, root_page_table, cap_space_page_tables);
 
@@ -133,7 +135,10 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
     return 0_map;
   }
 
-  dst->cap = make_page_table_cap(0, make_phys_ptr(dst->cap.memory.phys_addr));
+  map_ptr<page_table_t> page_table = make_phys_ptr(dst->cap.memory.phys_addr);
+  memset(page_table.get(), 0, sizeof(page_table_t));
+
+  dst->cap = make_page_table_cap(0, page_table);
 
   return dst;
 }
@@ -176,7 +181,10 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
     return 0_map;
   }
 
-  dst->cap = make_cap_space_cap(make_phys_ptr(dst->cap.memory.phys_addr));
+  map_ptr<cap_space_t> cap_space = make_phys_ptr(dst->cap.memory.phys_addr);
+  memset(cap_space.get(), 0, sizeof(cap_space_t));
+
+  dst->cap = make_cap_space_cap(cap_space);
 
   return dst;
 }
@@ -198,6 +206,8 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
   if (task->free_slots == nullptr) [[unlikely]] {
     return 0_map;
   }
+
+  map_ptr<cap_slot_t> free_slots = task->free_slots->prev;
 
   map_ptr<cap_slot_t> result = 0_map;
 
@@ -262,7 +272,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
     return 0_map;
   }
 
-  task->free_slots = task->free_slots->prev;
+  task->free_slots = free_slots;
 
   return result;
 }
