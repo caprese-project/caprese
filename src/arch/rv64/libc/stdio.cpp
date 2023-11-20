@@ -11,6 +11,10 @@ extern "C" {
     struct __FILE __stdout_file;
   } // namespace
 
+  struct __FILE* __stdin() {
+    return &__stdout_file;
+  }
+
   struct __FILE* __stdout() {
     return &__stdout_file;
   }

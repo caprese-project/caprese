@@ -42,8 +42,6 @@ target_sources(
   log/log.cpp
 )
 
-target_link_libraries(caprese_libc_stdio PUBLIC caprese_kernel_libc)
-target_link_libraries(caprese_libc_signal PUBLIC caprese_kernel_libc)
 target_link_libraries(caprese_kernel_libc PUBLIC caprese_libc caprese_libcxx)
 target_link_libraries(caprese_log PUBLIC caprese_libc caprese_libcxx)
 
