@@ -101,7 +101,7 @@ map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap) {
   return slot;
 }
 
-void kill_task(map_ptr<task_t> task) {
+void kill_task(map_ptr<task_t> task, int exit_status) {
   assert(task != nullptr);
 
   std::lock_guard<recursive_spinlock_t> lock(task->lock);
@@ -121,7 +121,8 @@ void kill_task(map_ptr<task_t> task) {
 
   // TODO: Release caps
 
-  task->state = task_state_t::killed;
+  task->state       = task_state_t::killed;
+  task->exit_status = exit_status;
 
   if (task->tid.index == 1) [[unlikely]] {
     panic("The root task has been killed.");

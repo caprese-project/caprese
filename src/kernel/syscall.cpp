@@ -127,7 +127,7 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
       if (!task_cap.killable) [[unlikely]] {
         return sysret_e_invalid_argument();
       }
-      kill_task(task_cap.task);
+      kill_task(task_cap.task, static_cast<int>(args->args[1]));
       return sysret_s_ok(0);
     case SYS_TASK_CAP_SWITCH & 0xffff:
       if (!task_cap.switchable) [[unlikely]] {

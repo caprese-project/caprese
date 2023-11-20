@@ -57,6 +57,7 @@ struct alignas(PAGE_SIZE) task_t {
   map_ptr<page_table_t> root_page_table;
   task_state_t          state;
   recursive_spinlock_t  lock;
+  int                   exit_status;
   char                  stack[];
 };
 
@@ -69,7 +70,7 @@ void init_task(map_ptr<task_t>       task,
 
 [[nodiscard]] map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap);
 
-void kill_task(map_ptr<task_t> task);
+void kill_task(map_ptr<task_t> task, int exit_status);
 void switch_task(map_ptr<task_t> task);
 void suspend_task(map_ptr<task_t> task);
 void resume_task(map_ptr<task_t> task);
