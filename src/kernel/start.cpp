@@ -173,7 +173,7 @@ __init_code [[noreturn]] void start(map_ptr<boot_info_t> boot_info) {
 
   lognl();
 
-  logi(tag, "Starting the init task...\n");
+  logi(tag, "Starting the root task...\n");
 
   load_context(make_map_ptr(&root_task.context));
 }
