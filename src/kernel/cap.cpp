@@ -117,15 +117,11 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   return dst;
 }
 
-map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, uint64_t level) {
+map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src) {
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
-
-  if (level >= MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
-    return 0_map;
-  }
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
@@ -137,7 +133,7 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
     return 0_map;
   }
 
-  dst->cap = make_page_table_cap(level, make_phys_ptr(dst->cap.memory.phys_addr));
+  dst->cap = make_page_table_cap(0, make_phys_ptr(dst->cap.memory.phys_addr));
 
   return dst;
 }
@@ -250,7 +246,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
     case CAP_ENDPOINT:
       break;
     case CAP_PAGE_TABLE:
-      result = create_page_table_object(task->free_slots, cap_slot, arg0);
+      result = create_page_table_object(task->free_slots, cap_slot);
       break;
     case CAP_VIRT_PAGE:
       result = create_virt_page_object(task->free_slots, cap_slot, arg0, arg1, arg2, arg3);
