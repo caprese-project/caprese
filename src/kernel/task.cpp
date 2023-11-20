@@ -122,6 +122,10 @@ void kill_task(map_ptr<task_t> task) {
   // TODO: Release caps
 
   task->state = task_state_t::killed;
+
+  if (task->tid.index == 1) [[unlikely]] {
+    panic("The root task has been killed.");
+  }
 }
 
 void switch_task(map_ptr<task_t> task) {
