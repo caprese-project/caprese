@@ -49,8 +49,6 @@ extern "C" {
 }
 
 [[noreturn]] void return_to_user_mode() {
-  logd(tag, "Return to user mode.");
-
   map_ptr<task_t>& task = get_cls()->current_task;
 
   uint64_t sstatus;
