@@ -63,6 +63,7 @@ add_custom_target(
   BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/kernel/linker.ld
 )
 add_dependencies(caprese_kernel_linker caprese_kernel_payload_base)
+add_dependencies(caprese_kernel_linker root_task_payload_size)
 add_dependencies(caprese_kernel caprese_kernel_linker)
 
 target_link_options(
