@@ -66,9 +66,12 @@ static_assert(sizeof(task_t) == PAGE_SIZE);
 void init_task(map_ptr<task_t>       task,
                map_ptr<cap_space_t>  cap_space,
                map_ptr<page_table_t> root_page_table,
-               map_ptr<page_table_t> (&cap_space_page_tables)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]);
+               map_ptr<page_table_t> (&cap_space_page_tables)[NUM_INTER_PAGE_TABLE + 1]);
 
 [[nodiscard]] map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap);
+[[nodiscard]] map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot);
+[[nodiscard]] map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot);
+[[nodiscard]] bool revoke_cap(map_ptr<cap_slot_t> slot);
 
 void kill_task(map_ptr<task_t> task, int exit_status);
 void switch_task(map_ptr<task_t> task);

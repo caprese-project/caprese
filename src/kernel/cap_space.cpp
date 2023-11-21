@@ -9,11 +9,15 @@
 #include <kernel/lock.h>
 #include <kernel/task.h>
 
+map_ptr<cap_space_t> cap_slot_t::get_cap_space() const {
+  return make_map_ptr(round_down(reinterpret_cast<uintptr_t>(this), PAGE_SIZE));
+}
+
 bool insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space) {
   assert(task != nullptr);
   assert(cap_space != nullptr);
 
-  std::lock_guard<recursive_spinlock_t> lock(task->lock);
+  std::lock_guard lock(task->lock);
 
   if (task->cap_count.num_cap_space / NUM_PAGE_TABLE_ENTRY > task->cap_count.num_extension) [[unlikely]] {
     return false;
@@ -50,6 +54,7 @@ bool insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space) {
   });
 
   cap_space->meta_info.map         = cap_space;
+  cap_space->meta_info.task        = task;
   cap_space->meta_info.space_index = task->cap_count.num_cap_space;
 
   ++task->cap_count.num_cap_space;
@@ -60,7 +65,7 @@ bool insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space) {
 bool extend_cap_space(map_ptr<task_t> task, map_ptr<void> page) {
   assert(task != nullptr);
 
-  std::lock_guard<recursive_spinlock_t> lock(task->lock);
+  std::lock_guard lock(task->lock);
 
   if (task->cap_count.num_extension == NUM_PAGE_TABLE_ENTRY - 1) [[unlikely]] {
     return false;
@@ -78,6 +83,7 @@ bool extend_cap_space(map_ptr<task_t> task, map_ptr<void> page) {
 
   pte = page_table->walk(cap_space_base_va, MEGA_PAGE_TABLE_LEVEL);
   assert(pte->is_disabled());
+  pte->set_flags({});
   pte->set_next_page(page);
   pte->enable();
 
@@ -89,7 +95,7 @@ bool extend_cap_space(map_ptr<task_t> task, map_ptr<void> page) {
 map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
   assert(task != nullptr);
 
-  std::lock_guard<recursive_spinlock_t> lock(task->lock);
+  std::lock_guard lock(task->lock);
 
   if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
     return 0_map;
@@ -107,7 +113,7 @@ map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
 
   map_ptr<page_table_t> page_table = task->root_page_table;
   map_ptr<pte_t>        pte        = 0_map;
-  for (size_t level = MAX_PAGE_TABLE_LEVEL; level >= MEGA_PAGE_TABLE_LEVEL; --level) {
+  for (size_t level = MAX_PAGE_TABLE_LEVEL; level >= KILO_PAGE_TABLE_LEVEL; --level) {
     pte = page_table->walk(va, level);
     if (pte->is_disabled()) [[unlikely]] {
       return 0_map;
@@ -115,19 +121,14 @@ map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
     page_table = pte->get_next_page().as<page_table_t>();
   }
 
-  pte = page_table->walk(va, KILO_PAGE_TABLE_LEVEL);
-  if (pte->is_disabled()) [[unlikely]] {
-    return 0_map;
-  }
-
-  map_ptr<cap_space_t> cap_space = pte->get_next_page().as<cap_space_t>();
+  map_ptr<cap_space_t> cap_space = page_table.as<cap_space_t>();
   return make_map_ptr(&cap_space->slots[slot_index]);
 }
 
 size_t get_cap_slot_index(map_ptr<cap_slot_t> cap_slot) {
   assert(cap_slot != nullptr);
 
-  map_ptr<cap_space_t> cap_space = make_map_ptr(round_down(cap_slot.raw(), PAGE_SIZE));
+  map_ptr<cap_space_t> cap_space = cap_slot->get_cap_space();
 
   size_t space_index = cap_space->meta_info.space_index;
   size_t slot_index  = cap_slot.get() - cap_space->slots;

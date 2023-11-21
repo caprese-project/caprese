@@ -10,6 +10,7 @@ struct spinlock_t {
 
   void lock();
   void unlock();
+  bool try_lock();
 };
 
 struct recursive_spinlock_t {
@@ -21,6 +22,7 @@ struct recursive_spinlock_t {
 
   void lock();
   void unlock();
+  bool try_lock();
 };
 
 #endif // KERNEL_LOCK_H_

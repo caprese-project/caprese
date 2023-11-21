@@ -12,13 +12,13 @@ constexpr size_t PAGE_SIZE            = 1 << PAGE_SIZE_BIT;
 constexpr size_t NUM_PAGE_TABLE_ENTRY = PAGE_SIZE / sizeof(uint64_t);
 
 #if defined(CONFIG_MMU_SV39)
-constexpr size_t NUM_PAGE_TABLE_LEVEL  = 3;
+constexpr size_t NUM_INTER_PAGE_TABLE  = 1;
 constexpr size_t KILO_PAGE_TABLE_LEVEL = 0;
 constexpr size_t MEGA_PAGE_TABLE_LEVEL = 1;
 constexpr size_t GIGA_PAGE_TABLE_LEVEL = 2;
 constexpr size_t MAX_PAGE_TABLE_LEVEL  = GIGA_PAGE_TABLE_LEVEL;
 #elif defined(CONFIG_MMU_SV48)
-constexpr size_t NUM_PAGE_TABLE_LEVEL  = 4;
+constexpr size_t NUM_INTER_PAGE_TABLE  = 2;
 constexpr size_t KILO_PAGE_TABLE_LEVEL = 0;
 constexpr size_t MEGA_PAGE_TABLE_LEVEL = 1;
 constexpr size_t GIGA_PAGE_TABLE_LEVEL = 2;
@@ -96,7 +96,7 @@ struct alignas(PAGE_SIZE) page_table_t {
 
   inline map_ptr<pte_t> walk(virt_ptr<void> va, size_t level) {
     assert(va.raw() < CONFIG_MAX_VIRTUAL_ADDRESS);
-    assert(level < NUM_PAGE_TABLE_LEVEL);
+    assert(level <= MAX_PAGE_TABLE_LEVEL);
     size_t index = (va.raw() >> (9 * level + PAGE_SIZE_BIT)) & 0x1ff;
     return make_map_ptr(&entries[index]);
   }

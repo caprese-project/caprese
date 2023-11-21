@@ -5,16 +5,20 @@
 #include <kernel/page.h>
 
 struct task_t;
+struct cap_space_t;
 
 struct cap_slot_t {
   capability_t        cap;
   map_ptr<cap_slot_t> prev;
   map_ptr<cap_slot_t> next;
+
+  map_ptr<cap_space_t> get_cap_space() const;
 };
 
 struct alignas(PAGE_SIZE) cap_space_t {
   struct {
     map_ptr<cap_space_t> map;
+    map_ptr<task_t>      task;
     uintptr_t            space_index;
   } meta_info;
 

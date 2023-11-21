@@ -9,6 +9,7 @@
 #include <kernel/cls.h>
 #include <kernel/lock.h>
 #include <kernel/task.h>
+#include <log/log.h>
 
 map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, size_t size, size_t alignment) {
   assert(src != nullptr);
@@ -63,7 +64,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
                                        map_ptr<cap_slot_t> src,
                                        map_ptr<cap_slot_t> cap_space_slot,
                                        map_ptr<cap_slot_t> root_page_table_slot,
-                                       map_ptr<cap_slot_t> (&cap_space_page_table_slots)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]) {
+                                       map_ptr<cap_slot_t> (&cap_space_page_table_slots)[NUM_INTER_PAGE_TABLE + 1]) {
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
@@ -72,15 +73,15 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   assert(get_cap_type(cap_space_slot->cap) == CAP_CAP_SPACE);
   assert(root_page_table_slot != nullptr);
   assert(get_cap_type(root_page_table_slot->cap) == CAP_PAGE_TABLE);
-  if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 1) {
+  if constexpr (NUM_INTER_PAGE_TABLE + 1 >= 1) {
     assert(cap_space_page_table_slots[0] != nullptr);
     assert(get_cap_type(cap_space_page_table_slots[0]->cap) == CAP_PAGE_TABLE);
   }
-  if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 2) {
+  if constexpr (NUM_INTER_PAGE_TABLE + 1 >= 2) {
     assert(cap_space_page_table_slots[1] != nullptr);
     assert(get_cap_type(cap_space_page_table_slots[1]->cap) == CAP_PAGE_TABLE);
   }
-  if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 3) {
+  if constexpr (NUM_INTER_PAGE_TABLE + 1 >= 3) {
     assert(cap_space_page_table_slots[2] != nullptr);
     assert(get_cap_type(cap_space_page_table_slots[2]->cap) == CAP_PAGE_TABLE);
   }
@@ -92,15 +93,9 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
 
   map_ptr<cap_space_t>  cap_space       = cap_space_slot->cap.cap_space.space;
   map_ptr<page_table_t> root_page_table = root_page_table_slot->cap.page_table.table;
-  map_ptr<page_table_t> cap_space_page_tables[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL];
-  if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 1) {
-    cap_space_page_tables[0] = cap_space_page_table_slots[0]->cap.page_table.table;
-  }
-  if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 2) {
-    cap_space_page_tables[1] = cap_space_page_table_slots[1]->cap.page_table.table;
-  }
-  if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 3) {
-    cap_space_page_tables[2] = cap_space_page_table_slots[2]->cap.page_table.table;
+  map_ptr<page_table_t> cap_space_page_tables[NUM_INTER_PAGE_TABLE + 1];
+  for (size_t i = 0; i < std::size(cap_space_page_table_slots); ++i) {
+    cap_space_page_tables[i] = cap_space_page_table_slots[i]->cap.page_table.table;
   }
 
   dst = create_memory_object(dst, src, true, true, false, PAGE_SIZE, PAGE_SIZE);
@@ -115,6 +110,29 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
 
   int flags = TASK_CAP_KILLABLE | TASK_CAP_SWITCHABLE | TASK_CAP_SUSPENDABLE | TASK_CAP_RESUMABLE | TASK_CAP_REGISTER_GETTABLE | TASK_CAP_REGISTER_SETTABLE | TASK_CAP_KILL_NOTIFIABLE;
   dst->cap  = make_task_cap(flags, task);
+
+  if (transfer_cap(task, cap_space_slot) == nullptr) [[unlikely]] {
+    if (!revoke_cap(dst)) [[unlikely]] {
+      panic("Failed to revoke cap.");
+    }
+    return 0_map;
+  }
+
+  if (transfer_cap(task, root_page_table_slot) == nullptr) [[unlikely]] {
+    if (!revoke_cap(dst)) [[unlikely]] {
+      panic("Failed to revoke cap.");
+    }
+    return 0_map;
+  }
+
+  for (size_t i = 0; i < std::size(cap_space_page_table_slots); ++i) {
+    if (transfer_cap(task, cap_space_page_table_slots[i]) == nullptr) [[unlikely]] {
+      if (!revoke_cap(dst)) [[unlikely]] {
+        panic("Failed to revoke cap.");
+      }
+      return 0_map;
+    }
+  }
 
   return dst;
 }
@@ -149,7 +167,7 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   assert(dst != nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
-  if (level >= MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
+  if (level > MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
     return 0_map;
   }
 
@@ -197,7 +215,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
     return 0_map;
   }
 
-  std::lock_guard<recursive_spinlock_t> lock(task->lock);
+  std::lock_guard lock(task->lock);
 
   if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
     return 0_map;
@@ -226,26 +244,13 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
         return 0_map;
       }
 
-      map_ptr<cap_slot_t> cap_space_page_table_slots[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL];
+      map_ptr<cap_slot_t> cap_space_page_table_slots[NUM_INTER_PAGE_TABLE + 1];
       static_assert(std::size(cap_space_page_table_slots) <= 3);
 
-      if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 1) {
-        cap_space_page_table_slots[0] = lookup_cap(task, arg2);
-        if (cap_space_page_table_slots[0] == nullptr || get_cap_type(cap_space_page_table_slots[0]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
-          return 0_map;
-        }
-      }
-
-      if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 2) {
-        cap_space_page_table_slots[1] = lookup_cap(task, arg3);
-        if (cap_space_page_table_slots[1] == nullptr || get_cap_type(cap_space_page_table_slots[1]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
-          return 0_map;
-        }
-      }
-
-      if constexpr (NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL >= 3) {
-        cap_space_page_table_slots[2] = lookup_cap(task, arg4);
-        if (cap_space_page_table_slots[2] == nullptr || get_cap_type(cap_space_page_table_slots[2]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+      const uintptr_t cap_descs[] { arg2, arg3, arg4 };
+      for (size_t i = 0; i < std::size(cap_space_page_table_slots); ++i) {
+        cap_space_page_table_slots[i] = lookup_cap(task, cap_descs[i]);
+        if (cap_space_page_table_slots[i] == nullptr || get_cap_type(cap_space_page_table_slots[i]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
           return 0_map;
         }
       }

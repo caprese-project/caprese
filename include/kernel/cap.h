@@ -143,7 +143,7 @@ inline capability_t make_task_cap(int flags, map_ptr<task_t> task) {
   };
 }
 
-inline capability_t make_page_table_cap(uint64_t level, map_ptr<page_table_t> page_table) {
+inline capability_t make_page_table_cap(uint64_t level, map_ptr<page_table_t> page_table, uintptr_t virt_addr_base = 0) {
   assert(page_table != nullptr);
   assert(level <= MAX_PAGE_TABLE_LEVEL);
 
@@ -152,7 +152,7 @@ inline capability_t make_page_table_cap(uint64_t level, map_ptr<page_table_t> pa
       .type           = static_cast<uint64_t>(CAP_PAGE_TABLE),
       .mapped         = false,
       .level          = level,
-      .virt_addr_base = 0,
+      .virt_addr_base = virt_addr_base,
       .table          = page_table,
     },
   };
@@ -197,7 +197,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
                                        map_ptr<cap_slot_t> src,
                                        map_ptr<cap_slot_t> cap_space_slot,
                                        map_ptr<cap_slot_t> root_page_table_slot,
-                                       map_ptr<cap_slot_t> (&cap_space_page_table_slots)[NUM_PAGE_TABLE_LEVEL - MEGA_PAGE_TABLE_LEVEL]);
+                                       map_ptr<cap_slot_t> (&cap_space_page_table_slots)[NUM_INTER_PAGE_TABLE + 1]);
 map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
 map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, uint64_t level);
 map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
