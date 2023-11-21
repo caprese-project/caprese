@@ -113,7 +113,7 @@ map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
 
   map_ptr<page_table_t> page_table = task->root_page_table;
   map_ptr<pte_t>        pte        = 0_map;
-  for (ssize_t level = MAX_PAGE_TABLE_LEVEL; level >= KILO_PAGE_TABLE_LEVEL; --level) {
+  for (ssize_t level = MAX_PAGE_TABLE_LEVEL; level >= static_cast<ssize_t>(KILO_PAGE_TABLE_LEVEL); --level) {
     pte = page_table->walk(va, level);
     if (pte->is_disabled()) [[unlikely]] {
       return 0_map;
