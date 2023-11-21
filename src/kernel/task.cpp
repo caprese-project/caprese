@@ -172,6 +172,48 @@ map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
   return dst_slot;
 }
 
+map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
+  assert(src_slot != nullptr);
+
+  map_ptr<task_t>& src_task = src_slot->get_cap_space()->meta_info.task;
+
+  std::lock_guard lock(src_task->lock);
+
+  map_ptr<cap_slot_t> dst_slot = 0_map;
+
+  switch (get_cap_type(src_slot->cap)) {
+    case CAP_NULL:
+      break;
+    case CAP_MEM:
+      break;
+    case CAP_TASK:
+      dst_slot = insert_cap(src_task, src_slot->cap);
+      break;
+    case CAP_ENDPOINT:
+      break;
+    case CAP_PAGE_TABLE:
+      break;
+    case CAP_VIRT_PAGE:
+      break;
+    case CAP_CAP_SPACE:
+      break;
+    case CAP_ZOMBIE:
+      break;
+    case CAP_UNKNOWN:
+      break;
+  }
+
+  if (dst_slot == nullptr) [[unlikely]] {
+    return 0_map;
+  }
+
+  dst_slot->prev = src_slot;
+  dst_slot->next = src_slot->next;
+  src_slot->next = dst_slot;
+
+  return dst_slot;
+}
+
 [[nodiscard]] bool revoke_cap(map_ptr<cap_slot_t> slot) {
   assert(slot != nullptr);
 

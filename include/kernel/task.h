@@ -70,6 +70,7 @@ void init_task(map_ptr<task_t>       task,
 [[nodiscard]] map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap);
 [[nodiscard]] map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot);
 [[nodiscard]] map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot);
+[[nodiscard]] map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot);
 [[nodiscard]] bool revoke_cap(map_ptr<cap_slot_t> slot);
 
 void kill_task(map_ptr<task_t> task, int exit_status);

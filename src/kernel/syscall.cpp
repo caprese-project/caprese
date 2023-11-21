@@ -61,6 +61,31 @@ sysret_t invoke_syscall_cap(uint16_t id, map_ptr<syscall_args_t> args) {
 
       return sysret_s_ok(static_cast<uintptr_t>(get_cap_type(cap_slot->cap)));
     }
+    case SYS_CAP_COPY & 0xffff: {
+      map_ptr<cap_slot_t> cap_slot = lookup_cap(task, args->args[0]);
+      if (cap_slot == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      map_ptr<cap_slot_t> result = copy_cap(cap_slot);
+      if (result == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      return sysret_s_ok(get_cap_slot_index(result));
+    }
+    case SYS_CAP_REVOKE & 0xffff: {
+      map_ptr<cap_slot_t> cap_slot = lookup_cap(task, args->args[0]);
+      if (cap_slot == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      if (revoke_cap(cap_slot)) {
+        return sysret_s_ok(0);
+      } else {
+        return sysret_e_invalid_argument();
+      }
+    }
     default:
       return sysret_e_invalid_code();
   }
