@@ -1,5 +1,6 @@
 #include <kernel/cls.h>
 #include <kernel/core_id.h>
+#include <kernel/frame.h>
 #include <kernel/syscall.h>
 #include <libcaprese/syscall.h>
 #include <string.h>
@@ -147,6 +148,64 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
       }
       resume_task(task_cap.task);
       return sysret_s_ok(0);
+    case SYS_TASK_CAP_GET_REG & 0xffff:
+      if (!task_cap.register_gettable) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      if (args->args[1] > LAST_REGISTER) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(get_register(make_map_ptr(&task_cap.task->frame), args->args[1]));
+    case SYS_TASK_CAP_SET_REG & 0xffff:
+      if (!task_cap.register_settable) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      if (args->args[1] > LAST_REGISTER) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(set_register(make_map_ptr(&task_cap.task->frame), args->args[1], args->args[2]));
+    case SYS_TASK_CAP_TRANSFER_CAP & 0xffff: {
+      map_ptr<cap_slot_t> dst_task_slot = lookup_cap(task_cap.task, args->args[1]);
+      if (dst_task_slot == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      if (get_cap_type(dst_task_slot->cap) != CAP_TASK) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      map_ptr<cap_slot_t> src_slot = lookup_cap(task_cap.task, args->args[2]);
+      if (src_slot == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      map_ptr<cap_slot_t> dst_slot = transfer_cap(dst_task_slot->cap.task.task, src_slot);
+      if (dst_slot == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      return sysret_s_ok(get_cap_slot_index(dst_slot));
+    }
+    case SYS_TASK_CAP_DELEGATE_CAP & 0xffff: {
+      map_ptr<cap_slot_t> dst_task_slot = lookup_cap(task_cap.task, args->args[1]);
+      if (dst_task_slot == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      if (get_cap_type(dst_task_slot->cap) != CAP_TASK) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      map_ptr<cap_slot_t> src_slot = lookup_cap(task_cap.task, args->args[2]);
+      if (src_slot == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      map_ptr<cap_slot_t> dst_slot = delegate_cap(dst_task_slot->cap.task.task, src_slot);
+      if (dst_slot == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      return sysret_s_ok(get_cap_slot_index(dst_slot));
+    }
     default:
       return sysret_e_invalid_code();
   }
