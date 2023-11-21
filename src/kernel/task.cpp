@@ -12,6 +12,8 @@
 #include <log/log.h>
 
 namespace {
+  constexpr const char* tag = "kernel/task";
+
   spinlock_t next_tid_lock;
   spinlock_t lookup_tid_lock;
   uint32_t   cur_tid = 0;
@@ -127,6 +129,8 @@ void kill_task(map_ptr<task_t> task, int exit_status) {
   if (task->tid.index == 1) [[unlikely]] {
     panic("The root task has been killed.");
   }
+
+  logd(tag, "Task 0x%x has been killed.", task->tid);
 }
 
 void switch_task(map_ptr<task_t> task) {
