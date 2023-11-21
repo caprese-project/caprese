@@ -2,6 +2,7 @@
 #include <kernel/core_id.h>
 #include <kernel/syscall.h>
 #include <libcaprese/syscall.h>
+#include <string.h>
 
 sysret_t invoke_syscall() {
   syscall_args_t args {};
@@ -13,19 +14,18 @@ sysret_t invoke_syscall() {
   switch (ns) {
     case SYSNS_SYSTEM:
       return invoke_syscall_system(id, make_map_ptr(&args));
-      break;
     case SYSNS_ARCH:
       return invoke_syscall_arch(id, make_map_ptr(&args));
-      break;
     case SYSNS_CAP:
       return invoke_syscall_cap(id, make_map_ptr(&args));
-      break;
     case SYSNS_MEM_CAP:
       return invoke_syscall_mem_cap(id, make_map_ptr(&args));
-      break;
     case SYSNS_TASK_CAP:
       return invoke_syscall_task_cap(id, make_map_ptr(&args));
-      break;
+    case SYSNS_PAGE_TABLE_CAP:
+      return invoke_syscall_page_table_cap(id, make_map_ptr(&args));
+    case SYSNS_VIRT_PAGE_CAP:
+      return invoke_syscall_virt_page_cap(id, make_map_ptr(&args));
     default:
       return sysret_e_invalid_code();
   }
@@ -147,6 +147,110 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
       }
       resume_task(task_cap.task);
       return sysret_s_ok(0);
+    default:
+      return sysret_e_invalid_code();
+  }
+}
+
+sysret_t invoke_syscall_page_table_cap(uint16_t id, map_ptr<syscall_args_t> args) {
+  map_ptr<cap_slot_t> cap_slot = lookup_cap(get_cls()->current_task, args->args[0]);
+  if (cap_slot == nullptr) [[unlikely]] {
+    return sysret_e_invalid_argument();
+  }
+  if (get_cap_type(cap_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    return sysret_e_invalid_argument();
+  }
+
+  auto& page_table_cap = cap_slot->cap.page_table;
+
+  switch (id) {
+    case SYS_PAGE_TABLE_CAP_MAPPED & 0xffff:
+      return sysret_s_ok(page_table_cap.mapped);
+    case SYS_PAGE_TABLE_CAP_LEVEL & 0xffff:
+      if (!page_table_cap.mapped) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(page_table_cap.level);
+    case SYS_PAGE_TABLE_CAP_MAP_TABLE & 0xffff:
+      if (!map_page_table_cap(cap_slot, args->args[1], lookup_cap(get_cls()->current_task, args->args[2]))) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(0);
+    case SYS_PAGE_TABLE_CAP_UNMAP_TABLE & 0xffff:
+      if (!unmap_page_table_cap(cap_slot, args->args[1], lookup_cap(get_cls()->current_task, args->args[2]))) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(0);
+    case SYS_PAGE_TABLE_CAP_MAP_PAGE & 0xffff:
+      if (!map_virt_page_cap(cap_slot, args->args[1], lookup_cap(get_cls()->current_task, args->args[5]), args->args[2], args->args[3], args->args[4])) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(0);
+    case SYS_PAGE_TABLE_CAP_UNMAP_PAGE & 0xffff:
+      if (!unmap_virt_page_cap(cap_slot, args->args[1], lookup_cap(get_cls()->current_task, args->args[2]))) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(0);
+    case SYS_PAGE_TABLE_CAP_REMAP_PAGE & 0xffff:
+      if (!remap_virt_page_cap(cap_slot,
+                               args->args[1],
+                               lookup_cap(get_cls()->current_task, args->args[5]),
+                               args->args[2],
+                               args->args[3],
+                               args->args[4],
+                               lookup_cap(get_cls()->current_task, args->args[6]))) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(0);
+    default:
+      return sysret_e_invalid_code();
+  }
+}
+
+sysret_t invoke_syscall_virt_page_cap(uint16_t id, map_ptr<syscall_args_t> args) {
+  map_ptr<cap_slot_t> cap_slot = lookup_cap(get_cls()->current_task, args->args[0]);
+  if (cap_slot == nullptr) [[unlikely]] {
+    return sysret_e_invalid_argument();
+  }
+  if (get_cap_type(cap_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    return sysret_e_invalid_argument();
+  }
+
+  auto& virt_page_cap = cap_slot->cap.virt_page;
+
+  switch (id) {
+    case SYS_VIRT_PAGE_CAP_MAPPED & 0xffff:
+      return sysret_s_ok(virt_page_cap.mapped);
+    case SYS_VIRT_PAGE_CAP_READABLE & 0xffff:
+      if (!virt_page_cap.mapped) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(virt_page_cap.readable);
+    case SYS_VIRT_PAGE_CAP_WRITABLE & 0xffff:
+      if (!virt_page_cap.mapped) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(virt_page_cap.writable);
+    case SYS_VIRT_PAGE_CAP_EXECUTABLE & 0xffff:
+      if (!virt_page_cap.mapped) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(virt_page_cap.executable);
+    case SYS_VIRT_PAGE_CAP_LEVEL & 0xffff:
+      if (!virt_page_cap.mapped) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(virt_page_cap.level);
+    case SYS_VIRT_PAGE_CAP_PHYS_ADDR & 0xffff:
+      if (!virt_page_cap.mapped) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(virt_page_cap.phys_addr);
+    case SYS_VIRT_PAGE_CAP_VIRT_ADDR & 0xffff:
+      if (!virt_page_cap.mapped) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(virt_page_cap.address.raw());
     default:
       return sysret_e_invalid_code();
   }

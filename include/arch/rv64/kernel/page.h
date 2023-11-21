@@ -70,6 +70,10 @@ struct pte_t {
     return !this->v;
   }
 
+  inline bool is_table() const {
+    return this->v && !this->r && !this->w && !this->x && !this->u && !this->g;
+  }
+
   inline void set_flags(pte_flags_t flags) {
     this->r = flags.readable;
     this->w = flags.writable;

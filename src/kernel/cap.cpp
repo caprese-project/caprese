@@ -276,3 +276,256 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
 
   return result;
 }
+
+bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot) {
+  assert(page_table_slot != nullptr);
+  assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
+
+  if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    return false;
+  }
+
+  if (child_page_table_slot == nullptr) [[unlikely]] {
+    return false;
+  }
+
+  if (get_cap_type(child_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    return false;
+  }
+
+  auto& page_table_cap       = page_table_slot->cap.page_table;
+  auto& child_page_table_cap = child_page_table_slot->cap.page_table;
+
+  if (page_table_cap.level == KILO_PAGE_TABLE_LEVEL) [[unlikely]] {
+    return false;
+  }
+
+  pte_t& pte = page_table_cap.table->entries[index];
+  if (pte.is_enabled()) [[unlikely]] {
+    return false;
+  }
+
+  if (child_page_table_cap.mapped) [[unlikely]] {
+    return false;
+  }
+
+  pte.set_flags({});
+  pte.set_next_page(child_page_table_cap.table.as<void>());
+  pte.enable();
+
+  child_page_table_cap.mapped         = true;
+  child_page_table_cap.level          = page_table_cap.level - 1;
+  child_page_table_cap.virt_addr_base = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
+
+  return true;
+}
+
+bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot) {
+  assert(page_table_slot != nullptr);
+  assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
+
+  if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    return false;
+  }
+
+  if (child_page_table_slot == nullptr) [[unlikely]] {
+    return false;
+  }
+
+  if (get_cap_type(child_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    return false;
+  }
+
+  auto& page_table_cap       = page_table_slot->cap.page_table;
+  auto& child_page_table_cap = child_page_table_slot->cap.page_table;
+
+  pte_t& pte = page_table_cap.table->entries[index];
+  if (pte.is_disabled()) [[unlikely]] {
+    return false;
+  }
+
+  if (!child_page_table_cap.mapped) [[unlikely]] {
+    return false;
+  }
+
+  if (pte.get_next_page() != child_page_table_cap.table.as<void>()) [[unlikely]] {
+    return false;
+  }
+
+  pte.disable();
+
+  child_page_table_cap.mapped = false;
+
+  return true;
+}
+
+bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot, bool readable, bool writable, bool executable) {
+  assert(page_table_slot != nullptr);
+  assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
+
+  if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    return false;
+  }
+
+  if (virt_page_slot == nullptr) [[unlikely]] {
+    return false;
+  }
+
+  if (get_cap_type(virt_page_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    return false;
+  }
+
+  auto& page_table_cap = page_table_slot->cap.page_table;
+  auto& virt_page_cap  = virt_page_slot->cap.virt_page;
+
+  pte_t& pte = page_table_cap.table->entries[index];
+  if (pte.is_enabled()) [[unlikely]] {
+    return false;
+  }
+
+  if (virt_page_cap.mapped) [[unlikely]] {
+    return false;
+  }
+
+  if (virt_page_cap.level != page_table_cap.level) [[unlikely]] {
+    return false;
+  }
+
+  pte.set_flags({
+      .readable   = readable,
+      .writable   = writable,
+      .executable = executable,
+      .user       = 0,
+      .global     = 0,
+  });
+  pte.set_next_page(make_phys_ptr(virt_page_cap.phys_addr));
+  pte.enable();
+
+  virt_page_cap.mapped     = true;
+  virt_page_cap.readable   = readable;
+  virt_page_cap.writable   = writable;
+  virt_page_cap.executable = executable;
+  virt_page_cap.index      = index;
+  virt_page_cap.address    = virt_ptr<void>::from(page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index);
+
+  return true;
+}
+
+bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot) {
+  assert(page_table_slot != nullptr);
+  assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
+
+  if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    return false;
+  }
+
+  if (virt_page_slot == nullptr) [[unlikely]] {
+    return false;
+  }
+
+  if (get_cap_type(virt_page_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    return false;
+  }
+
+  auto& page_table_cap = page_table_slot->cap.page_table;
+  auto& virt_page_cap  = virt_page_slot->cap.virt_page;
+
+  pte_t& pte = page_table_cap.table->entries[index];
+  if (pte.is_disabled()) [[unlikely]] {
+    return false;
+  }
+
+  if (!virt_page_cap.mapped) [[unlikely]] {
+    return false;
+  }
+
+  map_ptr<void> map_ptr = make_phys_ptr(virt_page_cap.phys_addr);
+
+  if (pte.get_next_page() != map_ptr) [[unlikely]] {
+    return false;
+  }
+
+  pte.disable();
+
+  virt_page_cap.mapped = false;
+
+  return true;
+}
+
+bool remap_virt_page_cap(
+    map_ptr<cap_slot_t> new_page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot, bool readable, bool writable, bool executable, map_ptr<cap_slot_t> old_page_table_slot) {
+  assert(new_page_table_slot != nullptr);
+  assert(get_cap_type(new_page_table_slot->cap) == CAP_PAGE_TABLE);
+
+  if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    return false;
+  }
+
+  if (virt_page_slot == nullptr) [[unlikely]] {
+    return false;
+  }
+
+  if (get_cap_type(virt_page_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    return false;
+  }
+
+  if (old_page_table_slot == nullptr) [[unlikely]] {
+    return false;
+  }
+
+  if (get_cap_type(old_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    return false;
+  }
+
+  auto& new_page_table_cap = new_page_table_slot->cap.page_table;
+  auto& virt_page_cap      = virt_page_slot->cap.virt_page;
+  auto& old_page_table_cap = old_page_table_slot->cap.page_table;
+
+  if (!virt_page_cap.mapped) [[unlikely]] {
+    return false;
+  }
+
+  if (new_page_table_cap.level != old_page_table_cap.level) [[unlikely]] {
+    return false;
+  }
+
+  if (new_page_table_cap.level != virt_page_cap.level) [[unlikely]] {
+    return false;
+  }
+
+  pte_t& new_pte = new_page_table_cap.table->entries[index];
+  if (new_pte.is_enabled()) [[unlikely]] {
+    return false;
+  }
+
+  pte_t& old_pte = old_page_table_cap.table->entries[virt_page_cap.index];
+  if (old_pte.is_disabled()) [[unlikely]] {
+    return false;
+  }
+
+  map_ptr<void> map_ptr = make_phys_ptr(virt_page_cap.phys_addr);
+
+  if (old_pte.get_next_page() != map_ptr) [[unlikely]] {
+    return false;
+  }
+
+  old_pte.disable();
+
+  new_pte.set_flags({
+      .readable   = readable,
+      .writable   = writable,
+      .executable = executable,
+      .user       = true,
+      .global     = false,
+  });
+  new_pte.set_next_page(map_ptr);
+  new_pte.enable();
+
+  virt_page_cap.readable   = readable;
+  virt_page_cap.writable   = writable;
+  virt_page_cap.executable = executable;
+  virt_page_cap.index      = index;
+  virt_page_cap.address    = virt_ptr<void>::from(new_page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index);
+
+  return true;
+}

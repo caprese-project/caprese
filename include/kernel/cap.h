@@ -47,18 +47,22 @@ union capability_t {
   } endpoint;
 
   struct {
-    uint64_t              type : 5;
-    uint64_t              level: 2;
+    uint64_t              type  : 5;
+    uint64_t              mapped: 1;
+    uint64_t              level : 2;
+    uint64_t              virt_addr_base: std::countr_zero<uint64_t>(CONFIG_MAX_VIRTUAL_ADDRESS);
     map_ptr<page_table_t> table;
   } page_table;
 
   struct {
     uint64_t       type      : 5;
+    uint64_t       mapped    : 1;
     uint64_t       readable  : 1;
     uint64_t       writable  : 1;
     uint64_t       executable: 1;
     uint64_t       level     : 2;
-    uint64_t       phys_addr: std::countr_zero<uintptr_t>(CONFIG_MAX_PHYSICAL_ADDRESS);
+    uint64_t       index: std::countr_zero<uint64_t>(NUM_PAGE_TABLE_ENTRY);
+    uint64_t       phys_addr: std::countr_zero<uint64_t>(CONFIG_MAX_PHYSICAL_ADDRESS);
     virt_ptr<void> address;
   } virt_page;
 
@@ -145,9 +149,11 @@ inline capability_t make_page_table_cap(uint64_t level, map_ptr<page_table_t> pa
 
   return {
     .page_table = {
-      .type  = static_cast<uint64_t>(CAP_PAGE_TABLE),
-      .level = level,
-      .table = page_table,
+      .type           = static_cast<uint64_t>(CAP_PAGE_TABLE),
+      .mapped         = false,
+      .level          = level,
+      .virt_addr_base = 0,
+      .table          = page_table,
     },
   };
 }
@@ -163,10 +169,12 @@ inline capability_t make_virt_page_cap(int flags, uint64_t level, uint64_t phys_
   return {
     .virt_page = {
       .type       = static_cast<uint64_t>(CAP_VIRT_PAGE),
+      .mapped     = false,
       .readable   = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_READABLE) >> 0),
       .writable   = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_WRITABLE) >> 1),
       .executable = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_EXECUTABLE) >> 2),
       .level      = level,
+      .index      = 0,
       .phys_addr  = phys_addr,
       .address    = 0_virt,
     },
@@ -194,5 +202,12 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
 map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, uint64_t level);
 map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
 map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_slot, cap_type_t type, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4);
+
+bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot);
+bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot);
+bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot, bool readable, bool writable, bool executable);
+bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot);
+bool remap_virt_page_cap(
+    map_ptr<cap_slot_t> new_page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot, bool readable, bool writable, bool executable, map_ptr<cap_slot_t> old_page_table_slot);
 
 #endif // KERNEL_CAP_H_
