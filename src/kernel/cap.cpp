@@ -111,29 +111,6 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   int flags = TASK_CAP_KILLABLE | TASK_CAP_SWITCHABLE | TASK_CAP_SUSPENDABLE | TASK_CAP_RESUMABLE | TASK_CAP_REGISTER_GETTABLE | TASK_CAP_REGISTER_SETTABLE | TASK_CAP_KILL_NOTIFIABLE;
   dst->cap  = make_task_cap(flags, task);
 
-  if (transfer_cap(task, cap_space_slot) == nullptr) [[unlikely]] {
-    if (!revoke_cap(dst)) [[unlikely]] {
-      panic("Failed to revoke cap.");
-    }
-    return 0_map;
-  }
-
-  if (transfer_cap(task, root_page_table_slot) == nullptr) [[unlikely]] {
-    if (!revoke_cap(dst)) [[unlikely]] {
-      panic("Failed to revoke cap.");
-    }
-    return 0_map;
-  }
-
-  for (size_t i = 0; i < std::size(cap_space_page_table_slots); ++i) {
-    if (transfer_cap(task, cap_space_page_table_slots[i]) == nullptr) [[unlikely]] {
-      if (!revoke_cap(dst)) [[unlikely]] {
-        panic("Failed to revoke cap.");
-      }
-      return 0_map;
-    }
-  }
-
   return dst;
 }
 
