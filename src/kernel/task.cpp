@@ -65,12 +65,12 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
   for (size_t level = MAX_PAGE_TABLE_LEVEL; level >= GIGA_PAGE_TABLE_LEVEL; --level) {
     pte = page_table->walk(make_virt_ptr(CONFIG_CAPABILITY_SPACE_BASE), level);
     assert(pte->is_disabled());
-    pte->set_next_page(cap_space_page_tables[MAX_PAGE_TABLE_LEVEL - level].as<void>());
+    pte->set_next_page(cap_space_page_tables[level - 1].as<void>());
     pte->set_flags({ .readable = 1, .writable = 1, .executable = 0, .user = 0, .global = 0 });
     pte->enable();
     page_table = pte->get_next_page().as<page_table_t>();
   }
-  if (!extend_cap_space(task, (std::end(cap_space_page_tables) - 1)->as<void>())) {
+  if (!extend_cap_space(task, cap_space_page_tables[0].as<void>())) {
     panic("Failed to extend cap space.");
   }
 

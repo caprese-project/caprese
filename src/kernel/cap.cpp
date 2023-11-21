@@ -73,17 +73,21 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   assert(get_cap_type(cap_space_slot->cap) == CAP_CAP_SPACE);
   assert(root_page_table_slot != nullptr);
   assert(get_cap_type(root_page_table_slot->cap) == CAP_PAGE_TABLE);
+  assert(root_page_table_slot->cap.page_table.mapped == false);
   if constexpr (NUM_INTER_PAGE_TABLE + 1 >= 1) {
     assert(cap_space_page_table_slots[0] != nullptr);
     assert(get_cap_type(cap_space_page_table_slots[0]->cap) == CAP_PAGE_TABLE);
+    assert(cap_space_page_table_slots[0]->cap.page_table.mapped == false);
   }
   if constexpr (NUM_INTER_PAGE_TABLE + 1 >= 2) {
     assert(cap_space_page_table_slots[1] != nullptr);
     assert(get_cap_type(cap_space_page_table_slots[1]->cap) == CAP_PAGE_TABLE);
+    assert(cap_space_page_table_slots[1]->cap.page_table.mapped == false);
   }
   if constexpr (NUM_INTER_PAGE_TABLE + 1 >= 3) {
     assert(cap_space_page_table_slots[2] != nullptr);
     assert(get_cap_type(cap_space_page_table_slots[2]->cap) == CAP_PAGE_TABLE);
+    assert(cap_space_page_table_slots[2]->cap.page_table.mapped == false);
   }
 
   auto& mem_cap = src->cap.memory;
@@ -110,6 +114,16 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
 
   int flags = TASK_CAP_KILLABLE | TASK_CAP_SWITCHABLE | TASK_CAP_SUSPENDABLE | TASK_CAP_RESUMABLE | TASK_CAP_REGISTER_GETTABLE | TASK_CAP_REGISTER_SETTABLE | TASK_CAP_KILL_NOTIFIABLE;
   dst->cap  = make_task_cap(flags, task);
+
+  root_page_table_slot->cap.page_table.level          = MAX_PAGE_TABLE_LEVEL;
+  root_page_table_slot->cap.page_table.mapped         = true;
+  root_page_table_slot->cap.page_table.virt_addr_base = 0;
+
+  for (size_t i = 0; i < std::size(cap_space_page_table_slots); ++i) {
+    cap_space_page_table_slots[i]->cap.page_table.level          = i;
+    cap_space_page_table_slots[i]->cap.page_table.mapped         = true;
+    cap_space_page_table_slots[i]->cap.page_table.virt_addr_base = 0; // TODO
+  }
 
   return dst;
 }
@@ -217,7 +231,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       }
 
       map_ptr<cap_slot_t> root_page_table_slot = lookup_cap(task, arg1);
-      if (root_page_table_slot == nullptr || get_cap_type(root_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+      if (root_page_table_slot == nullptr || get_cap_type(root_page_table_slot->cap) != CAP_PAGE_TABLE || root_page_table_slot->cap.page_table.mapped) [[unlikely]] {
         return 0_map;
       }
 
@@ -227,7 +241,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       const uintptr_t cap_descs[] { arg2, arg3, arg4 };
       for (size_t i = 0; i < std::size(cap_space_page_table_slots); ++i) {
         cap_space_page_table_slots[i] = lookup_cap(task, cap_descs[i]);
-        if (cap_space_page_table_slots[i] == nullptr || get_cap_type(cap_space_page_table_slots[i]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+        if (cap_space_page_table_slots[i] == nullptr || get_cap_type(cap_space_page_table_slots[i]->cap) != CAP_PAGE_TABLE || cap_space_page_table_slots[i]->cap.page_table.mapped) [[unlikely]] {
           return 0_map;
         }
       }
