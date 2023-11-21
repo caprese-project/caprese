@@ -38,12 +38,11 @@ struct task_queue_t {
 
 enum struct task_state_t : uint8_t {
   unused    = 0,
-  creating  = 1,
-  running   = 2,
-  ready     = 3,
-  waiting   = 4,
-  suspended = 5,
-  killed    = 6,
+  running   = 1,
+  ready     = 2,
+  waiting   = 3,
+  suspended = 4,
+  killed    = 5,
 };
 
 struct alignas(PAGE_SIZE) task_t {

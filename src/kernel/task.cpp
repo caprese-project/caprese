@@ -42,7 +42,7 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
   task->waiting_queue   = {};
   task->free_slots      = 0_map;
   task->root_page_table = root_page_table;
-  task->state           = task_state_t::creating;
+  task->state           = task_state_t::suspended;
 
   memset(root_page_table.get(), 0, sizeof(page_table_t));
 
@@ -265,8 +265,10 @@ void switch_task(map_ptr<task_t> task) {
   }
 
   get_cls()->current_task = task;
+  old_task->state         = task_state_t::ready;
   switch_context(make_map_ptr(&task->context), make_map_ptr(&old_task->context));
-  get_cls()->current_task = old_task;
+  assert(old_task->state == task_state_t::running);
+  assert(get_cls()->current_task == old_task);
 }
 
 void suspend_task(map_ptr<task_t> task) {

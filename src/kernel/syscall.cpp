@@ -149,7 +149,7 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
       resume_task(task_cap.task);
       return sysret_s_ok(0);
     case SYS_TASK_CAP_GET_REG & 0xffff:
-      if (!task_cap.register_gettable) [[unlikely]] {
+      if (!task_cap.register_gettable || task_cap.task->state != task_state_t::suspended) [[unlikely]] {
         return sysret_e_invalid_argument();
       }
       if (args->args[1] > LAST_REGISTER) [[unlikely]] {
@@ -157,7 +157,7 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
       }
       return sysret_s_ok(get_register(make_map_ptr(&task_cap.task->frame), args->args[1]));
     case SYS_TASK_CAP_SET_REG & 0xffff:
-      if (!task_cap.register_settable) [[unlikely]] {
+      if (!task_cap.register_settable || task_cap.task->state != task_state_t::suspended) [[unlikely]] {
         return sysret_e_invalid_argument();
       }
       if (args->args[1] > LAST_REGISTER) [[unlikely]] {
