@@ -1,10 +1,12 @@
+#include <cstring>
+#include <iterator>
+
 #include <kernel/cls.h>
 #include <kernel/core_id.h>
 #include <kernel/frame.h>
 #include <kernel/syscall.h>
 #include <libcaprese/syscall.h>
 #include <log/log.h>
-#include <string.h>
 
 namespace {
   constexpr const char* tag = "kernel/syscall";
@@ -40,16 +42,18 @@ sysret_t invoke_syscall() {
 
 sysret_t invoke_syscall_system(uint16_t id, [[maybe_unused]] map_ptr<syscall_args_t> args) {
   switch (id) {
-    case SYS_SYSTEM_NULL:
+    case SYS_SYSTEM_NULL & 0xffff:
       return sysret_s_ok(0);
-    case SYS_SYSTEM_CORE_ID:
+    case SYS_SYSTEM_CORE_ID & 0xffff:
       return sysret_s_ok(get_core_id());
-    case SYS_SYSTEM_PAGE_SIZE:
+    case SYS_SYSTEM_PAGE_SIZE & 0xffff:
       return sysret_s_ok(PAGE_SIZE);
-    case SYS_SYSTEM_USER_SPACE_START:
+    case SYS_SYSTEM_USER_SPACE_START & 0xffff:
       return sysret_s_ok(CONFIG_USER_SPACE_BASE);
-    case SYS_SYSTEM_USER_SPACE_END:
+    case SYS_SYSTEM_USER_SPACE_END & 0xffff:
       return sysret_s_ok(CONFIG_USER_SPACE_BASE + CONFIG_USER_SPACE_SIZE);
+    case SYS_SYSTEM_CAPS_PER_CAP_SPACE & 0xffff:
+      return sysret_s_ok(std::size(static_cast<cap_space_t*>(nullptr)->slots));
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);
       return sysret_e_invalid_code();
