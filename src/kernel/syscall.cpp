@@ -5,6 +5,7 @@
 #include <kernel/core_id.h>
 #include <kernel/frame.h>
 #include <kernel/syscall.h>
+#include <kernel/task.h>
 #include <libcaprese/syscall.h>
 #include <log/log.h>
 
@@ -54,6 +55,9 @@ sysret_t invoke_syscall_system(uint16_t id, [[maybe_unused]] map_ptr<syscall_arg
       return sysret_s_ok(CONFIG_USER_SPACE_BASE + CONFIG_USER_SPACE_SIZE);
     case SYS_SYSTEM_CAPS_PER_CAP_SPACE & 0xffff:
       return sysret_s_ok(std::size(static_cast<cap_space_t*>(nullptr)->slots));
+    case SYS_SYSTEM_YIELD & 0xffff:
+      switch_task(get_cls()->idle_task);
+      return sysret_s_ok(0);
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);
       return sysret_e_invalid_code();
