@@ -402,6 +402,8 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
     return false;
   }
 
+  memset(phys_ptr<void>::from(virt_page_cap.phys_addr).as_map().get(), 0, get_page_size(virt_page_cap.level));
+
   pte.set_flags({
       .readable   = readable,
       .writable   = writable,

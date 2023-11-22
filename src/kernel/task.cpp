@@ -319,6 +319,20 @@ void suspend_task(map_ptr<task_t> task) {
   std::lock_guard lock(task->lock);
 
   // TODO: impl
+
+  switch (task->state) {
+    case task_state_t::running:
+      task->state = task_state_t::suspended;
+      break;
+    case task_state_t::ready:
+      task->state = task_state_t::suspended;
+      break;
+    case task_state_t::waiting:
+      task->state = task_state_t::suspended;
+      break;
+    default:
+      break;
+  }
 }
 
 void resume_task(map_ptr<task_t> task) {
@@ -330,7 +344,7 @@ void resume_task(map_ptr<task_t> task) {
     return;
   }
 
-  // TODO: impl
+  task->state = task_state_t::ready;
 }
 
 extern "C" {
