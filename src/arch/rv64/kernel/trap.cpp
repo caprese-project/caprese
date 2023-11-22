@@ -30,7 +30,7 @@ extern "C" {
         panic("User trap!");
       }
     } else {
-      if (scause & SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE) {
+      if ((scause & SCAUSE_EXCEPTION_CODE) == SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE) {
         enable_trap();
 
         sysret_t sysret = invoke_syscall();
