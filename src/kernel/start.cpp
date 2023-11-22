@@ -202,6 +202,7 @@ __init_code void setup_root_task_payload() {
   logi(tag, "Setting up the root task payload...");
 
   load_root_task_payload();
+  setup_root_task_stack();
 
   void*     stack     = bake_stack(make_map_ptr(_root_task_stack_end), make_map_ptr(&root_boot_info), sizeof(root_boot_info_t) + sizeof(mem_cap_t) * root_boot_info.num_mem_caps);
   uintptr_t sp_offset = _root_task_stack_end - reinterpret_cast<char*>(stack);
