@@ -40,6 +40,7 @@ extern "C" {
         task->frame.a1        = sysret.error;
         task->frame.sepc += 4;
       } else {
+        logd(tag, "scause-exception: %p", scause & SCAUSE_EXCEPTION_CODE);
         panic("User trap!");
       }
     }
