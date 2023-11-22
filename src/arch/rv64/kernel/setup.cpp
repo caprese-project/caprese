@@ -14,6 +14,8 @@ extern "C" {
   extern const char _kernel_end[];
   extern const char _payload_start[];
   extern const char _payload_end[];
+  extern const char _root_task_stack_start[];
+  extern const char _root_task_stack_end[];
 }
 
 namespace {
@@ -267,6 +269,11 @@ __init_code void setup_memory_capabilities(map_ptr<task_t> root_task, map_ptr<bo
   push_reserved_region(region_t {
       .start = make_map_ptr(_payload_start),
       .end   = make_map_ptr(_payload_end),
+  });
+
+  push_reserved_region(region_t {
+      .start = make_map_ptr(_root_task_stack_start),
+      .end   = make_map_ptr(_root_task_stack_end),
   });
 
   for_each_dtb_node(boot_info->dtb, [](map_ptr<dtb_node_t> node) {

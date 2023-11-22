@@ -46,20 +46,19 @@ SECTIONS
 
   _kernel_end = .;
 
-  _payload_start = .;
-
   .payload :
   {
+    _payload_start = .;
     *(.payload)
     KEEP(*(.payload))
+    . += CONFIG_ROOT_TASK_PAYLOAD_SIZE;
+    . = ALIGN(0x1000);
+    _payload_end = .;
     _root_task_stack_start = .;
     /* TODO: Make the stack size configurable. */
     . += 0x1000;
     _root_task_stack_end = .;
-    . += CONFIG_ROOT_TASK_PAYLOAD_SIZE;
   }
-
-  _payload_end = .;
 
   . = ALIGN(16);
 

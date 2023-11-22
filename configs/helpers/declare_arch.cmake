@@ -86,8 +86,8 @@ macro(declare_arch)
     endif()
 
     if(NOT DEFINED CONFIG_MAX_RESERVED_REGIONS)
-      # mmode_resv0(OpenSBI), mmode_resv1(OpenSBI), kernel, payload
-      set(CONFIG_MAX_RESERVED_REGIONS 4)
+      # mmode_resv0(OpenSBI), mmode_resv1(OpenSBI), kernel, payload, payload-stack
+      set(CONFIG_MAX_RESERVED_REGIONS 5)
     endif()
 
     if(NOT DEFINED CONFIG_MAX_DEVICE_REGIONS)

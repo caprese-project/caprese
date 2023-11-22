@@ -43,6 +43,7 @@ namespace {
   cap_space_t  root_task_first_cap_space;
   page_table_t root_task_root_page_table;
   page_table_t root_task_page_tables[NUM_INTER_PAGE_TABLE + 1];
+  page_table_t root_task_stack_page_tables[NUM_INTER_PAGE_TABLE + 1];
   page_table_t root_task_cap_space_page_tables[NUM_INTER_PAGE_TABLE + 1];
 
   __init_data alignas(PAGE_SIZE) root_boot_info_t root_boot_info;
@@ -117,9 +118,7 @@ __init_code void setup_cap_space(map_ptr<boot_info_t> boot_info) {
   logi(tag, "Setting up capability space... done");
 }
 
-__init_code void setup_root_task_payload() {
-  logi(tag, "Setting up the root task payload...");
-
+__init_code void load_root_task_payload() {
   constexpr virt_ptr<void> payload_base_va = make_virt_ptr(CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS);
 
   memset(root_task_page_tables, 0, sizeof(root_task_page_tables));
@@ -157,10 +156,56 @@ __init_code void setup_root_task_payload() {
       panic("Failed to insert the virtual page capability.");
     }
   }
+}
+
+__init_code void setup_root_task_stack() {
+  size_t         root_task_stack_size = static_cast<size_t>(_root_task_stack_end - _root_task_stack_start);
+  virt_ptr<void> stack_base_va        = make_virt_ptr(CONFIG_USER_SPACE_BASE + CONFIG_USER_SPACE_SIZE - root_task_stack_size);
+
+  memset(root_task_stack_page_tables, 0, sizeof(root_task_stack_page_tables));
+
+  map_ptr<task_t> root_task_ptr = make_map_ptr(&root_task);
+
+  map_ptr<page_table_t> page_table = make_map_ptr(&root_task_root_page_table);
+  map_ptr<pte_t>        pte        = 0_map;
+  for (size_t level = MAX_PAGE_TABLE_LEVEL; level > KILO_PAGE_TABLE_LEVEL; --level) {
+    pte = page_table->walk(stack_base_va, level);
+    assert(pte->is_disabled());
+    pte->set_next_page(make_map_ptr(&root_task_stack_page_tables[level - 1]));
+    pte->enable();
+    page_table = pte->get_next_page().as<page_table_t>();
+
+    map_ptr<cap_slot_t> page_table_cap_slot = insert_cap(root_task_ptr, make_page_table_cap(level, page_table));
+    if (page_table_cap_slot == nullptr) [[unlikely]] {
+      panic("Failed to insert the page table capability.");
+    }
+    root_boot_info.stack_page_table_caps[level - 1] = get_cap_slot_index(page_table_cap_slot);
+  }
+
+  for (uintptr_t va_offset = 0; va_offset < root_task_stack_size; va_offset += PAGE_SIZE) {
+    map_ptr<void> page = make_map_ptr(_root_task_stack_start + va_offset);
+
+    pte = page_table->walk(make_virt_ptr(stack_base_va.raw() + va_offset), KILO_PAGE_TABLE_LEVEL);
+    assert(pte->is_disabled());
+    pte->set_flags({ .readable = 1, .writable = 1, .executable = 0, .user = 1, .global = 0 });
+    pte->set_next_page(page);
+    pte->enable();
+
+    map_ptr<cap_slot_t> virt_page_cap_slot = insert_cap(root_task_ptr, make_virt_page_cap(VIRT_PAGE_CAP_READABLE | VIRT_PAGE_CAP_WRITABLE, KILO_PAGE_TABLE_LEVEL, page.as_phys().raw()));
+    if (virt_page_cap_slot == nullptr) [[unlikely]] {
+      panic("Failed to insert the virtual page capability.");
+    }
+  }
+}
+
+__init_code void setup_root_task_payload() {
+  logi(tag, "Setting up the root task payload...");
+
+  load_root_task_payload();
 
   void*     stack     = bake_stack(make_map_ptr(_root_task_stack_end), make_map_ptr(&root_boot_info), sizeof(root_boot_info_t) + sizeof(mem_cap_t) * root_boot_info.num_mem_caps);
-  uintptr_t sp_offset = reinterpret_cast<char*>(stack) - _payload_start;
-  uintptr_t sp        = CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS + sp_offset;
+  uintptr_t sp_offset = _root_task_stack_end - reinterpret_cast<char*>(stack);
+  uintptr_t sp        = CONFIG_USER_SPACE_BASE + CONFIG_USER_SPACE_SIZE - sp_offset;
 
   set_register(make_map_ptr(&root_task.frame), REG_PROGRAM_COUNTER, CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS);
   set_register(make_map_ptr(&root_task.frame), REG_STACK_POINTER, sp);
