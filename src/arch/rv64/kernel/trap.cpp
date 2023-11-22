@@ -64,13 +64,13 @@ extern "C" {
   _return_to_user_mode(&task->frame);
 }
 
-void arch_init_task(map_ptr<task_t> task) {
+void arch_init_task(map_ptr<task_t> task, void (*payload)()) {
   assert(task != nullptr);
 
   task->context = {};
   task->frame   = {};
 
-  task->context.ra = reinterpret_cast<uintptr_t>(return_to_user_mode);
+  task->context.ra = reinterpret_cast<uintptr_t>(payload);
   task->context.sp = task.raw() + PAGE_SIZE;
 
 #if defined(CONFIG_MMU_SV39)

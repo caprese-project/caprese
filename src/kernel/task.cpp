@@ -4,6 +4,7 @@
 #include <cstring>
 #include <iterator>
 #include <mutex>
+#include <utility>
 
 #include <kernel/cls.h>
 #include <kernel/lock.h>
@@ -14,15 +15,74 @@
 namespace {
   constexpr const char* tag = "kernel/task";
 
-  spinlock_t next_tid_lock;
-  spinlock_t lookup_tid_lock;
-  uint32_t   cur_tid = 0;
-  jmp_buf    jump_buffer;
+  spinlock_t      next_tid_lock;
+  spinlock_t      lookup_tid_lock;
+  uint32_t        cur_tid = 0;
+  jmp_buf         jump_buffer;
+  map_ptr<task_t> ready_queue;
+  spinlock_t      ready_queue_lock;
 
   tid_t next_tid() {
     std::lock_guard lock(next_tid_lock);
     ++cur_tid;
     return std::bit_cast<tid_t>(cur_tid);
+  }
+
+  void push_ready_queue(map_ptr<task_t> task) {
+    assert(task != nullptr);
+    assert(task->state == task_state_t::ready);
+    assert(task->prev_ready_task == nullptr);
+    assert(task->next_ready_task == nullptr);
+    assert(task != ready_queue);
+
+    std::lock_guard lock(ready_queue_lock);
+
+    if (ready_queue == nullptr) {
+      ready_queue = task;
+      return;
+    }
+
+    task->prev_ready_task        = ready_queue;
+    task->next_ready_task        = 0_map;
+    ready_queue->next_ready_task = task;
+  }
+
+  map_ptr<task_t> pop_ready_task() {
+    std::lock_guard lock(ready_queue_lock);
+
+    map_ptr<task_t> task = ready_queue;
+    if (task == nullptr) [[unlikely]] {
+      return 0_map;
+    }
+
+    ready_queue = task->next_ready_task;
+
+    task->prev_ready_task = 0_map;
+    task->next_ready_task = 0_map;
+
+    return task;
+  }
+
+  void remove_ready_queue(map_ptr<task_t> task) {
+    assert(task != nullptr);
+    assert(task->state == task_state_t::ready);
+
+    std::lock_guard lock(ready_queue_lock);
+
+    if (task == ready_queue || task->prev_ready_task != nullptr || task->next_ready_task != nullptr) {
+      if (task->prev_ready_task == nullptr) {
+        ready_queue = task->next_ready_task;
+      } else {
+        task->prev_ready_task->next_ready_task = task->next_ready_task;
+      }
+
+      if (task->next_ready_task != nullptr) {
+        task->next_ready_task->prev_ready_task = task->prev_ready_task;
+      }
+
+      task->prev_ready_task = 0_map;
+      task->next_ready_task = 0_map;
+    }
   }
 } // namespace
 
@@ -37,12 +97,14 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
 
   std::lock_guard lock(task->lock);
 
-  task->cap_count       = {};
-  task->ready_queue     = {};
-  task->waiting_queue   = {};
-  task->free_slots      = 0_map;
-  task->root_page_table = root_page_table;
-  task->state           = task_state_t::suspended;
+  task->cap_count         = {};
+  task->prev_ready_task   = 0_map;
+  task->next_ready_task   = 0_map;
+  task->prev_waiting_task = 0_map;
+  task->next_waiting_task = 0_map;
+  task->free_slots        = 0_map;
+  task->root_page_table   = root_page_table;
+  task->state             = task_state_t::suspended;
 
   memset(root_page_table.get(), 0, sizeof(page_table_t));
 
@@ -78,7 +140,39 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
     panic("Failed to insert cap space.");
   }
 
-  arch_init_task(task);
+  arch_init_task(task, return_to_user_mode);
+}
+
+void init_idle_task(map_ptr<task_t> task, map_ptr<page_table_t> root_page_table) {
+  assert(task != nullptr);
+  assert(root_page_table != nullptr);
+
+  assert(task->state == task_state_t::unused);
+
+  std::lock_guard lock(task->lock);
+
+  task->cap_count         = {};
+  task->prev_ready_task   = 0_map;
+  task->next_ready_task   = 0_map;
+  task->prev_waiting_task = 0_map;
+  task->next_waiting_task = 0_map;
+  task->free_slots        = 0_map;
+  task->root_page_table   = root_page_table;
+  task->state             = task_state_t::ready;
+
+  memset(root_page_table.get(), 0, sizeof(page_table_t));
+
+  constexpr size_t max_page_size = get_page_size(MAX_PAGE_TABLE_LEVEL);
+  static_assert(std::countr_zero(CONFIG_MAPPED_SPACE_BASE) >= std::countr_zero(max_page_size));
+  for (uintptr_t phys = 0; phys < CONFIG_MAPPED_SPACE_SIZE; phys += max_page_size) {
+    map_ptr<pte_t> pte = root_page_table->walk(make_virt_ptr(CONFIG_MAPPED_SPACE_BASE + phys), MAX_PAGE_TABLE_LEVEL);
+    assert(pte->is_disabled());
+    pte->set_flags({ .readable = 1, .writable = 1, .executable = 1, .user = 0, .global = 1 });
+    pte->set_next_page(make_phys_ptr(phys));
+    pte->enable();
+  }
+
+  arch_init_task(task, idle);
 }
 
 map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap) {
@@ -268,7 +362,7 @@ void kill_task(map_ptr<task_t> task, int exit_status) {
 
   switch (task->state) {
     case task_state_t::ready:
-      // TODO: impl
+      remove_ready_queue(task);
       break;
     case task_state_t::waiting:
       // TODO: impl
@@ -287,6 +381,11 @@ void kill_task(map_ptr<task_t> task, int exit_status) {
   }
 
   logd(tag, "Task 0x%x has been killed.", task->tid);
+
+  if (task == get_cls()->current_task) [[unlikely]] {
+    switch_task(get_cls()->idle_task);
+    std::unreachable();
+  }
 }
 
 void switch_task(map_ptr<task_t> task) {
@@ -303,11 +402,13 @@ void switch_task(map_ptr<task_t> task) {
     if (task->state != task_state_t::ready) [[unlikely]] {
       return;
     }
+    remove_ready_queue(task);
     task->state = task_state_t::running;
   }
 
   get_cls()->current_task = task;
   old_task->state         = task_state_t::ready;
+  push_ready_queue(old_task);
   switch_context(make_map_ptr(&task->context), make_map_ptr(&old_task->context));
   assert(old_task->state == task_state_t::running);
   assert(get_cls()->current_task == old_task);
@@ -318,13 +419,17 @@ void suspend_task(map_ptr<task_t> task) {
 
   std::lock_guard lock(task->lock);
 
-  // TODO: impl
-
   switch (task->state) {
     case task_state_t::running:
       task->state = task_state_t::suspended;
+      if (task == get_cls()->current_task) {
+        switch_task(get_cls()->idle_task);
+      } else {
+        // TODO: ipi
+      }
       break;
     case task_state_t::ready:
+      remove_ready_queue(task);
       task->state = task_state_t::suspended;
       break;
     case task_state_t::waiting:
@@ -345,6 +450,7 @@ void resume_task(map_ptr<task_t> task) {
   }
 
   task->state = task_state_t::ready;
+  push_ready_queue(task);
 }
 
 extern "C" {
@@ -379,4 +485,15 @@ map_ptr<task_t> lookup_tid(tid_t tid) {
 
   signal(SIGSEGV, old_handler);
   return task;
+}
+
+void idle() {
+  while (true) {
+    map_ptr<task_t> task = pop_ready_task();
+    if (task == nullptr) {
+      continue;
+    }
+
+    switch_task(task);
+  }
 }

@@ -219,6 +219,15 @@ __init_code void setup_root_task_payload() {
   logi(tag, "Setting up the root task payload... done");
 }
 
+__init_code void setup_idle_task() {
+  logi(tag, "Setting up the idle task...");
+
+  task_t* task         = reinterpret_cast<task_t*>(get_cls()->idle_task_region);
+  get_cls()->idle_task = make_map_ptr(task);
+
+  init_idle_task(get_cls()->idle_task, make_map_ptr(get_cls()->idle_task_root_page_table));
+}
+
 __init_code void setup(map_ptr<boot_info_t> boot_info) {
   set_core_id(boot_info->core_id);
 
@@ -226,6 +235,7 @@ __init_code void setup(map_ptr<boot_info_t> boot_info) {
   setup_root_task();
   setup_cap_space(boot_info);
   setup_root_task_payload();
+  setup_idle_task();
 }
 
 __init_code [[noreturn]] void start(map_ptr<boot_info_t> boot_info) {
