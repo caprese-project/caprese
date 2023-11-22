@@ -40,13 +40,15 @@ namespace {
   // clang-format on
 
   task_t       root_task;
-  cap_space_t  root_task_first_cap_space;
+  cap_space_t  root_task_cap_spaces[CONFIG_ROOT_TASK_CAP_SPACES];
   page_table_t root_task_root_page_table;
   page_table_t root_task_page_tables[NUM_INTER_PAGE_TABLE + 1];
   page_table_t root_task_stack_page_tables[NUM_INTER_PAGE_TABLE + 1];
   page_table_t root_task_cap_space_page_tables[NUM_INTER_PAGE_TABLE + 1];
 
   __init_data alignas(PAGE_SIZE) root_boot_info_t root_boot_info;
+
+  static_assert(CONFIG_ROOT_TASK_CAP_SPACES < NUM_PAGE_TABLE_ENTRY);
 } // namespace
 
 __init_code [[noreturn]] void early_trap_handler() {
@@ -66,7 +68,7 @@ __init_code void setup_root_task() {
   logi(tag, "Setting up the root task...");
 
   map_ptr<task_t>       root_task_ptr                 = make_map_ptr(&root_task);
-  map_ptr<cap_space_t>  root_task_first_cap_space_ptr = make_map_ptr(&root_task_first_cap_space);
+  map_ptr<cap_space_t>  root_task_first_cap_space_ptr = make_map_ptr(&root_task_cap_spaces[0]);
   map_ptr<page_table_t> root_task_root_page_table_ptr = make_map_ptr(&root_task_root_page_table);
 
   map_ptr<page_table_t> root_task_cap_space_page_table_ptrs[std::size(root_task_cap_space_page_tables)];
@@ -78,6 +80,12 @@ __init_code void setup_root_task() {
 
   init_task(root_task_ptr, root_task_first_cap_space_ptr, root_task_root_page_table_ptr, root_task_cap_space_page_table_ptrs);
 
+  for (size_t i = 1; i < std::size(root_task_cap_spaces); ++i) {
+    if (!insert_cap_space(root_task_ptr, make_map_ptr(&root_task_cap_spaces[i]))) {
+      panic("Failed to insert cap space.");
+    }
+  }
+
   constexpr int       flags = TASK_CAP_KILLABLE | TASK_CAP_SWITCHABLE | TASK_CAP_SUSPENDABLE | TASK_CAP_RESUMABLE | TASK_CAP_REGISTER_GETTABLE | TASK_CAP_REGISTER_SETTABLE | TASK_CAP_KILL_NOTIFIABLE;
   map_ptr<cap_slot_t> root_task_cap_slot = insert_cap(root_task_ptr, make_task_cap(flags, root_task_ptr));
   if (root_task_cap_slot == nullptr) [[unlikely]] {
@@ -85,11 +93,15 @@ __init_code void setup_root_task() {
   }
   root_boot_info.root_task_cap = get_cap_slot_index(root_task_cap_slot);
 
-  map_ptr<cap_slot_t> root_task_first_cap_space_cap_slot = insert_cap(root_task_ptr, make_cap_space_cap(root_task_first_cap_space_ptr));
-  if (root_task_first_cap_space_cap_slot == nullptr) [[unlikely]] {
-    panic("Failed to insert the first cap space capability.");
+  for (size_t i = 0; i < std::size(root_task_cap_spaces); ++i) {
+    map_ptr<cap_slot_t> cap_space_cap_slot = insert_cap(root_task_ptr, make_cap_space_cap(make_map_ptr(&root_task_cap_spaces[i])));
+    if (cap_space_cap_slot == nullptr) [[unlikely]] {
+      panic("Failed to insert the cap space capability.");
+    }
+    if (i == 0) [[unlikely]] {
+      root_boot_info.first_cap_space_cap = get_cap_slot_index(cap_space_cap_slot);
+    }
   }
-  root_boot_info.first_cap_space_cap = get_cap_slot_index(root_task_first_cap_space_cap_slot);
 
   map_ptr<cap_slot_t> root_task_root_page_table_cap_slot = insert_cap(root_task_ptr, make_page_table_cap(root_task_root_page_table_ptr, true, MAX_PAGE_TABLE_LEVEL, 0));
   if (root_task_root_page_table_cap_slot == nullptr) [[unlikely]] {
