@@ -91,7 +91,7 @@ __init_code void setup_root_task() {
   }
   root_boot_info.first_cap_space_cap = get_cap_slot_index(root_task_first_cap_space_cap_slot);
 
-  map_ptr<cap_slot_t> root_task_root_page_table_cap_slot = insert_cap(root_task_ptr, make_page_table_cap(MAX_PAGE_TABLE_LEVEL, root_task_root_page_table_ptr));
+  map_ptr<cap_slot_t> root_task_root_page_table_cap_slot = insert_cap(root_task_ptr, make_page_table_cap(root_task_root_page_table_ptr, true, MAX_PAGE_TABLE_LEVEL, 0));
   if (root_task_root_page_table_cap_slot == nullptr) [[unlikely]] {
     panic("Failed to insert the root page table capability.");
   }
@@ -99,7 +99,7 @@ __init_code void setup_root_task() {
 
   map_ptr<cap_slot_t> root_task_cap_space_page_table_cap_slots[std::size(root_task_cap_space_page_table_ptrs)];
   for (size_t i = 0; i < std::size(root_task_cap_space_page_table_ptrs); ++i) {
-    root_task_cap_space_page_table_cap_slots[i] = insert_cap(make_map_ptr(&root_task), make_page_table_cap(i, root_task_cap_space_page_table_ptrs[i]));
+    root_task_cap_space_page_table_cap_slots[i] = insert_cap(make_map_ptr(&root_task), make_page_table_cap(root_task_cap_space_page_table_ptrs[i], true, i, CONFIG_CAPABILITY_SPACE_BASE));
     if (root_task_cap_space_page_table_cap_slots[i] == nullptr) [[unlikely]] {
       panic("Failed to insert the cap space page table capability.");
     }
@@ -134,7 +134,7 @@ __init_code void load_root_task_payload() {
     pte->enable();
     page_table = pte->get_next_page().as<page_table_t>();
 
-    map_ptr<cap_slot_t> page_table_cap_slot = insert_cap(root_task_ptr, make_page_table_cap(level, page_table));
+    map_ptr<cap_slot_t> page_table_cap_slot = insert_cap(root_task_ptr, make_page_table_cap(page_table, true, level, payload_base_va.raw() & ~(get_page_size(level) - 1)));
     if (page_table_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the page table capability.");
     }
@@ -175,7 +175,7 @@ __init_code void setup_root_task_stack() {
     pte->enable();
     page_table = pte->get_next_page().as<page_table_t>();
 
-    map_ptr<cap_slot_t> page_table_cap_slot = insert_cap(root_task_ptr, make_page_table_cap(level, page_table));
+    map_ptr<cap_slot_t> page_table_cap_slot = insert_cap(root_task_ptr, make_page_table_cap(page_table, true, level, stack_base_va.raw() & ~(get_page_size(level) - 1)));
     if (page_table_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the page table capability.");
     }

@@ -143,14 +143,13 @@ inline capability_t make_task_cap(int flags, map_ptr<task_t> task) {
   };
 }
 
-inline capability_t make_page_table_cap(uint64_t level, map_ptr<page_table_t> page_table, uintptr_t virt_addr_base = 0) {
+inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool mapped, uint64_t level, uint64_t virt_addr_base) {
   assert(page_table != nullptr);
-  assert(level <= MAX_PAGE_TABLE_LEVEL);
 
   return {
     .page_table = {
       .type           = static_cast<uint64_t>(CAP_PAGE_TABLE),
-      .mapped         = false,
+      .mapped         = mapped,
       .level          = level,
       .virt_addr_base = virt_addr_base,
       .table          = page_table,
