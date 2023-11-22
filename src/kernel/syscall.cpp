@@ -326,6 +326,12 @@ sysret_t invoke_syscall_page_table_cap(uint16_t id, map_ptr<syscall_args_t> args
         return sysret_e_invalid_argument();
       }
       return sysret_s_ok(0);
+    case SYS_PAGE_TABLE_CAP_VIRT_ADDR_BASE & 0xffff:
+      if (!page_table_cap.mapped) [[unlikely]] {
+        loge(tag, "This page table cap is not mapped: %d", args->args[0]);
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(page_table_cap.virt_addr_base);
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);
       return sysret_e_invalid_code();
