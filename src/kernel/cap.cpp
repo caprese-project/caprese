@@ -292,6 +292,11 @@ bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_p
   auto& page_table_cap       = page_table_slot->cap.page_table;
   auto& child_page_table_cap = child_page_table_slot->cap.page_table;
 
+  uintptr_t va = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
+  if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    return false;
+  }
+
   if (page_table_cap.level == KILO_PAGE_TABLE_LEVEL) [[unlikely]] {
     return false;
   }
@@ -311,7 +316,7 @@ bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_p
 
   child_page_table_cap.mapped         = true;
   child_page_table_cap.level          = page_table_cap.level - 1;
-  child_page_table_cap.virt_addr_base = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
+  child_page_table_cap.virt_addr_base = va;
 
   return true;
 }
@@ -334,6 +339,11 @@ bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map
 
   auto& page_table_cap       = page_table_slot->cap.page_table;
   auto& child_page_table_cap = child_page_table_slot->cap.page_table;
+
+  uintptr_t va = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
+  if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    return false;
+  }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_disabled()) [[unlikely]] {
@@ -374,6 +384,11 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
   auto& page_table_cap = page_table_slot->cap.page_table;
   auto& virt_page_cap  = virt_page_slot->cap.virt_page;
 
+  uintptr_t va = page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index;
+  if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    return false;
+  }
+
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_enabled()) [[unlikely]] {
     return false;
@@ -391,8 +406,8 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
       .readable   = readable,
       .writable   = writable,
       .executable = executable,
-      .user       = 0,
-      .global     = 0,
+      .user       = true,
+      .global     = false,
   });
   pte.set_next_page(make_phys_ptr(virt_page_cap.phys_addr));
   pte.enable();
@@ -402,7 +417,7 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
   virt_page_cap.writable   = writable;
   virt_page_cap.executable = executable;
   virt_page_cap.index      = index;
-  virt_page_cap.address    = virt_ptr<void>::from(page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index);
+  virt_page_cap.address    = virt_ptr<void>::from(va);
 
   return true;
 }
@@ -425,6 +440,11 @@ bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_
 
   auto& page_table_cap = page_table_slot->cap.page_table;
   auto& virt_page_cap  = virt_page_slot->cap.virt_page;
+
+  uintptr_t va = page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index;
+  if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    return false;
+  }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_disabled()) [[unlikely]] {
@@ -476,6 +496,11 @@ bool remap_virt_page_cap(
   auto& new_page_table_cap = new_page_table_slot->cap.page_table;
   auto& virt_page_cap      = virt_page_slot->cap.virt_page;
   auto& old_page_table_cap = old_page_table_slot->cap.page_table;
+
+  uintptr_t va = new_page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index;
+  if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    return false;
+  }
 
   if (!virt_page_cap.mapped) [[unlikely]] {
     return false;
