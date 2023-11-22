@@ -155,6 +155,8 @@ __init_code void load_root_task_payload() {
     if (virt_page_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the virtual page capability.");
     }
+
+    logd(tag, "Mapped page %p -> %p (4k)", payload_base_va.raw() + va_offset, page.as_phys());
   }
 }
 
@@ -195,6 +197,8 @@ __init_code void setup_root_task_stack() {
     if (virt_page_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the virtual page capability.");
     }
+
+    logd(tag, "Mapped page %p -> %p (4k)", stack_base_va.raw() + va_offset, page.as_phys());
   }
 }
 
