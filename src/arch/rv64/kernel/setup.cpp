@@ -310,6 +310,14 @@ __init_code void setup_memory_capabilities(map_ptr<task_t> root_task, map_ptr<bo
   }
 }
 
+__init_code void setup_arch_root_boot_info(map_ptr<boot_info_t> boot_info, map_ptr<root_boot_info_t> root_boot_info) {
+  assert(boot_info != nullptr);
+  assert(root_boot_info != nullptr);
+
+  root_boot_info->arch_info.dtb_start = boot_info->dtb.as_phys().raw();
+  root_boot_info->arch_info.dtb_end   = root_boot_info->arch_info.dtb_start + std::byteswap(boot_info->dtb.as<fdt_header_t>()->totalsize);
+}
+
 __init_code void* bake_stack(map_ptr<void> stack, map_ptr<void> data, size_t size) {
   assert(stack != nullptr);
   assert(data != nullptr);

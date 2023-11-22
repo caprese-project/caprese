@@ -202,11 +202,13 @@ __init_code void setup_root_task_stack() {
   }
 }
 
-__init_code void setup_root_task_payload() {
+__init_code void setup_root_task_payload(map_ptr<boot_info_t> boot_info) {
   logi(tag, "Setting up the root task payload...");
 
   load_root_task_payload();
   setup_root_task_stack();
+
+  setup_arch_root_boot_info(boot_info, make_map_ptr(&root_boot_info));
 
   void*     stack     = bake_stack(make_map_ptr(_root_task_stack_end), make_map_ptr(&root_boot_info), sizeof(root_boot_info_t) + sizeof(mem_cap_t) * root_boot_info.num_mem_caps);
   uintptr_t sp_offset = _root_task_stack_end - reinterpret_cast<char*>(stack);
@@ -234,7 +236,7 @@ __init_code void setup(map_ptr<boot_info_t> boot_info) {
   setup_early_trap();
   setup_root_task();
   setup_cap_space(boot_info);
-  setup_root_task_payload();
+  setup_root_task_payload(boot_info);
   setup_idle_task();
 }
 
