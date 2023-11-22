@@ -122,7 +122,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   for (size_t i = 0; i < std::size(cap_space_page_table_slots); ++i) {
     cap_space_page_table_slots[i]->cap.page_table.level          = i;
     cap_space_page_table_slots[i]->cap.page_table.mapped         = true;
-    cap_space_page_table_slots[i]->cap.page_table.virt_addr_base = 0; // TODO
+    cap_space_page_table_slots[i]->cap.page_table.virt_addr_base = CONFIG_CAPABILITY_SPACE_BASE;
   }
 
   return dst;
