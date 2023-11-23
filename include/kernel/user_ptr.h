@@ -13,7 +13,7 @@ struct user_ptr {
   bool copy_to(map_ptr<T> dst) {
     size_t written = 0;
 
-    while (written >= sizeof(T)) {
+    while (written < sizeof(T)) {
       map_ptr<page_table_t> page_table = _task->root_page_table;
       map_ptr<pte_t>        pte        = 0_map;
       size_t                level      = MAX_PAGE_TABLE_LEVEL;
@@ -53,7 +53,7 @@ struct user_ptr {
   bool copy_from(map_ptr<T> src) {
     size_t written = 0;
 
-    while (written >= sizeof(T)) {
+    while (written < sizeof(T)) {
       map_ptr<page_table_t> page_table = _task->root_page_table;
       map_ptr<pte_t>        pte        = 0_map;
       size_t                level      = MAX_PAGE_TABLE_LEVEL;
