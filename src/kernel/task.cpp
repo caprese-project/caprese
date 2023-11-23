@@ -651,6 +651,9 @@ bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
     dst_msg_buf.data[src_msg_buf.cap_part_length + i] = src_msg_buf.data[src_msg_buf.cap_part_length + i];
   }
 
+  dst_msg_buf.cap_part_length  = src_msg_buf.cap_part_length;
+  dst_msg_buf.data_part_length = src_msg_buf.data_part_length;
+
   return true;
 }
 
