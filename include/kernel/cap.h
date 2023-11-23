@@ -94,7 +94,7 @@ constexpr size_t get_cap_size(cap_type_t type) {
     case CAP_TASK:
       return PAGE_SIZE;
     case CAP_ENDPOINT:
-      return 48;
+      return 64;
     case CAP_PAGE_TABLE:
       return PAGE_SIZE;
     case CAP_VIRT_PAGE:
