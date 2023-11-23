@@ -183,6 +183,8 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
   auto& task_cap = cap_slot->cap.task;
 
   switch (id) {
+    case SYS_TASK_CAP_TID & 0xffff:
+      return sysret_s_ok(std::bit_cast<uint32_t>(task_cap.task->tid));
     case SYS_TASK_CAP_KILLABLE & 0xffff:
       return sysret_s_ok(task_cap.killable);
     case SYS_TASK_CAP_SWITCHABLE & 0xffff:
