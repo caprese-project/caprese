@@ -85,6 +85,56 @@ union capability_t {
 
 static_assert(sizeof(capability_t) == sizeof(uint64_t) * 2);
 
+constexpr size_t get_cap_size(cap_type_t type) {
+  switch (type) {
+    case CAP_NULL:
+      return 0;
+    case CAP_MEM:
+      return 0;
+    case CAP_TASK:
+      return PAGE_SIZE;
+    case CAP_ENDPOINT:
+      return 48;
+    case CAP_PAGE_TABLE:
+      return PAGE_SIZE;
+    case CAP_VIRT_PAGE:
+      return PAGE_SIZE;
+    case CAP_CAP_SPACE:
+      return PAGE_SIZE;
+    case CAP_ZOMBIE:
+      return 0;
+    case CAP_UNKNOWN:
+      return -1;
+  }
+
+  return -1;
+}
+
+constexpr size_t get_cap_align(cap_type_t type) {
+  switch (type) {
+    case CAP_NULL:
+      return 0;
+    case CAP_MEM:
+      return 1;
+    case CAP_TASK:
+      return PAGE_SIZE;
+    case CAP_ENDPOINT:
+      return 8;
+    case CAP_PAGE_TABLE:
+      return PAGE_SIZE;
+    case CAP_VIRT_PAGE:
+      return PAGE_SIZE;
+    case CAP_CAP_SPACE:
+      return PAGE_SIZE;
+    case CAP_ZOMBIE:
+      return 0;
+    case CAP_UNKNOWN:
+      return -1;
+  }
+
+  return -1;
+}
+
 constexpr cap_type_t get_cap_type(capability_t cap) {
   return static_cast<cap_type_t>(cap.null.type);
 }
@@ -144,6 +194,19 @@ inline capability_t make_task_cap(int flags, map_ptr<task_t> task) {
       .register_settable = static_cast<uint64_t>((flags & TASK_CAP_REGISTER_SETTABLE) >> 5),
       .kill_notifiable   = static_cast<uint64_t>((flags & TASK_CAP_KILL_NOTIFIABLE) >> 6),
       .task              = task,
+    },
+  };
+}
+
+inline capability_t make_endpoint_cap(map_ptr<endpoint_t> endpoint) {
+  assert(endpoint != nullptr);
+
+  return {
+    .endpoint = {
+      .type       = static_cast<uint64_t>(CAP_ENDPOINT),
+      .sendable   = 1,
+      .receivable = 1,
+      .endpoint   = endpoint,
     },
   };
 }

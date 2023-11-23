@@ -44,7 +44,7 @@ sysret_t invoke_syscall() {
   }
 }
 
-sysret_t invoke_syscall_system(uint16_t id, [[maybe_unused]] map_ptr<syscall_args_t> args) {
+sysret_t invoke_syscall_system(uint16_t id, map_ptr<syscall_args_t> args) {
   switch (id) {
     case SYS_SYSTEM_NULL & 0xffff:
       return sysret_s_ok(0);
@@ -61,6 +61,18 @@ sysret_t invoke_syscall_system(uint16_t id, [[maybe_unused]] map_ptr<syscall_arg
     case SYS_SYSTEM_YIELD & 0xffff:
       yield();
       return sysret_s_ok(0);
+    case SYS_SYSTEM_CAP_SIZE & 0xffff:
+      if (args->args[0] > CAP_ZOMBIE) {
+        loge(tag, "Invalid cap type: %d", args->args[0]);
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(get_cap_size(static_cast<cap_type_t>(args->args[0])));
+    case SYS_SYSTEM_CAP_ALIGN & 0xffff:
+      if (args->args[0] > CAP_ZOMBIE) {
+        loge(tag, "Invalid cap type: %d", args->args[0]);
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(get_cap_align(static_cast<cap_type_t>(args->args[0])));
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);
       return sysret_e_invalid_code();

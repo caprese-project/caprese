@@ -128,6 +128,30 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   return dst;
 }
 
+map_ptr<cap_slot_t> create_endpoint_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src) {
+  assert(src != nullptr);
+  assert(get_cap_type(src->cap) == CAP_MEM);
+  assert(dst != nullptr);
+  assert(get_cap_type(dst->cap) == CAP_NULL);
+
+  auto& mem_cap = src->cap.memory;
+  if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
+    return 0_map;
+  }
+
+  dst = create_memory_object(dst, src, true, true, false, get_cap_size(CAP_ENDPOINT), get_cap_size(CAP_ENDPOINT));
+  if (dst == nullptr) [[unlikely]] {
+    return 0_map;
+  }
+
+  map_ptr<endpoint_t> endpoint = make_phys_ptr(dst->cap.memory.phys_addr);
+  memset(endpoint.get(), 0, sizeof(endpoint_t));
+
+  dst->cap = make_endpoint_cap(endpoint);
+
+  return dst;
+}
+
 map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src) {
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
@@ -250,6 +274,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       break;
     }
     case CAP_ENDPOINT:
+      result = create_endpoint_object(task->free_slots, cap_slot);
       break;
     case CAP_PAGE_TABLE:
       result = create_page_table_object(task->free_slots, cap_slot);
