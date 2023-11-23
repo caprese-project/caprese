@@ -20,8 +20,8 @@ namespace {
   uint32_t   cur_tid = 0;
   jmp_buf    jump_buffer;
 
-  task_queue_t ready_queue;
-  spinlock_t   ready_queue_lock;
+  task_queue_t         ready_queue;
+  recursive_spinlock_t ready_queue_lock;
 
   tid_t next_tid() {
     std::lock_guard lock(next_tid_lock);
