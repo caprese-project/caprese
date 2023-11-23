@@ -97,9 +97,10 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint);
 bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src);
 
 [[nodiscard]] map_ptr<task_t> lookup_task(tid_t tid);
-[[nodiscard]]
+[[nodiscard]] map_ptr<task_t> lookup_tid(tid_t tid);
 
-map_ptr<task_t> lookup_tid(tid_t tid);
+void resched();
+void yield();
 
 void idle();
 

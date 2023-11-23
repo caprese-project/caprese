@@ -413,7 +413,7 @@ void kill_task(map_ptr<task_t> task, int exit_status) {
   logd(tag, "Task 0x%x has been killed.", task->tid);
 
   if (task == get_cls()->current_task) [[unlikely]] {
-    switch_task(get_cls()->idle_task);
+    resched();
     std::unreachable();
   }
 }
@@ -453,7 +453,7 @@ void suspend_task(map_ptr<task_t> task) {
     case task_state_t::running:
       task->state = task_state_t::suspended;
       if (task == get_cls()->current_task) {
-        switch_task(get_cls()->idle_task);
+        resched();
       } else {
         // TODO: ipi
       }
@@ -531,7 +531,7 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
 
   ep_lock.unlock();
 
-  switch_task(get_cls()->idle_task);
+  resched();
 
   ep_lock.lock();
 
@@ -574,7 +574,7 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
 
   ep_lock.unlock();
 
-  switch_task(get_cls()->idle_task);
+  resched();
 
   ep_lock.lock();
 
@@ -617,7 +617,7 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
 
   ep_lock.unlock();
 
-  switch_task(get_cls()->idle_task);
+  resched();
 
   ep_lock.lock();
 
@@ -679,13 +679,32 @@ map_ptr<task_t> lookup_tid(tid_t tid) {
   return task;
 }
 
+void resched() {
+  map_ptr<task_t> cur_task  = get_cls()->current_task;
+  map_ptr<task_t> idle_task = get_cls()->idle_task;
+  get_cls()->current_task   = idle_task;
+  switch_context(make_map_ptr(&idle_task->context), make_map_ptr(&cur_task->context));
+}
+
+void yield() {
+  {
+    map_ptr<task_t> cur_task = get_cls()->current_task;
+    std::lock_guard lock(cur_task->lock);
+    cur_task->state = task_state_t::ready;
+    push_ready_queue(cur_task);
+  }
+  resched();
+}
+
 void idle() {
   while (true) {
     map_ptr<task_t> task = pop_ready_task();
     if (task == nullptr) {
+      // TODO: wait for interrupt.
       continue;
     }
-
-    switch_task(task);
+    get_cls()->current_task = task;
+    task->state             = task_state_t::running;
+    switch_context(make_map_ptr(&task->context), make_map_ptr(&get_cls()->idle_task->context));
   }
 }

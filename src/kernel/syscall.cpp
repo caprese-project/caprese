@@ -59,7 +59,7 @@ sysret_t invoke_syscall_system(uint16_t id, [[maybe_unused]] map_ptr<syscall_arg
     case SYS_SYSTEM_CAPS_PER_CAP_SPACE & 0xffff:
       return sysret_s_ok(std::size(static_cast<cap_space_t*>(nullptr)->slots));
     case SYS_SYSTEM_YIELD & 0xffff:
-      switch_task(get_cls()->idle_task);
+      yield();
       return sysret_s_ok(0);
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);
