@@ -342,6 +342,21 @@ sysret_t invoke_syscall_endpoint_cap(uint16_t id, map_ptr<syscall_args_t> args) 
       }
       return sysret_s_ok(0);
     }
+    case SYS_ENDPOINT_CAP_CALL & 0xffff: {
+      bool copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_to(make_map_ptr(&get_cls()->current_task->msg_buf));
+      if (!copied) {
+        loge(tag, "Failed to copy message buffer");
+        return sysret_e_invalid_argument();
+      }
+      ipc_send_long(true, ep_cap.endpoint);
+      ipc_receive(true, ep_cap.endpoint);
+      copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_from(make_map_ptr(&get_cls()->current_task->msg_buf));
+      if (!copied) {
+        loge(tag, "Failed to copy message buffer");
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(0);
+    }
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);
       return sysret_e_invalid_code();

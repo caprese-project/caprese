@@ -236,6 +236,10 @@ map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
 
   std::scoped_lock lock { src_task->lock, task->lock };
 
+  if (task->state != task_state_t::suspended) [[unlikely]] {
+    return 0_map;
+  }
+
   if (get_cap_type(src_slot->cap) == CAP_NULL || get_cap_type(src_slot->cap) == CAP_ZOMBIE) [[unlikely]] {
     return 0_map;
   }
@@ -269,6 +273,10 @@ map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
   map_ptr<task_t>& src_task = src_slot->get_cap_space()->meta_info.task;
 
   std::scoped_lock lock { src_task->lock, task->lock };
+
+  if (task->state != task_state_t::suspended) [[unlikely]] {
+    return 0_map;
+  }
 
   if (get_cap_type(src_slot->cap) == CAP_NULL || get_cap_type(src_slot->cap) == CAP_ZOMBIE) [[unlikely]] {
     return 0_map;
