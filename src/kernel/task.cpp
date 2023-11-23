@@ -487,10 +487,10 @@ void resume_task(map_ptr<task_t> task) {
 bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {
   std::unique_lock ep_lock(endpoint->lock);
 
-  map_ptr<task_t>& cur_task = get_cls()->current_task;
+  map_ptr<task_t> cur_task = get_cls()->current_task;
 
   if (endpoint->receiver_queue.head != nullptr && endpoint->sender_queue.head == nullptr) {
-    map_ptr<task_t>& receiver          = endpoint->receiver_queue.head;
+    map_ptr<task_t> receiver           = endpoint->receiver_queue.head;
     receiver->msg_buf.cap_part_length  = 0;
     receiver->msg_buf.data_part_length = 6;
     receiver->msg_buf.data[0]          = arg0;
@@ -543,10 +543,10 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
 bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
   std::unique_lock ep_lock(endpoint->lock);
 
-  map_ptr<task_t>& cur_task = get_cls()->current_task;
+  map_ptr<task_t> cur_task = get_cls()->current_task;
 
   if (endpoint->receiver_queue.head != nullptr && endpoint->sender_queue.head == nullptr) {
-    map_ptr<task_t>& receiver = endpoint->receiver_queue.head;
+    map_ptr<task_t> receiver = endpoint->receiver_queue.head;
 
     if (!ipc_transfer_msg(receiver, cur_task)) [[unlikely]] {
       return false;
@@ -586,10 +586,10 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
 bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
   std::unique_lock ep_lock(endpoint->lock);
 
-  map_ptr<task_t>& cur_task = get_cls()->current_task;
+  map_ptr<task_t> cur_task = get_cls()->current_task;
 
   if (endpoint->receiver_queue.head == nullptr && endpoint->sender_queue.head != nullptr) {
-    map_ptr<task_t>& sender = endpoint->sender_queue.head;
+    map_ptr<task_t> sender = endpoint->sender_queue.head;
 
     if (!ipc_transfer_msg(cur_task, sender)) [[unlikely]] {
       return false;
