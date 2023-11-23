@@ -250,6 +250,11 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
       }
       return sysret_s_ok(set_register(make_map_ptr(&task_cap.task->frame), args->args[1], args->args[2]));
     case SYS_TASK_CAP_TRANSFER_CAP & 0xffff: {
+      if (task_cap.task->state != task_state_t::suspended) [[unlikely]] {
+        loge(tag, "Unexpected task state: %d", task_cap.task->state);
+        return sysret_e_invalid_argument();
+      }
+
       map_ptr<cap_slot_t> src_slot = lookup_cap(get_cls()->current_task, args->args[1]);
       if (src_slot == nullptr) [[unlikely]] {
         loge(tag, "Failed to look up cap: %d", args->args[1]);
@@ -265,6 +270,11 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
       return sysret_s_ok(get_cap_slot_index(dst_slot));
     }
     case SYS_TASK_CAP_DELEGATE_CAP & 0xffff: {
+      if (task_cap.task->state != task_state_t::suspended) [[unlikely]] {
+        loge(tag, "Unexpected task state: %d", task_cap.task->state);
+        return sysret_e_invalid_argument();
+      }
+
       map_ptr<cap_slot_t> src_slot = lookup_cap(get_cls()->current_task, args->args[1]);
       if (src_slot == nullptr) [[unlikely]] {
         loge(tag, "Failed to look up cap: %d", args->args[1]);

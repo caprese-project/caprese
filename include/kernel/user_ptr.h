@@ -16,10 +16,10 @@ struct user_ptr {
     while (written < sizeof(T)) {
       map_ptr<page_table_t> page_table = _task->root_page_table;
       map_ptr<pte_t>        pte        = 0_map;
-      size_t                level      = MAX_PAGE_TABLE_LEVEL;
+      int                   level      = MAX_PAGE_TABLE_LEVEL;
       uintptr_t             va         = _ptr + written;
 
-      for (; level > 0; --level) {
+      for (; level >= 0; --level) {
         pte = page_table->walk(make_virt_ptr(va), level);
         if (pte->is_disabled()) {
           return false;
@@ -36,7 +36,7 @@ struct user_ptr {
         return false;
       }
 
-      size_t page_size = get_page_size(level - 1);
+      size_t page_size = get_page_size(level);
       size_t offset    = va & (page_size - 1);
       size_t size      = page_size - offset;
       if (size > sizeof(T) - written) {
@@ -56,10 +56,10 @@ struct user_ptr {
     while (written < sizeof(T)) {
       map_ptr<page_table_t> page_table = _task->root_page_table;
       map_ptr<pte_t>        pte        = 0_map;
-      size_t                level      = MAX_PAGE_TABLE_LEVEL;
+      int                   level      = MAX_PAGE_TABLE_LEVEL;
       uintptr_t             va         = _ptr + written;
 
-      for (; level > 0; --level) {
+      for (; level >= 0; --level) {
         pte = page_table->walk(make_virt_ptr(va), level);
         if (pte->is_disabled()) {
           return false;
@@ -76,7 +76,7 @@ struct user_ptr {
         return false;
       }
 
-      size_t page_size = get_page_size(level - 1);
+      size_t page_size = get_page_size(level);
       size_t offset    = va & (page_size - 1);
       size_t size      = page_size - offset;
       if (size > sizeof(T) - written) {

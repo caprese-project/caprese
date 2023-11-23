@@ -236,10 +236,6 @@ map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
 
   std::scoped_lock lock { src_task->lock, task->lock };
 
-  if (task->state != task_state_t::suspended) [[unlikely]] {
-    return 0_map;
-  }
-
   if (get_cap_type(src_slot->cap) == CAP_NULL || get_cap_type(src_slot->cap) == CAP_ZOMBIE) [[unlikely]] {
     return 0_map;
   }
@@ -273,10 +269,6 @@ map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
   map_ptr<task_t>& src_task = src_slot->get_cap_space()->meta_info.task;
 
   std::scoped_lock lock { src_task->lock, task->lock };
-
-  if (task->state != task_state_t::suspended) [[unlikely]] {
-    return 0_map;
-  }
 
   if (get_cap_type(src_slot->cap) == CAP_NULL || get_cap_type(src_slot->cap) == CAP_ZOMBIE) [[unlikely]] {
     return 0_map;
@@ -643,8 +635,16 @@ bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
 
   for (size_t i = 0; i < src_msg_buf.cap_part_length; ++i) {
     map_ptr<cap_slot_t> src_slot = lookup_cap(src, src_msg_buf.data[i]);
+    if (src_slot == nullptr) [[unlikely]] {
+      return false;
+    }
+
     map_ptr<cap_slot_t> dst_slot = delegate_cap(dst, src_slot);
-    dst_msg_buf.data[i]          = get_cap_slot_index(dst_slot);
+    if (dst_slot == nullptr) [[unlikely]] {
+      return false;
+    }
+
+    dst_msg_buf.data[i] = get_cap_slot_index(dst_slot);
   }
 
   for (size_t i = 0; i < src_msg_buf.data_part_length; ++i) {
