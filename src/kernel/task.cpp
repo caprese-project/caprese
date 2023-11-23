@@ -322,6 +322,7 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
       dst_slot = insert_cap(src_task, src_slot->cap);
       break;
     case CAP_ENDPOINT:
+      dst_slot = insert_cap(src_task, src_slot->cap);
       break;
     case CAP_PAGE_TABLE:
       break;
