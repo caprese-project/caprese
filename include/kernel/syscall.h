@@ -29,6 +29,7 @@ sysret_t invoke_syscall_arch(uint16_t id, map_ptr<syscall_args_t> args);
 sysret_t invoke_syscall_cap(uint16_t id, map_ptr<syscall_args_t> args);
 sysret_t invoke_syscall_mem_cap(uint16_t id, map_ptr<syscall_args_t> args);
 sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args);
+sysret_t invoke_syscall_endpoint_cap(uint16_t id, map_ptr<syscall_args_t> args);
 sysret_t invoke_syscall_page_table_cap(uint16_t id, map_ptr<syscall_args_t> args);
 sysret_t invoke_syscall_virt_page_cap(uint16_t id, map_ptr<syscall_args_t> args);
 

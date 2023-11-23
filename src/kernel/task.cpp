@@ -15,12 +15,13 @@
 namespace {
   constexpr const char* tag = "kernel/task";
 
-  spinlock_t      next_tid_lock;
-  spinlock_t      lookup_tid_lock;
-  uint32_t        cur_tid = 0;
-  jmp_buf         jump_buffer;
-  map_ptr<task_t> ready_queue;
-  spinlock_t      ready_queue_lock;
+  spinlock_t next_tid_lock;
+  spinlock_t lookup_tid_lock;
+  uint32_t   cur_tid = 0;
+  jmp_buf    jump_buffer;
+
+  task_queue_t ready_queue;
+  spinlock_t   ready_queue_lock;
 
   tid_t next_tid() {
     std::lock_guard lock(next_tid_lock);
@@ -33,34 +34,16 @@ namespace {
     assert(task->state == task_state_t::ready);
     assert(task->prev_ready_task == nullptr);
     assert(task->next_ready_task == nullptr);
-    assert(task != ready_queue);
 
     std::lock_guard lock(ready_queue_lock);
 
-    if (ready_queue == nullptr) {
-      ready_queue = task;
-      return;
+    if (ready_queue.head == nullptr) {
+      ready_queue.head = task;
+      ready_queue.tail = task;
+    } else {
+      ready_queue.tail->next_ready_task = task;
+      ready_queue.tail                  = task;
     }
-
-    task->prev_ready_task        = ready_queue;
-    task->next_ready_task        = 0_map;
-    ready_queue->next_ready_task = task;
-  }
-
-  map_ptr<task_t> pop_ready_task() {
-    std::lock_guard lock(ready_queue_lock);
-
-    map_ptr<task_t> task = ready_queue;
-    if (task == nullptr) [[unlikely]] {
-      return 0_map;
-    }
-
-    ready_queue = task->next_ready_task;
-
-    task->prev_ready_task = 0_map;
-    task->next_ready_task = 0_map;
-
-    return task;
   }
 
   void remove_ready_queue(map_ptr<task_t> task) {
@@ -69,20 +52,67 @@ namespace {
 
     std::lock_guard lock(ready_queue_lock);
 
-    if (task == ready_queue || task->prev_ready_task != nullptr || task->next_ready_task != nullptr) {
-      if (task->prev_ready_task == nullptr) {
-        ready_queue = task->next_ready_task;
-      } else {
-        task->prev_ready_task->next_ready_task = task->next_ready_task;
-      }
-
-      if (task->next_ready_task != nullptr) {
-        task->next_ready_task->prev_ready_task = task->prev_ready_task;
-      }
-
-      task->prev_ready_task = 0_map;
-      task->next_ready_task = 0_map;
+    if (ready_queue.head == task) {
+      ready_queue.head = task->next_ready_task;
+    } else {
+      task->prev_ready_task->next_ready_task = task->next_ready_task;
     }
+
+    if (ready_queue.tail == task) {
+      ready_queue.tail = task->prev_ready_task;
+    } else {
+      task->next_ready_task->prev_ready_task = task->prev_ready_task;
+    }
+
+    task->prev_ready_task = 0_map;
+    task->next_ready_task = 0_map;
+  }
+
+  map_ptr<task_t> pop_ready_task() {
+    std::lock_guard lock(ready_queue_lock);
+
+    map_ptr<task_t> task = ready_queue.head;
+    if (task == nullptr) [[unlikely]] {
+      return 0_map;
+    }
+
+    remove_ready_queue(task);
+    return task;
+  }
+
+  void push_waiting_queue(task_queue_t& queue, map_ptr<task_t> task) {
+    assert(task != nullptr);
+    assert(task->state == task_state_t::waiting);
+    assert(task->prev_waiting_task == nullptr);
+    assert(task->next_waiting_task == nullptr);
+
+    if (queue.head == nullptr) {
+      queue.head = task;
+      queue.tail = task;
+    } else {
+      queue.tail->next_waiting_task = task;
+      queue.tail                    = task;
+    }
+  }
+
+  void remove_waiting_task(task_queue_t& queue, map_ptr<task_t> task) {
+    assert(task != nullptr);
+    assert(task->state == task_state_t::waiting);
+
+    if (queue.head == task) {
+      queue.head = task->next_waiting_task;
+    } else {
+      task->prev_waiting_task->next_waiting_task = task->next_waiting_task;
+    }
+
+    if (queue.tail == task) {
+      queue.tail = task->prev_waiting_task;
+    } else {
+      task->next_waiting_task->prev_waiting_task = task->prev_waiting_task;
+    }
+
+    task->prev_waiting_task = 0_map;
+    task->next_waiting_task = 0_map;
   }
 } // namespace
 
@@ -451,6 +481,168 @@ void resume_task(map_ptr<task_t> task) {
 
   task->state = task_state_t::ready;
   push_ready_queue(task);
+}
+
+bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {
+  std::unique_lock ep_lock(endpoint->lock);
+
+  map_ptr<task_t>& cur_task = get_cls()->current_task;
+
+  if (endpoint->receiver_queue.head != nullptr && endpoint->sender_queue.head == nullptr) {
+    map_ptr<task_t>& receiver          = endpoint->receiver_queue.head;
+    receiver->msg_buf.cap_part_length  = 0;
+    receiver->msg_buf.data_part_length = 6;
+    receiver->msg_buf.data[0]          = arg0;
+    receiver->msg_buf.data[1]          = arg1;
+    receiver->msg_buf.data[2]          = arg2;
+    receiver->msg_buf.data[3]          = arg3;
+    receiver->msg_buf.data[4]          = arg4;
+    receiver->msg_buf.data[5]          = arg5;
+
+    {
+      std::lock_guard lock(receiver->lock);
+      assert(endpoint->receiver_queue.head == receiver);
+      remove_waiting_task(endpoint->receiver_queue, receiver);
+      receiver->state = task_state_t::ready;
+      push_ready_queue(receiver);
+    }
+
+    return true;
+  }
+
+  if (!blocking) {
+    return false;
+  }
+
+  cur_task->msg_buf.cap_part_length  = 0;
+  cur_task->msg_buf.data_part_length = 6;
+  cur_task->msg_buf.data[0]          = arg0;
+  cur_task->msg_buf.data[1]          = arg1;
+  cur_task->msg_buf.data[2]          = arg2;
+  cur_task->msg_buf.data[3]          = arg3;
+  cur_task->msg_buf.data[4]          = arg4;
+  cur_task->msg_buf.data[5]          = arg5;
+
+  {
+    std::lock_guard lock(cur_task->lock);
+    cur_task->state = task_state_t::waiting;
+    push_waiting_queue(endpoint->sender_queue, cur_task);
+  }
+
+  ep_lock.unlock();
+
+  switch_task(get_cls()->idle_task);
+
+  ep_lock.lock();
+
+  // The message should be written to receiver->msg_buf in ipc_receive.
+  return true;
+}
+
+bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
+  std::unique_lock ep_lock(endpoint->lock);
+
+  map_ptr<task_t>& cur_task = get_cls()->current_task;
+
+  if (endpoint->receiver_queue.head != nullptr && endpoint->sender_queue.head == nullptr) {
+    map_ptr<task_t>& receiver = endpoint->receiver_queue.head;
+
+    if (!ipc_transfer_msg(receiver, cur_task)) [[unlikely]] {
+      return false;
+    }
+
+    {
+      std::lock_guard lock(receiver->lock);
+      assert(endpoint->receiver_queue.head == receiver);
+      remove_waiting_task(endpoint->receiver_queue, receiver);
+      receiver->state = task_state_t::ready;
+      push_ready_queue(receiver);
+    }
+
+    return true;
+  }
+
+  if (!blocking) {
+    return false;
+  }
+
+  {
+    std::lock_guard lock(cur_task->lock);
+    cur_task->state = task_state_t::waiting;
+    push_waiting_queue(endpoint->sender_queue, cur_task);
+  }
+
+  ep_lock.unlock();
+
+  switch_task(get_cls()->idle_task);
+
+  ep_lock.lock();
+
+  // The message should be written to receiver->msg_buf in ipc_receive.
+  return true;
+}
+
+bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
+  std::unique_lock ep_lock(endpoint->lock);
+
+  map_ptr<task_t>& cur_task = get_cls()->current_task;
+
+  if (endpoint->receiver_queue.head == nullptr && endpoint->sender_queue.head != nullptr) {
+    map_ptr<task_t>& sender = endpoint->sender_queue.head;
+
+    if (!ipc_transfer_msg(cur_task, sender)) [[unlikely]] {
+      return false;
+    }
+
+    {
+      std::lock_guard lock(sender->lock);
+      assert(endpoint->sender_queue.head == sender);
+      remove_waiting_task(endpoint->sender_queue, sender);
+      sender->state = task_state_t::ready;
+      push_ready_queue(sender);
+    }
+
+    return true;
+  }
+
+  if (!blocking) {
+    return false;
+  }
+
+  {
+    std::lock_guard lock(cur_task->lock);
+    cur_task->state = task_state_t::waiting;
+    push_waiting_queue(endpoint->receiver_queue, cur_task);
+  }
+
+  ep_lock.unlock();
+
+  switch_task(get_cls()->idle_task);
+
+  ep_lock.lock();
+
+  // The message should be written to cur_task->msg_buf in ipc_send_xxx.
+  return true;
+}
+
+bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
+  assert(dst != nullptr);
+  assert(src != nullptr);
+
+  const message_buffer_t& src_msg_buf = src->msg_buf;
+  message_buffer_t&       dst_msg_buf = dst->msg_buf;
+
+  for (size_t i = 0; i < src_msg_buf.cap_part_length; ++i) {
+    map_ptr<cap_slot_t> src_slot = lookup_cap(src, src_msg_buf.data[i]);
+    map_ptr<cap_slot_t> dst_slot = delegate_cap(dst, src_slot);
+    dst_msg_buf.data[i]          = get_cap_slot_index(dst_slot);
+  }
+
+  for (size_t i = 0; i < src_msg_buf.data_part_length; ++i) {
+    dst_msg_buf.data[src_msg_buf.cap_part_length + i] = src_msg_buf.data[src_msg_buf.cap_part_length + i];
+  }
+
+  return true;
 }
 
 extern "C" {

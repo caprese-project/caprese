@@ -6,6 +6,7 @@
 #include <kernel/frame.h>
 #include <kernel/syscall.h>
 #include <kernel/task.h>
+#include <kernel/user_ptr.h>
 #include <libcaprese/syscall.h>
 #include <log/log.h>
 
@@ -31,6 +32,8 @@ sysret_t invoke_syscall() {
       return invoke_syscall_mem_cap(id, make_map_ptr(&args));
     case SYSNS_TASK_CAP:
       return invoke_syscall_task_cap(id, make_map_ptr(&args));
+    case SYSNS_ENDPOINT_CAP:
+      return invoke_syscall_endpoint_cap(id, make_map_ptr(&args));
     case SYSNS_PAGE_TABLE_CAP:
       return invoke_syscall_page_table_cap(id, make_map_ptr(&args));
     case SYSNS_VIRT_PAGE_CAP:
@@ -261,6 +264,69 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
       }
 
       return sysret_s_ok(get_cap_slot_index(dst_slot));
+    }
+    default:
+      loge(tag, "Invalid syscall id: 0x%x", id);
+      return sysret_e_invalid_code();
+  }
+}
+
+sysret_t invoke_syscall_endpoint_cap(uint16_t id, map_ptr<syscall_args_t> args) {
+  map_ptr<cap_slot_t> cap_slot = lookup_cap(get_cls()->current_task, args->args[0]);
+  if (cap_slot == nullptr) [[unlikely]] {
+    loge(tag, "Failed to look up cap: %d", args->args[0]);
+    return sysret_e_invalid_argument();
+  }
+  if (get_cap_type(cap_slot->cap) != CAP_ENDPOINT) [[unlikely]] {
+    loge(tag, "Invalid cap type: %d", get_cap_type(cap_slot->cap));
+    return sysret_e_invalid_argument();
+  }
+
+  auto& ep_cap = cap_slot->cap.endpoint;
+
+  switch (id) {
+    case SYS_ENDPOINT_CAP_SEND_SHORT & 0xffff:
+      ipc_send_short(true, ep_cap.endpoint, args->args[1], args->args[2], args->args[3], args->args[4], args->args[5], args->args[6]);
+      return sysret_s_ok(0);
+    case SYS_ENDPOINT_CAP_SEND_LONG & 0xffff: {
+      bool copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_to(make_map_ptr(&get_cls()->current_task->msg_buf));
+      if (!copied) {
+        loge(tag, "Failed to copy message buffer");
+        return sysret_e_invalid_argument();
+      }
+      ipc_send_long(true, ep_cap.endpoint);
+      return sysret_s_ok(0);
+    }
+    case SYS_ENDPOINT_CAP_RECEIVE & 0xffff: {
+      ipc_receive(true, ep_cap.endpoint);
+      bool copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_from(make_map_ptr(&get_cls()->current_task->msg_buf));
+      if (!copied) {
+        loge(tag, "Failed to copy message buffer");
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(0);
+    }
+    case SYS_ENDPOINT_CAP_NB_SEND_SHORT & 0xffff:
+      ipc_send_short(false, ep_cap.endpoint, args->args[1], args->args[2], args->args[3], args->args[4], args->args[5], args->args[6]);
+      return sysret_s_ok(0);
+    case SYS_ENDPOINT_CAP_NB_SEND_LONG & 0xffff: {
+      bool copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_to(make_map_ptr(&get_cls()->current_task->msg_buf));
+      if (!copied) {
+        loge(tag, "Failed to copy message buffer");
+        return sysret_e_invalid_argument();
+      }
+      ipc_send_long(false, ep_cap.endpoint);
+      return sysret_s_ok(0);
+    }
+    case SYS_ENDPOINT_CAP_NB_RECEIVE & 0xffff: {
+      if (ipc_receive(false, ep_cap.endpoint)) {
+        bool copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_from(make_map_ptr(&get_cls()->current_task->msg_buf));
+        if (!copied) {
+          loge(tag, "Failed to copy message buffer");
+          return sysret_e_invalid_argument();
+        }
+      }
+      return sysret_s_ok(0);
     }
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);

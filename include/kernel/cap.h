@@ -12,6 +12,7 @@ struct task_t;
 struct page_table_t;
 struct cap_space_t;
 struct cap_slot_t;
+struct endpoint_t;
 
 union capability_t {
   struct {
@@ -44,6 +45,10 @@ union capability_t {
   } task;
 
   struct {
+    uint64_t            type      : 5;
+    uint64_t            sendable  : 1;
+    uint64_t            receivable: 1;
+    map_ptr<endpoint_t> endpoint;
   } endpoint;
 
   struct {
