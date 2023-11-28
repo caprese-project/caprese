@@ -42,6 +42,7 @@ namespace {
       ready_queue.tail = task;
     } else {
       ready_queue.tail->next_ready_task = task;
+      task->prev_ready_task             = ready_queue.tail;
       ready_queue.tail                  = task;
     }
   }
@@ -91,6 +92,7 @@ namespace {
       queue.tail = task;
     } else {
       queue.tail->next_waiting_task = task;
+      task->prev_waiting_task       = queue.tail;
       queue.tail                    = task;
     }
   }
