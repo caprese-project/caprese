@@ -1,5 +1,6 @@
 #include <cstring>
 #include <iterator>
+#include <mutex>
 
 #include <kernel/cls.h>
 #include <kernel/core_id.h>
@@ -495,6 +496,56 @@ sysret_t invoke_syscall_virt_page_cap(uint16_t id, map_ptr<syscall_args_t> args)
         return sysret_e_invalid_argument();
       }
       return sysret_s_ok(virt_page_cap.address.raw());
+    default:
+      loge(tag, "Invalid syscall id: 0x%x", id);
+      return sysret_e_invalid_code();
+  }
+}
+
+sysret_t invoke_syscall_id_cap(uint16_t id, map_ptr<syscall_args_t> args) {
+  map_ptr<task_t> task = get_cls()->current_task;
+  std::lock_guard lock(task->lock);
+
+  switch (id) {
+    case SYS_ID_CAP_CREATE & 0xffff: {
+      if (task->free_slots == nullptr) [[unlikely]] {
+        return sysret_e_invalid_argument();
+      }
+
+      map_ptr<cap_slot_t> free_slots = task->free_slots->prev;
+      map_ptr<cap_slot_t> result     = create_id_object(task->free_slots);
+
+      if (result == nullptr) {
+        return sysret_e_invalid_argument();
+      }
+
+      task->free_slots = free_slots;
+
+      return sysret_s_ok(get_cap_slot_index(result));
+    }
+    case SYS_ID_CAP_COMPARE & 0xffff: {
+      map_ptr<cap_slot_t> cap_slot1 = lookup_cap(task, args->args[0]);
+      if (cap_slot1 == nullptr) [[unlikely]] {
+        loge(tag, "Failed to look up cap: %d", args->args[0]);
+        return sysret_e_invalid_argument();
+      }
+      if (get_cap_type(cap_slot1->cap) != CAP_ID) [[unlikely]] {
+        loge(tag, "Invalid cap type: %d", get_cap_type(cap_slot1->cap));
+        return sysret_e_invalid_argument();
+      }
+
+      map_ptr<cap_slot_t> cap_slot2 = lookup_cap(task, args->args[1]);
+      if (cap_slot2 == nullptr) [[unlikely]] {
+        loge(tag, "Failed to look up cap: %d", args->args[1]);
+        return sysret_e_invalid_argument();
+      }
+      if (get_cap_type(cap_slot2->cap) != CAP_ID) [[unlikely]] {
+        loge(tag, "Invalid cap type: %d", get_cap_type(cap_slot2->cap));
+        return sysret_e_invalid_argument();
+      }
+
+      return sysret_s_ok(static_cast<uintptr_t>(static_cast<intptr_t>(compare_id_cap(cap_slot1, cap_slot2))));
+    }
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);
       return sysret_e_invalid_code();

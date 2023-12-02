@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <mutex>
 
 #include <kernel/align.h>
@@ -10,6 +11,27 @@
 #include <kernel/lock.h>
 #include <kernel/task.h>
 #include <log/log.h>
+
+namespace {
+  spinlock_t id_cap_lock;
+  uint64_t   next_id[2];
+} // namespace
+
+capability_t make_unique_id_cap() {
+  std::lock_guard lock(id_cap_lock);
+
+  uint64_t val1 = next_id[0];
+  uint64_t val2 = next_id[1];
+
+  if (next_id[1] == std::numeric_limits<uint64_t>::max()) [[unlikely]] {
+    ++next_id[0];
+    next_id[1] = 0;
+  } else {
+    ++next_id[1];
+  }
+
+  return make_id_cap(val1, val2);
+}
 
 map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, size_t size, size_t alignment) {
   assert(src != nullptr);
@@ -222,6 +244,15 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   return dst;
 }
 
+map_ptr<cap_slot_t> create_id_object(map_ptr<cap_slot_t> dst) {
+  assert(dst != nullptr);
+  assert(get_cap_type(dst->cap) == CAP_NULL);
+
+  dst->cap = make_unique_id_cap();
+
+  return dst;
+}
+
 map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_slot, cap_type_t type, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4) {
   assert(task == get_cls()->current_task);
   assert(cap_slot != nullptr);
@@ -245,6 +276,8 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
   map_ptr<cap_slot_t> result = 0_map;
 
   switch (type) {
+    case CAP_NULL:
+      break;
     case CAP_MEM:
       result = create_memory_object(task->free_slots, cap_slot, arg0, arg1, arg2, arg3, arg4);
       break;
@@ -285,7 +318,11 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
     case CAP_CAP_SPACE:
       result = create_cap_space_object(task->free_slots, cap_slot);
       break;
-    default:
+    case CAP_ID:
+      break;
+    case CAP_ZOMBIE:
+      break;
+    case CAP_UNKNOWN:
       break;
   }
 
@@ -576,4 +613,32 @@ bool remap_virt_page_cap(
   virt_page_cap.address    = virt_ptr<void>::from(new_page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index);
 
   return true;
+}
+
+int compare_id_cap(map_ptr<cap_slot_t> slot1, map_ptr<cap_slot_t> slot2) {
+  assert(slot1 != nullptr);
+  assert(get_cap_type(slot1->cap) == CAP_ID);
+  assert(slot2 != nullptr);
+  assert(get_cap_type(slot2->cap) == CAP_ID);
+
+  auto& id_cap1 = slot1->cap.id;
+  auto& id_cap2 = slot2->cap.id;
+
+  if (id_cap1.val1 < id_cap2.val1) [[unlikely]] {
+    return -1;
+  }
+
+  if (id_cap1.val1 > id_cap2.val1) [[unlikely]] {
+    return 1;
+  }
+
+  if (id_cap1.val2 < id_cap2.val2) {
+    return -1;
+  }
+
+  if (id_cap1.val2 > id_cap2.val2) {
+    return 1;
+  }
+
+  return 0;
 }

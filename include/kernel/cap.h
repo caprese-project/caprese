@@ -77,6 +77,12 @@ union capability_t {
   } cap_space;
 
   struct {
+    uint64_t type: 5;
+    uint64_t val1: 59;
+    uint64_t val2;
+  } id;
+
+  struct {
     uint64_t       type    : 5;
     uint64_t       size_bit: 6;
     phys_ptr<void> address;
@@ -101,6 +107,8 @@ constexpr size_t get_cap_size(cap_type_t type) {
       return PAGE_SIZE;
     case CAP_CAP_SPACE:
       return PAGE_SIZE;
+    case CAP_ID:
+      return 0;
     case CAP_ZOMBIE:
       return 0;
     case CAP_UNKNOWN:
@@ -126,6 +134,8 @@ constexpr size_t get_cap_align(cap_type_t type) {
       return PAGE_SIZE;
     case CAP_CAP_SPACE:
       return PAGE_SIZE;
+    case CAP_ID:
+      return 0;
     case CAP_ZOMBIE:
       return 0;
     case CAP_UNKNOWN:
@@ -259,6 +269,19 @@ inline capability_t make_cap_space_cap(map_ptr<cap_space_t> cap_space) {
   };
 }
 
+inline capability_t make_id_cap(uint64_t val1, uint64_t val2) {
+  assert(val1 < (1ull << 59));
+  return {
+    .id = {
+      .type = static_cast<uint64_t>(CAP_ID),
+      .val1 = val1,
+      .val2 = val2,
+    },
+  };
+}
+
+capability_t make_unique_id_cap();
+
 map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, size_t size, size_t alignment);
 map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
                                        map_ptr<cap_slot_t> src,
@@ -268,6 +291,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
 map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
 map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, uint64_t level);
 map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
+map_ptr<cap_slot_t> create_id_object(map_ptr<cap_slot_t> dst);
 map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_slot, cap_type_t type, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4);
 
 bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot);
@@ -276,5 +300,7 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
 bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot);
 bool remap_virt_page_cap(
     map_ptr<cap_slot_t> new_page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot, bool readable, bool writable, bool executable, map_ptr<cap_slot_t> old_page_table_slot);
+
+int compare_id_cap(map_ptr<cap_slot_t> slot1, map_ptr<cap_slot_t> slot2);
 
 #endif // KERNEL_CAP_H_

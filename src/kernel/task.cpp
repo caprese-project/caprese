@@ -324,6 +324,9 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
       break;
     case CAP_CAP_SPACE:
       break;
+    case CAP_ID:
+      dst_slot = insert_cap(src_task, src_slot->cap);
+      break;
     case CAP_ZOMBIE:
       break;
     case CAP_UNKNOWN:
