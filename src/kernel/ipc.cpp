@@ -32,7 +32,8 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
         receiver->msg_buf.data[5]          = arg5;
 
         remove_waiting_queue(endpoint->receiver_queue, receiver);
-        receiver->state = task_state_t::ready;
+        receiver->state     = task_state_t::ready;
+        receiver->ipc_state = ipc_state_t::none;
         push_ready_queue(receiver);
       }
 
@@ -91,7 +92,8 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
         }
 
         remove_waiting_queue(endpoint->receiver_queue, receiver);
-        receiver->state = task_state_t::ready;
+        receiver->state     = task_state_t::ready;
+        receiver->ipc_state = ipc_state_t::none;
         push_ready_queue(receiver);
       }
 
