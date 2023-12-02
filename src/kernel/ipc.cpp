@@ -11,6 +11,10 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
 
   map_ptr<task_t> cur_task = get_cls()->current_task;
 
+  assert(cur_task->prev_waiting_task == nullptr);
+  assert(cur_task->next_waiting_task == nullptr);
+  assert(cur_task->callee_task == nullptr);
+
   {
     std::lock_guard ep_lock(endpoint->lock);
 
@@ -36,6 +40,8 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
         receiver->ipc_state = ipc_state_t::none;
         push_ready_queue(receiver);
       }
+
+      switch_task(receiver);
 
       return true;
     }
@@ -76,6 +82,10 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
 
   map_ptr<task_t> cur_task = get_cls()->current_task;
 
+  assert(cur_task->prev_waiting_task == nullptr);
+  assert(cur_task->next_waiting_task == nullptr);
+  assert(cur_task->callee_task == nullptr);
+
   {
     std::lock_guard ep_lock(endpoint->lock);
 
@@ -96,6 +106,8 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
         receiver->ipc_state = ipc_state_t::none;
         push_ready_queue(receiver);
       }
+
+      switch_task(receiver);
 
       return true;
     }
@@ -127,6 +139,10 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
 
   map_ptr<task_t> cur_task = get_cls()->current_task;
 
+  assert(cur_task->prev_waiting_task == nullptr);
+  assert(cur_task->next_waiting_task == nullptr);
+  assert(cur_task->callee_task == nullptr);
+
   {
     std::lock_guard ep_lock(endpoint->lock);
 
@@ -139,8 +155,10 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
         assert(caller->ipc_state == ipc_state_t::calling);
         assert(caller->prev_waiting_task == nullptr);
         assert(caller->next_waiting_task == nullptr);
-        caller->state     = task_state_t::ready;
-        caller->ipc_state = ipc_state_t::canceled;
+        assert(caller->callee_task == cur_task);
+        caller->state       = task_state_t::ready;
+        caller->ipc_state   = ipc_state_t::canceled;
+        caller->callee_task = 0_map;
         push_ready_queue(caller);
       }
 
@@ -154,6 +172,8 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
 
       {
         std::lock_guard lock(sender->lock);
+
+        assert(sender->callee_task == nullptr);
 
         if (!ipc_transfer_msg(cur_task, sender)) [[unlikely]] {
           return false;
@@ -170,6 +190,10 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
           sender->ipc_state = ipc_state_t::none;
           push_ready_queue(sender);
         }
+      }
+
+      if (sender->state == task_state_t::ready) {
+        switch_task(sender);
       }
 
       return true;
@@ -251,18 +275,16 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
         }
 
         remove_waiting_queue(endpoint->receiver_queue, receiver);
-        receiver->state       = task_state_t::ready;
-        receiver->ipc_state   = ipc_state_t::none;
-        receiver->caller_task = cur_task;
 
-        {
-          std::lock_guard cur_lock(cur_task->lock);
-          cur_task->state       = task_state_t::waiting;
-          cur_task->callee_task = receiver;
-        }
+        receiver->state     = task_state_t::ready;
+        receiver->ipc_state = ipc_state_t::none;
 
         push_ready_queue(receiver);
       }
+
+      cur_task->ipc_state = ipc_state_t::none;
+
+      switch_task(receiver);
 
       return true;
     }
