@@ -12,8 +12,6 @@
 #include <kernel/page.h>
 #include <libcaprese/ipc.h>
 
-struct task_t;
-
 struct tid_t {
   uint32_t index: std::countr_zero<uintptr_t>(CONFIG_MAX_TASKS);
   uint32_t generation: 32 - std::countr_zero<uintptr_t>(CONFIG_MAX_TASKS);
@@ -43,15 +41,12 @@ enum struct task_state_t : uint8_t {
   killed    = 5,
 };
 
-struct task_queue_t {
-  map_ptr<task_t> head;
-  map_ptr<task_t> tail;
-};
-
-struct endpoint_t {
-  task_queue_t         sender_queue;
-  task_queue_t         receiver_queue;
-  recursive_spinlock_t lock;
+enum struct ipc_state_t : uint8_t {
+  none      = 0,
+  sending   = 1,
+  receiving = 2,
+  calling   = 3,
+  canceled  = 4,
 };
 
 struct alignas(PAGE_SIZE) task_t {
@@ -63,12 +58,14 @@ struct alignas(PAGE_SIZE) task_t {
   map_ptr<task_t>       next_ready_task;
   map_ptr<task_t>       prev_waiting_task;
   map_ptr<task_t>       next_waiting_task;
+  map_ptr<task_t>       caller_task;
+  map_ptr<task_t>       callee_task;
   map_ptr<cap_slot_t>   free_slots;
   map_ptr<page_table_t> root_page_table;
-  map_ptr<endpoint_t>   waiting_queue_head;
   message_buffer_t      msg_buf;
   recursive_spinlock_t  lock;
   task_state_t          state;
+  ipc_state_t           ipc_state;
   int                   exit_status;
   char                  stack[];
 };
@@ -90,11 +87,9 @@ void switch_task(map_ptr<task_t> task);
 void suspend_task(map_ptr<task_t> task);
 void resume_task(map_ptr<task_t> task);
 
-bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5);
-bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint);
-bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint);
-
-bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src);
+void            push_ready_queue(map_ptr<task_t> task);
+void            remove_ready_queue(map_ptr<task_t> task);
+map_ptr<task_t> pop_ready_task();
 
 [[nodiscard]] map_ptr<task_t> lookup_task(tid_t tid);
 [[nodiscard]] map_ptr<task_t> lookup_tid(tid_t tid);

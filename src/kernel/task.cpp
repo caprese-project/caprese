@@ -7,6 +7,7 @@
 #include <utility>
 
 #include <kernel/cls.h>
+#include <kernel/ipc.h>
 #include <kernel/lock.h>
 #include <kernel/task.h>
 #include <kernel/trap.h>
@@ -28,94 +29,6 @@ namespace {
     ++cur_tid;
     return std::bit_cast<tid_t>(cur_tid);
   }
-
-  void push_ready_queue(map_ptr<task_t> task) {
-    assert(task != nullptr);
-    assert(task->state == task_state_t::ready);
-    assert(task->prev_ready_task == nullptr);
-    assert(task->next_ready_task == nullptr);
-
-    std::lock_guard lock(ready_queue_lock);
-
-    if (ready_queue.head == nullptr) {
-      ready_queue.head = task;
-      ready_queue.tail = task;
-    } else {
-      ready_queue.tail->next_ready_task = task;
-      task->prev_ready_task             = ready_queue.tail;
-      ready_queue.tail                  = task;
-    }
-  }
-
-  void remove_ready_queue(map_ptr<task_t> task) {
-    assert(task != nullptr);
-    assert(task->state == task_state_t::ready);
-
-    std::lock_guard lock(ready_queue_lock);
-
-    if (ready_queue.head == task) {
-      ready_queue.head = task->next_ready_task;
-    } else {
-      task->prev_ready_task->next_ready_task = task->next_ready_task;
-    }
-
-    if (ready_queue.tail == task) {
-      ready_queue.tail = task->prev_ready_task;
-    } else {
-      task->next_ready_task->prev_ready_task = task->prev_ready_task;
-    }
-
-    task->prev_ready_task = 0_map;
-    task->next_ready_task = 0_map;
-  }
-
-  map_ptr<task_t> pop_ready_task() {
-    std::lock_guard lock(ready_queue_lock);
-
-    map_ptr<task_t> task = ready_queue.head;
-    if (task == nullptr) [[unlikely]] {
-      return 0_map;
-    }
-
-    remove_ready_queue(task);
-    return task;
-  }
-
-  void push_waiting_queue(task_queue_t& queue, map_ptr<task_t> task) {
-    assert(task != nullptr);
-    assert(task->state == task_state_t::waiting);
-    assert(task->prev_waiting_task == nullptr);
-    assert(task->next_waiting_task == nullptr);
-
-    if (queue.head == nullptr) {
-      queue.head = task;
-      queue.tail = task;
-    } else {
-      queue.tail->next_waiting_task = task;
-      task->prev_waiting_task       = queue.tail;
-      queue.tail                    = task;
-    }
-  }
-
-  void remove_waiting_task(task_queue_t& queue, map_ptr<task_t> task) {
-    assert(task != nullptr);
-    assert(task->state == task_state_t::waiting);
-
-    if (queue.head == task) {
-      queue.head = task->next_waiting_task;
-    } else {
-      task->prev_waiting_task->next_waiting_task = task->next_waiting_task;
-    }
-
-    if (queue.tail == task) {
-      queue.tail = task->prev_waiting_task;
-    } else {
-      task->next_waiting_task->prev_waiting_task = task->prev_waiting_task;
-    }
-
-    task->prev_waiting_task = 0_map;
-    task->next_waiting_task = 0_map;
-  }
 } // namespace
 
 void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<page_table_t> root_page_table, map_ptr<page_table_t> (&cap_space_page_tables)[NUM_INTER_PAGE_TABLE + 1]) {
@@ -126,6 +39,7 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
   assert(task->state == task_state_t::unused);
 
   task->tid = next_tid();
+  memset(&task->lock, 0, sizeof(task->lock));
 
   std::lock_guard lock(task->lock);
 
@@ -134,9 +48,13 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
   task->next_ready_task   = 0_map;
   task->prev_waiting_task = 0_map;
   task->next_waiting_task = 0_map;
+  task->caller_task       = 0_map;
+  task->callee_task       = 0_map;
   task->free_slots        = 0_map;
   task->root_page_table   = root_page_table;
   task->state             = task_state_t::suspended;
+  task->ipc_state         = ipc_state_t::none;
+  task->exit_status       = 0;
 
   memset(root_page_table.get(), 0, sizeof(page_table_t));
 
@@ -489,177 +407,56 @@ void resume_task(map_ptr<task_t> task) {
   push_ready_queue(task);
 }
 
-bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {
-  std::unique_lock ep_lock(endpoint->lock);
+void push_ready_queue(map_ptr<task_t> task) {
+  assert(task != nullptr);
+  assert(task->state == task_state_t::ready);
+  assert(task->prev_ready_task == nullptr);
+  assert(task->next_ready_task == nullptr);
 
-  map_ptr<task_t> cur_task = get_cls()->current_task;
+  std::lock_guard lock(ready_queue_lock);
 
-  if (endpoint->receiver_queue.head != nullptr && endpoint->sender_queue.head == nullptr) {
-    map_ptr<task_t> receiver           = endpoint->receiver_queue.head;
-    receiver->msg_buf.cap_part_length  = 0;
-    receiver->msg_buf.data_part_length = 6;
-    receiver->msg_buf.data[0]          = arg0;
-    receiver->msg_buf.data[1]          = arg1;
-    receiver->msg_buf.data[2]          = arg2;
-    receiver->msg_buf.data[3]          = arg3;
-    receiver->msg_buf.data[4]          = arg4;
-    receiver->msg_buf.data[5]          = arg5;
-
-    {
-      std::lock_guard lock(receiver->lock);
-      assert(endpoint->receiver_queue.head == receiver);
-      remove_waiting_task(endpoint->receiver_queue, receiver);
-      receiver->state = task_state_t::ready;
-      push_ready_queue(receiver);
-    }
-
-    return true;
+  if (ready_queue.head == nullptr) {
+    ready_queue.head = task;
+    ready_queue.tail = task;
+  } else {
+    ready_queue.tail->next_ready_task = task;
+    task->prev_ready_task             = ready_queue.tail;
+    ready_queue.tail                  = task;
   }
-
-  if (!blocking) {
-    return false;
-  }
-
-  cur_task->msg_buf.cap_part_length  = 0;
-  cur_task->msg_buf.data_part_length = 6;
-  cur_task->msg_buf.data[0]          = arg0;
-  cur_task->msg_buf.data[1]          = arg1;
-  cur_task->msg_buf.data[2]          = arg2;
-  cur_task->msg_buf.data[3]          = arg3;
-  cur_task->msg_buf.data[4]          = arg4;
-  cur_task->msg_buf.data[5]          = arg5;
-
-  {
-    std::lock_guard lock(cur_task->lock);
-    cur_task->state = task_state_t::waiting;
-    push_waiting_queue(endpoint->sender_queue, cur_task);
-  }
-
-  ep_lock.unlock();
-
-  resched();
-
-  ep_lock.lock();
-
-  // The message should be written to receiver->msg_buf in ipc_receive.
-  return true;
 }
 
-bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
-  std::unique_lock ep_lock(endpoint->lock);
+void remove_ready_queue(map_ptr<task_t> task) {
+  assert(task != nullptr);
+  assert(task->state == task_state_t::ready);
 
-  map_ptr<task_t> cur_task = get_cls()->current_task;
+  std::lock_guard lock(ready_queue_lock);
 
-  if (endpoint->receiver_queue.head != nullptr && endpoint->sender_queue.head == nullptr) {
-    map_ptr<task_t> receiver = endpoint->receiver_queue.head;
-
-    if (!ipc_transfer_msg(receiver, cur_task)) [[unlikely]] {
-      return false;
-    }
-
-    {
-      std::lock_guard lock(receiver->lock);
-      assert(endpoint->receiver_queue.head == receiver);
-      remove_waiting_task(endpoint->receiver_queue, receiver);
-      receiver->state = task_state_t::ready;
-      push_ready_queue(receiver);
-    }
-
-    return true;
+  if (ready_queue.head == task) {
+    ready_queue.head = task->next_ready_task;
+  } else {
+    task->prev_ready_task->next_ready_task = task->next_ready_task;
   }
 
-  if (!blocking) {
-    return false;
+  if (ready_queue.tail == task) {
+    ready_queue.tail = task->prev_ready_task;
+  } else {
+    task->next_ready_task->prev_ready_task = task->prev_ready_task;
   }
 
-  {
-    std::lock_guard lock(cur_task->lock);
-    cur_task->state = task_state_t::waiting;
-    push_waiting_queue(endpoint->sender_queue, cur_task);
-  }
-
-  ep_lock.unlock();
-
-  resched();
-
-  ep_lock.lock();
-
-  // The message should be written to receiver->msg_buf in ipc_receive.
-  return true;
+  task->prev_ready_task = 0_map;
+  task->next_ready_task = 0_map;
 }
 
-bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
-  std::unique_lock ep_lock(endpoint->lock);
+map_ptr<task_t> pop_ready_task() {
+  std::lock_guard lock(ready_queue_lock);
 
-  map_ptr<task_t> cur_task = get_cls()->current_task;
-
-  if (endpoint->receiver_queue.head == nullptr && endpoint->sender_queue.head != nullptr) {
-    map_ptr<task_t> sender = endpoint->sender_queue.head;
-
-    if (!ipc_transfer_msg(cur_task, sender)) [[unlikely]] {
-      return false;
-    }
-
-    {
-      std::lock_guard lock(sender->lock);
-      assert(endpoint->sender_queue.head == sender);
-      remove_waiting_task(endpoint->sender_queue, sender);
-      sender->state = task_state_t::ready;
-      push_ready_queue(sender);
-    }
-
-    return true;
+  map_ptr<task_t> task = ready_queue.head;
+  if (task == nullptr) [[unlikely]] {
+    return 0_map;
   }
 
-  if (!blocking) {
-    return false;
-  }
-
-  {
-    std::lock_guard lock(cur_task->lock);
-    cur_task->state = task_state_t::waiting;
-    push_waiting_queue(endpoint->receiver_queue, cur_task);
-  }
-
-  ep_lock.unlock();
-
-  resched();
-
-  ep_lock.lock();
-
-  // The message should be written to cur_task->msg_buf in ipc_send_xxx.
-  return true;
-}
-
-bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
-  assert(dst != nullptr);
-  assert(src != nullptr);
-
-  const message_buffer_t& src_msg_buf = src->msg_buf;
-  message_buffer_t&       dst_msg_buf = dst->msg_buf;
-
-  for (size_t i = 0; i < src_msg_buf.cap_part_length; ++i) {
-    map_ptr<cap_slot_t> src_slot = lookup_cap(src, src_msg_buf.data[i]);
-    if (src_slot == nullptr) [[unlikely]] {
-      return false;
-    }
-
-    map_ptr<cap_slot_t> dst_slot = delegate_cap(dst, src_slot);
-    if (dst_slot == nullptr) [[unlikely]] {
-      return false;
-    }
-
-    dst_msg_buf.data[i] = get_cap_slot_index(dst_slot);
-  }
-
-  for (size_t i = 0; i < src_msg_buf.data_part_length; ++i) {
-    dst_msg_buf.data[src_msg_buf.cap_part_length + i] = src_msg_buf.data[src_msg_buf.cap_part_length + i];
-  }
-
-  dst_msg_buf.cap_part_length  = src_msg_buf.cap_part_length;
-  dst_msg_buf.data_part_length = src_msg_buf.data_part_length;
-
-  return true;
+  remove_ready_queue(task);
+  return task;
 }
 
 extern "C" {

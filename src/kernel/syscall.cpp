@@ -5,6 +5,7 @@
 #include <kernel/cls.h>
 #include <kernel/core_id.h>
 #include <kernel/frame.h>
+#include <kernel/ipc.h>
 #include <kernel/syscall.h>
 #include <kernel/task.h>
 #include <kernel/user_ptr.h>
@@ -331,6 +332,15 @@ sysret_t invoke_syscall_endpoint_cap(uint16_t id, map_ptr<syscall_args_t> args) 
       }
       return sysret_s_ok(0);
     }
+    case SYS_ENDPOINT_CAP_REPLY & 0xffff: {
+      bool copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_to(make_map_ptr(&get_cls()->current_task->msg_buf));
+      if (!copied) {
+        loge(tag, "Failed to copy message buffer");
+        return sysret_e_invalid_argument();
+      }
+      ipc_reply(ep_cap.endpoint);
+      return sysret_s_ok(0);
+    }
     case SYS_ENDPOINT_CAP_NB_SEND_SHORT & 0xffff:
       ipc_send_short(false, ep_cap.endpoint, args->args[1], args->args[2], args->args[3], args->args[4], args->args[5], args->args[6]);
       return sysret_s_ok(0);
@@ -359,7 +369,21 @@ sysret_t invoke_syscall_endpoint_cap(uint16_t id, map_ptr<syscall_args_t> args) 
         loge(tag, "Failed to copy message buffer");
         return sysret_e_invalid_argument();
       }
-      ipc_send_long(true, ep_cap.endpoint);
+      ipc_call(ep_cap.endpoint);
+      copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_from(make_map_ptr(&get_cls()->current_task->msg_buf));
+      if (!copied) {
+        loge(tag, "Failed to copy message buffer");
+        return sysret_e_invalid_argument();
+      }
+      return sysret_s_ok(0);
+    }
+    case SYS_ENDPOINT_CAP_REPLY_AND_RECEIVE & 0xffff: {
+      bool copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_to(make_map_ptr(&get_cls()->current_task->msg_buf));
+      if (!copied) {
+        loge(tag, "Failed to copy message buffer");
+        return sysret_e_invalid_argument();
+      }
+      ipc_reply(ep_cap.endpoint);
       ipc_receive(true, ep_cap.endpoint);
       copied = user_ptr<message_buffer_t>::from(get_cls()->current_task, args->args[1]).copy_from(make_map_ptr(&get_cls()->current_task->msg_buf));
       if (!copied) {

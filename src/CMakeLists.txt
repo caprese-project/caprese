@@ -56,6 +56,7 @@ target_sources(
   kernel/cap_space.cpp
   kernel/cap.cpp
   kernel/cls.cpp
+  kernel/ipc.cpp
   kernel/lock.cpp
   kernel/start.cpp
   kernel/syscall.cpp

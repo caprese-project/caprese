@@ -8,6 +8,7 @@
 #include <kernel/cap.h>
 #include <kernel/cap_space.h>
 #include <kernel/cls.h>
+#include <kernel/ipc.h>
 #include <kernel/lock.h>
 #include <kernel/task.h>
 #include <log/log.h>
