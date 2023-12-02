@@ -18,6 +18,7 @@ function(declare_boot name)
     ${name} PRIVATE
     boot/entry.S
     boot/start.cpp
+    boot/libc.cpp
   )
 
   add_custom_target(

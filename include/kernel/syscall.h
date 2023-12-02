@@ -1,6 +1,8 @@
 #ifndef KERNEL_SYSCALL_H_
 #define KERNEL_SYSCALL_H_
 
+#include <cerrno>
+
 #include <kernel/task.h>
 #include <libcaprese/syscall.h>
 
@@ -15,12 +17,32 @@ constexpr sysret_t sysret_s_ok(uintptr_t result) {
   return sysret_t { result, SYS_S_OK };
 }
 
-constexpr sysret_t sysret_e_invalid_argument() {
-  return sysret_t { 0, SYS_E_INVALID_ARGUMENT };
+constexpr sysret_t sysret_e_unknown() {
+  return sysret_t { 0, SYS_E_UNKNOWN };
 }
 
-constexpr sysret_t sysret_e_invalid_code() {
-  return sysret_t { 0, SYS_E_INVALID_CODE };
+constexpr sysret_t sysret_e_cap_type() {
+  return sysret_t { 0, SYS_E_CAP_TYPE };
+}
+
+constexpr sysret_t sysret_e_cap_state() {
+  return sysret_t { 0, SYS_E_CAP_STATE };
+}
+
+constexpr sysret_t sysret_e_ill_code() {
+  return sysret_t { 0, SYS_E_ILL_CODE };
+}
+
+constexpr sysret_t sysret_e_ill_args() {
+  return sysret_t { 0, SYS_E_ILL_ARGS };
+}
+
+constexpr sysret_t sysret_e_ill_state() {
+  return sysret_t { 0, SYS_E_ILL_STATE };
+}
+
+inline sysret_t errno_to_sysret() {
+  return sysret_t { 0, errno };
 }
 
 sysret_t invoke_syscall();

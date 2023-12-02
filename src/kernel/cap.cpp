@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cerrno>
 #include <cstring>
 #include <iterator>
 #include <limits>
@@ -11,6 +12,7 @@
 #include <kernel/ipc.h>
 #include <kernel/lock.h>
 #include <kernel/task.h>
+#include <libcaprese/syscall.h>
 #include <log/log.h>
 
 namespace {
@@ -43,18 +45,22 @@ map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_sl
   auto& mem_cap = src->cap.memory;
 
   if (size == 0 || std::popcount(size) != 1) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return 0_map;
   }
 
   if (readable && !mem_cap.readable) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
   if (writable && !mem_cap.writable) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
   if (executable && !mem_cap.executable) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
@@ -62,6 +68,7 @@ map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_sl
   size_t    rem_size  = mem_cap.phys_addr + (1 << mem_cap.size_bit) - base_addr;
 
   if (rem_size < size) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
@@ -115,6 +122,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
@@ -159,6 +167,7 @@ map_ptr<cap_slot_t> create_endpoint_object(map_ptr<cap_slot_t> dst, map_ptr<cap_
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
@@ -183,6 +192,7 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
@@ -206,6 +216,7 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
   if (level > MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return 0_map;
   }
 
@@ -229,6 +240,7 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
@@ -259,16 +271,19 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
   assert(cap_slot != nullptr);
 
   if (get_cap_type(cap_slot->cap) != CAP_MEM) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return 0_map;
   }
 
   std::lock_guard lock(task->lock);
 
   if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
   if (task->free_slots == nullptr) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
@@ -284,12 +299,26 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       break;
     case CAP_TASK: {
       map_ptr<cap_slot_t> cap_space_slot = lookup_cap(task, arg0);
-      if (cap_space_slot == nullptr || get_cap_type(cap_space_slot->cap) != CAP_CAP_SPACE) [[unlikely]] {
+      if (cap_space_slot == nullptr) [[unlikely]] {
+        errno = SYS_E_ILL_ARGS;
+        return 0_map;
+      }
+      if (get_cap_type(cap_space_slot->cap) != CAP_CAP_SPACE) [[unlikely]] {
+        errno = SYS_E_CAP_TYPE;
         return 0_map;
       }
 
       map_ptr<cap_slot_t> root_page_table_slot = lookup_cap(task, arg1);
-      if (root_page_table_slot == nullptr || get_cap_type(root_page_table_slot->cap) != CAP_PAGE_TABLE || root_page_table_slot->cap.page_table.mapped) [[unlikely]] {
+      if (root_page_table_slot == nullptr) [[unlikely]] {
+        errno = SYS_E_ILL_ARGS;
+        return 0_map;
+      }
+      if (get_cap_type(root_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+        errno = SYS_E_CAP_TYPE;
+        return 0_map;
+      }
+      if (root_page_table_slot->cap.page_table.mapped) [[unlikely]] {
+        errno = SYS_E_CAP_STATE;
         return 0_map;
       }
 
@@ -299,7 +328,16 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       const uintptr_t cap_descs[] { arg2, arg3, arg4 };
       for (size_t i = 0; i < std::size(cap_space_page_table_slots); ++i) {
         cap_space_page_table_slots[i] = lookup_cap(task, cap_descs[i]);
-        if (cap_space_page_table_slots[i] == nullptr || get_cap_type(cap_space_page_table_slots[i]->cap) != CAP_PAGE_TABLE || cap_space_page_table_slots[i]->cap.page_table.mapped) [[unlikely]] {
+        if (cap_space_page_table_slots[i] == nullptr) [[unlikely]] {
+          errno = SYS_E_ILL_ARGS;
+          return 0_map;
+        }
+        if (get_cap_type(cap_space_page_table_slots[i]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+          errno = SYS_E_CAP_TYPE;
+          return 0_map;
+        }
+        if (cap_space_page_table_slots[i]->cap.page_table.mapped) [[unlikely]] {
+          errno = SYS_E_CAP_STATE;
           return 0_map;
         }
       }
@@ -341,14 +379,17 @@ bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_p
   assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (child_page_table_slot == nullptr) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(child_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return false;
   }
 
@@ -357,19 +398,23 @@ bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_p
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (page_table_cap.level == KILO_PAGE_TABLE_LEVEL) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_enabled()) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (child_page_table_cap.mapped) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return false;
   }
 
@@ -389,14 +434,17 @@ bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map
   assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (child_page_table_slot == nullptr) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(child_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return false;
   }
 
@@ -405,19 +453,23 @@ bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_disabled()) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (!child_page_table_cap.mapped) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return false;
   }
 
   if (pte.get_next_page() != child_page_table_cap.table.as<void>()) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
@@ -433,14 +485,17 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
   assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (virt_page_slot == nullptr) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(virt_page_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return false;
   }
 
@@ -449,19 +504,23 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_enabled()) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (virt_page_cap.mapped) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return false;
   }
 
   if (virt_page_cap.level != page_table_cap.level) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return false;
   }
 
@@ -492,14 +551,17 @@ bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_
   assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (virt_page_slot == nullptr) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(virt_page_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return false;
   }
 
@@ -508,21 +570,25 @@ bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_disabled()) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (!virt_page_cap.mapped) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return false;
   }
 
   map_ptr<void> map_ptr = make_phys_ptr(virt_page_cap.phys_addr);
 
   if (pte.get_next_page() != map_ptr) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
@@ -539,22 +605,27 @@ bool remap_virt_page_cap(
   assert(get_cap_type(new_page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (virt_page_slot == nullptr) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(virt_page_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return false;
   }
 
   if (old_page_table_slot == nullptr) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(old_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return false;
   }
 
@@ -564,34 +635,41 @@ bool remap_virt_page_cap(
 
   uintptr_t va = new_page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (!virt_page_cap.mapped) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return false;
   }
 
   if (new_page_table_cap.level != old_page_table_cap.level) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return false;
   }
 
   if (new_page_table_cap.level != virt_page_cap.level) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
     return false;
   }
 
   pte_t& new_pte = new_page_table_cap.table->entries[index];
   if (new_pte.is_enabled()) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
   pte_t& old_pte = old_page_table_cap.table->entries[virt_page_cap.index];
   if (old_pte.is_disabled()) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
   map_ptr<void> map_ptr = make_phys_ptr(virt_page_cap.phys_addr);
 
   if (old_pte.get_next_page() != map_ptr) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 

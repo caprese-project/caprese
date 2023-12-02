@@ -1,4 +1,5 @@
 #include <cassert>
+#include <cerrno>
 #include <csetjmp>
 #include <csignal>
 #include <cstring>
@@ -11,6 +12,7 @@
 #include <kernel/lock.h>
 #include <kernel/task.h>
 #include <kernel/trap.h>
+#include <libcaprese/syscall.h>
 #include <log/log.h>
 
 namespace {
@@ -131,10 +133,12 @@ map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap) {
   std::lock_guard lock(task->lock);
 
   if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
   if (task->free_slots == nullptr) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
@@ -157,14 +161,17 @@ map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
   std::scoped_lock lock { src_task->lock, task->lock };
 
   if (get_cap_type(src_slot->cap) == CAP_NULL || get_cap_type(src_slot->cap) == CAP_ZOMBIE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return 0_map;
   }
 
   if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
   if (src_task->state == task_state_t::unused || src_task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
@@ -191,14 +198,17 @@ map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
   std::scoped_lock lock { src_task->lock, task->lock };
 
   if (get_cap_type(src_slot->cap) == CAP_NULL || get_cap_type(src_slot->cap) == CAP_ZOMBIE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return 0_map;
   }
 
   if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
   if (src_task->state == task_state_t::unused || src_task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
@@ -252,6 +262,7 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
   }
 
   if (dst_slot == nullptr) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return 0_map;
   }
 

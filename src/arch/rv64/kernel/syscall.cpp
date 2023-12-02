@@ -28,6 +28,6 @@ sysret_t invoke_syscall_arch(uint16_t id, [[maybe_unused]] map_ptr<syscall_args_
       return sysret_s_ok(0);
 #endif
     default:
-      return sysret_e_invalid_code();
+      return sysret_e_ill_code();
   }
 }

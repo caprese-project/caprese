@@ -91,7 +91,6 @@ void            push_ready_queue(map_ptr<task_t> task);
 void            remove_ready_queue(map_ptr<task_t> task);
 map_ptr<task_t> pop_ready_task();
 
-[[nodiscard]] map_ptr<task_t> lookup_task(tid_t tid);
 [[nodiscard]] map_ptr<task_t> lookup_tid(tid_t tid);
 
 void resched();

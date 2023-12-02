@@ -34,7 +34,7 @@ function(declare_executable name)
   target_link_libraries(${name} ${COMMON_LIBRARIES})
 endfunction(declare_executable)
 
-declare_library(caprese_kernel_libc OBJECT TRUE)
+declare_library(caprese_kernel_libc OBJECT FALSE)
 declare_library(caprese_log STATIC TRUE)
 
 target_sources(
@@ -42,14 +42,14 @@ target_sources(
   log/log.cpp
 )
 
-target_link_libraries(caprese_kernel_libc PUBLIC caprese_libc caprese_libcxx)
+target_link_libraries(caprese_kernel_libc PUBLIC caprese_libc caprese_libcxx libcaprese)
 target_link_libraries(caprese_log PUBLIC caprese_libc caprese_libcxx)
 
 declare_executable(caprese_boot_stub)
 declare_executable(caprese_kernel)
 declare_executable(caprese_boot)
 
-target_link_libraries(caprese_kernel libcaprese)
+target_link_libraries(caprese_kernel caprese_kernel_libc)
 
 target_sources(
   caprese_kernel PRIVATE

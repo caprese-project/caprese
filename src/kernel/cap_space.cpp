@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <cerrno>
 #include <iterator>
 #include <mutex>
 
@@ -8,6 +9,7 @@
 #include <kernel/cls.h>
 #include <kernel/lock.h>
 #include <kernel/task.h>
+#include <libcaprese/syscall.h>
 
 map_ptr<cap_space_t> cap_slot_t::get_cap_space() const {
   return make_map_ptr(round_down(reinterpret_cast<uintptr_t>(this), PAGE_SIZE));
@@ -20,6 +22,7 @@ bool insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space) {
   std::lock_guard lock(task->lock);
 
   if (task->cap_count.num_cap_space / NUM_PAGE_TABLE_ENTRY > task->cap_count.num_extension) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
@@ -68,6 +71,7 @@ bool extend_cap_space(map_ptr<task_t> task, map_ptr<void> page) {
   std::lock_guard lock(task->lock);
 
   if (task->cap_count.num_extension == NUM_PAGE_TABLE_ENTRY - 1) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return false;
   }
 
@@ -98,11 +102,13 @@ map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
   std::lock_guard lock(task->lock);
 
   if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
   uintptr_t capacity = task->cap_count.num_cap_space * std::size(static_cast<cap_space_t*>(nullptr)->slots);
   if (cap_desc >= capacity) [[unlikely]] {
+    errno = SYS_E_ILL_ARGS;
     return 0_map;
   }
 
@@ -116,6 +122,7 @@ map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
   for (ssize_t level = MAX_PAGE_TABLE_LEVEL; level >= static_cast<ssize_t>(KILO_PAGE_TABLE_LEVEL); --level) {
     pte = page_table->walk(va, level);
     if (pte->is_disabled()) [[unlikely]] {
+      errno = SYS_E_ILL_STATE;
       return 0_map;
     }
     page_table = pte->get_next_page().as<page_table_t>();

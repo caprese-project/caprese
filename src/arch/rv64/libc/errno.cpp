@@ -1,9 +1,7 @@
-namespace {
-  int __errno_value;
-} // namespace
+#include <kernel/cls.h>
 
 extern "C" {
   int* __errno() {
-    return &__errno_value;
+    return &get_cls()->errno_value;
   }
 }

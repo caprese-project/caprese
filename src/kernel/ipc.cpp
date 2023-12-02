@@ -1,8 +1,10 @@
+#include <cerrno>
 #include <mutex>
 
 #include <kernel/cls.h>
 #include <kernel/ipc.h>
 #include <kernel/task.h>
+#include <libcaprese/syscall.h>
 
 bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {
   assert(endpoint != nullptr);
@@ -38,6 +40,7 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
     }
 
     if (!blocking) {
+      errno = SYS_E_BLOCKED;
       return false;
     }
 
@@ -58,6 +61,10 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
   resched();
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
+
+  if (cur_task->ipc_state == ipc_state_t::canceled) {
+    errno = SYS_E_CANCELED;
+  }
 
   // The message should be written to receiver->msg_buf in ipc_receive.
   return cur_task->ipc_state == ipc_state_t::none;
@@ -92,6 +99,7 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
     }
 
     if (!blocking) {
+      errno = SYS_E_BLOCKED;
       return false;
     }
 
@@ -103,6 +111,10 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
   resched();
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
+
+  if (cur_task->ipc_state == ipc_state_t::canceled) {
+    errno = SYS_E_CANCELED;
+  }
 
   // The message should be written to receiver->msg_buf in ipc_receive.
   return cur_task->ipc_state == ipc_state_t::none;
@@ -162,6 +174,7 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
     }
 
     if (!blocking) {
+      errno = SYS_E_BLOCKED;
       return false;
     }
 
@@ -173,6 +186,10 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
   resched();
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
+
+  if (cur_task->ipc_state == ipc_state_t::canceled) {
+    errno = SYS_E_CANCELED;
+  }
 
   // The message should be written to cur_task->msg_buf in ipc_send_xxx.
   return cur_task->ipc_state == ipc_state_t::none;
@@ -256,6 +273,10 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
   resched();
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
+
+  if (cur_task->ipc_state == ipc_state_t::canceled) {
+    errno = SYS_E_CANCELED;
+  }
 
   return cur_task->ipc_state == ipc_state_t::none;
 }
