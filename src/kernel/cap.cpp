@@ -209,7 +209,7 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
   return dst;
 }
 
-map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, uint64_t level) {
+map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, uint64_t level) {
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
@@ -221,13 +221,12 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   }
 
   size_t page_size = get_page_size(level);
-  dst              = create_memory_object(dst, src, readable, writable, executable, page_size, page_size);
+  dst              = create_memory_object(dst, src, true, true, true, page_size, page_size);
   if (dst == nullptr) [[unlikely]] {
     return 0_map;
   }
 
-  int flags = (static_cast<int>(readable) << 0) | (static_cast<int>(writable) << 1) | (static_cast<int>(executable) << 2);
-  dst->cap  = make_virt_page_cap(flags, level, dst->cap.memory.phys_addr);
+  dst->cap  = make_virt_page_cap(0, level, dst->cap.memory.phys_addr);
 
   return dst;
 }
@@ -352,7 +351,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       result = create_page_table_object(task->free_slots, cap_slot);
       break;
     case CAP_VIRT_PAGE:
-      result = create_virt_page_object(task->free_slots, cap_slot, arg0, arg1, arg2, arg3);
+      result = create_virt_page_object(task->free_slots, cap_slot, arg0);
       break;
     case CAP_CAP_SPACE:
       result = create_cap_space_object(task->free_slots, cap_slot);
