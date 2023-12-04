@@ -40,6 +40,8 @@ sysret_t invoke_syscall() {
       return invoke_syscall_page_table_cap(id, make_map_ptr(&args));
     case SYSNS_VIRT_PAGE_CAP:
       return invoke_syscall_virt_page_cap(id, make_map_ptr(&args));
+    case SYSNS_ID_CAP:
+      return invoke_syscall_id_cap(id, make_map_ptr(&args));
     default:
       loge(tag, "Invalid syscall namespace: 0x%x", ns);
       return sysret_e_ill_code();
