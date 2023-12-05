@@ -209,6 +209,15 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
         loge(tag, "This task cap is not switchable: %d", args->args[0]);
         return sysret_e_cap_state();
       }
+      {
+        std::lock_guard lock(task_cap.task->lock);
+
+        if (task_cap.task->state != task_state_t::ready) {
+          return sysret_e_ill_state();
+        }
+
+        remove_ready_queue(task_cap.task);
+      }
       switch_task(task_cap.task);
       return sysret_s_ok(0);
     case SYS_TASK_CAP_SUSPEND & 0xffff:

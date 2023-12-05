@@ -40,7 +40,7 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
         receiver->ipc_state = ipc_state_t::none;
       }
 
-      switch_to(receiver);
+      switch_task(receiver);
 
       return true;
     }
@@ -106,7 +106,7 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
       }
 
       ep_lock.unlock();
-      switch_to(receiver);
+      switch_task(receiver);
       ep_lock.lock();
 
       return true;
@@ -193,7 +193,7 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
 
       if (sender->state == task_state_t::ready) {
         ep_lock.unlock();
-        switch_to(sender);
+        switch_task(sender);
         ep_lock.lock();
       }
 
@@ -287,7 +287,7 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
       }
 
       ep_lock.unlock();
-      switch_to(receiver);
+      switch_task(receiver);
       ep_lock.lock();
 
       return true;
