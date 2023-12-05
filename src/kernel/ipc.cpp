@@ -271,29 +271,23 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
 
       map_ptr<task_t> receiver = endpoint->receiver_queue.head;
 
-      {
-        std::lock_guard recv_lock(receiver->lock);
+      std::lock_guard recv_lock(receiver->lock);
 
-        if (!ipc_transfer_msg(receiver, cur_task)) [[unlikely]] {
-          return false;
-        }
-
-        remove_waiting_queue(endpoint->receiver_queue, receiver);
-
-        receiver->state       = task_state_t::ready;
-        receiver->ipc_state   = ipc_state_t::none;
-        receiver->caller_task = cur_task;
-        cur_task->callee_task = receiver;
+      if (!ipc_transfer_msg(receiver, cur_task)) [[unlikely]] {
+        return false;
       }
 
-      ep_lock.unlock();
-      switch_task(receiver);
-      ep_lock.lock();
+      remove_waiting_queue(endpoint->receiver_queue, receiver);
 
-      return true;
+      receiver->state       = task_state_t::ready;
+      receiver->ipc_state   = ipc_state_t::none;
+      receiver->caller_task = cur_task;
+      cur_task->callee_task = receiver;
+
+      push_ready_queue(receiver);
+    } else {
+      push_waiting_queue(endpoint->sender_queue, cur_task);
     }
-
-    push_waiting_queue(endpoint->sender_queue, cur_task);
   }
 
   resched();
