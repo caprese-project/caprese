@@ -38,10 +38,9 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
         remove_waiting_queue(endpoint->receiver_queue, receiver);
         receiver->state     = task_state_t::ready;
         receiver->ipc_state = ipc_state_t::none;
-        push_ready_queue(receiver);
       }
 
-      switch_task(receiver);
+      switch_to(receiver);
 
       return true;
     }
@@ -104,11 +103,10 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
         remove_waiting_queue(endpoint->receiver_queue, receiver);
         receiver->state     = task_state_t::ready;
         receiver->ipc_state = ipc_state_t::none;
-        push_ready_queue(receiver);
       }
 
       ep_lock.unlock();
-      switch_task(receiver);
+      switch_to(receiver);
       ep_lock.lock();
 
       return true;
@@ -190,13 +188,12 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
         } else {
           sender->state     = task_state_t::ready;
           sender->ipc_state = ipc_state_t::none;
-          push_ready_queue(sender);
         }
       }
 
       if (sender->state == task_state_t::ready) {
         ep_lock.unlock();
-        switch_task(sender);
+        switch_to(sender);
         ep_lock.lock();
       }
 
@@ -263,6 +260,9 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
 
   map_ptr<task_t> cur_task = get_cls()->current_task;
 
+  cur_task->state     = task_state_t::waiting;
+  cur_task->ipc_state = ipc_state_t::calling;
+
   {
     std::unique_lock ep_lock(endpoint->lock);
 
@@ -280,23 +280,19 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
 
         remove_waiting_queue(endpoint->receiver_queue, receiver);
 
-        receiver->state     = task_state_t::ready;
-        receiver->ipc_state = ipc_state_t::none;
-
-        push_ready_queue(receiver);
+        receiver->state       = task_state_t::ready;
+        receiver->ipc_state   = ipc_state_t::none;
+        receiver->caller_task = cur_task;
+        cur_task->callee_task = receiver;
       }
 
-      cur_task->ipc_state = ipc_state_t::none;
-
       ep_lock.unlock();
-      switch_task(receiver);
+      switch_to(receiver);
       ep_lock.lock();
 
       return true;
     }
 
-    cur_task->state     = task_state_t::waiting;
-    cur_task->ipc_state = ipc_state_t::calling;
     push_waiting_queue(endpoint->sender_queue, cur_task);
   }
 

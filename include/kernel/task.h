@@ -93,6 +93,7 @@ map_ptr<task_t> pop_ready_task();
 
 [[nodiscard]] map_ptr<task_t> lookup_tid(tid_t tid);
 
+void switch_to(map_ptr<task_t> task);
 void resched();
 void yield();
 

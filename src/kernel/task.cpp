@@ -356,11 +356,7 @@ void kill_task(map_ptr<task_t> task, int exit_status) {
 void switch_task(map_ptr<task_t> task) {
   assert(task != nullptr);
 
-  map_ptr<task_t> old_task = get_cls()->current_task;
-
-  if (task == old_task) [[unlikely]] {
-    return;
-  }
+  map_ptr<task_t> cur_task = get_cls()->current_task;
 
   {
     std::lock_guard lock(task->lock);
@@ -368,15 +364,12 @@ void switch_task(map_ptr<task_t> task) {
       return;
     }
     remove_ready_queue(task);
-    task->state = task_state_t::running;
   }
 
-  get_cls()->current_task = task;
-  old_task->state         = task_state_t::ready;
-  push_ready_queue(old_task);
-  switch_context(make_map_ptr(&task->context), make_map_ptr(&old_task->context));
-  assert(old_task->state == task_state_t::running);
-  assert(get_cls()->current_task == old_task);
+  cur_task->state = task_state_t::ready;
+  push_ready_queue(cur_task);
+
+  switch_to(task);
 }
 
 void suspend_task(map_ptr<task_t> task) {
@@ -502,6 +495,24 @@ map_ptr<task_t> lookup_tid(tid_t tid) {
 
   signal(SIGSEGV, old_handler);
   return task;
+}
+
+void switch_to(map_ptr<task_t> task) {
+  assert(task != nullptr);
+
+  map_ptr<task_t> old_task = get_cls()->current_task;
+
+  if (task == old_task) [[unlikely]] {
+    return;
+  }
+
+  get_cls()->current_task = task;
+  task->state             = task_state_t::running;
+
+  switch_context(make_map_ptr(&task->context), make_map_ptr(&old_task->context));
+
+  assert(old_task->state == task_state_t::running);
+  assert(get_cls()->current_task == old_task);
 }
 
 void resched() {
