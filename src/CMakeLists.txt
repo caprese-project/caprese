@@ -13,7 +13,7 @@ set(COMMON_LIBRARIES "")
 
 function(declare_target name)
   target_compile_features(${name} PRIVATE cxx_std_23)
-  target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C>:${CONFIG_C_OPTIONS}> $<$<COMPILE_LANGUAGE:CXX>:${CONFIG_CXX_OPTIONS}>)
+  target_compile_options(${name} PRIVATE ${CONFIG_COMPILE_OPTIONS})
   target_compile_definitions(${name} PRIVATE CONFIG_BOOT_PAYLOAD_BASE=${CONFIG_BOOT_PAYLOAD_BASE} CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS=${CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS})
 
   target_include_directories(${name} PRIVATE ${INCLUDE_DIR})

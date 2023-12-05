@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.0)
 function(declare_deps)
   include(FetchContent)
 
-  set(LIBC_COMPILE_OPTIONS ${CONFIG_C_OPTIONS})
+  set(LIBC_COMPILE_OPTIONS ${CONFIG_COMPILE_OPTIONS})
   FetchContent_Declare(
     caprese_libc
     GIT_REPOSITORY https://github.com/caprese-project/libc.git

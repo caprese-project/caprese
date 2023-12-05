@@ -32,7 +32,7 @@ macro(declare_arch)
     set(CMAKE_OBJDUMP ${TOOLCHAIN_PREFIX}objdump CACHE STRING "objdump")
 
     set(
-      CONFIG_C_OPTIONS
+      CONFIG_COMPILE_OPTIONS
       -Wall
       -Wextra
       -Werror
@@ -49,29 +49,7 @@ macro(declare_arch)
       -fno-exceptions
       -fno-pie
       -no-pie
-      $<IF:$<CONFIG:Debug>,-O0,-O3>
-      $<IF:$<CONFIG:Debug>,-g3,-g0>
-    )
-
-    set(
-      CONFIG_CXX_OPTIONS
-      -Wall
-      -Wextra
-      -Werror
-      -Wno-format-overflow
-      -Wno-attributes
-      -fno-omit-frame-pointer
-      -gdwarf-2
-      -MD
-      -mcmodel=medany
-      -ffreestanding
-      -fno-common
-      -mno-relax
-      -fno-stack-protector
-      -fno-exceptions
-      -fno-pie
-      -no-pie
-      -fno-use-cxa-atexit
+      $<$<COMPILE_LANGUAGE:CXX>:-fno-use-cxa-atexit>
       $<IF:$<CONFIG:Debug>,-O0,-O3>
       $<IF:$<CONFIG:Debug>,-g3,-g0>
     )
