@@ -1,6 +1,7 @@
 #include <cstdio>
 
 #include <kernel/log.h>
+#include <kernel/cls.h>
 
 void log(log_level_t level, const char* tag, const char* fmt, va_list ap) {
   const char* level_str = "";
@@ -23,7 +24,16 @@ void log(log_level_t level, const char* tag, const char* fmt, va_list ap) {
       break;
   }
 
-  printf("%s" TERM_COLOR_MAGENTA "%s" TERM_RESET ": ", level_str, tag);
+  printf(level_str);
+
+  map_ptr<task_t> cur_task = get_cls()->current_task;
+  if (cur_task != nullptr) {
+    printf(TERM_COLOR_MAGENTA "[tid=%02d] " TERM_RESET, cur_task->tid);
+  } else {
+    printf(TERM_COLOR_MAGENTA "[kernel] " TERM_RESET);
+  }
+
+  printf(TERM_COLOR_MAGENTA "%s" TERM_RESET ": ", tag);
   vprintf(fmt, ap);
   lognl();
 }
