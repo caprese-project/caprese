@@ -1,9 +1,9 @@
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <utility>
 
 #include <kernel/arch/csr.h>
-#include <log/log.h>
 
 constexpr const char* tag = "boot/start";
 
@@ -54,20 +54,13 @@ void map_mapped_space(void) {
 }
 
 extern "C" [[noreturn]] void start(uintptr_t hartid, uintptr_t dtb) {
-  lognl();
+  printf("\nBooting on Hart %ld...\n", hartid);
+  printf("Device Tree Blob:      %p\n", reinterpret_cast<void*>(dtb));
+  printf("Payload Start Address: %p\n", _payload_start);
 
-  logi(tag, "Booting on hart %ld...", hartid);
-
-  lognl();
-
-  logd(tag, "Device tree blob:      %p", dtb);
-  logd(tag, "Payload start address: %p", _payload_start);
-
-  logi(tag, "Mapping kernel spaces...");
-
+  printf("Mapping kernel spaces...\n");
   map_mapped_space();
-
-  logi(tag, "Kernel spaces mapped.");
+  printf("Kernel spaces mapped.\n");
 
   uintptr_t satp = reinterpret_cast<uintptr_t>(root_page_table) >> 12;
 #if defined(CONFIG_MMU_SV39)
@@ -80,7 +73,7 @@ extern "C" [[noreturn]] void start(uintptr_t hartid, uintptr_t dtb) {
 
   asm volatile("csrw stvec, %0" : : "r"(CONFIG_MAPPED_SPACE_BASE + _payload_start));
 
-  logi(tag, "Jumping to kernel...");
+  printf("Jumping to Kernel...\n");
 
   asm volatile("mv a0, %0" : : "r"(hartid));
   asm volatile("mv a1, %0" : : "r"(CONFIG_MAPPED_SPACE_BASE + dtb));

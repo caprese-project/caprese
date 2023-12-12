@@ -6,13 +6,13 @@
 #include <kernel/cap_space.h>
 #include <kernel/cls.h>
 #include <kernel/core_id.h>
+#include <kernel/log.h>
 #include <kernel/page.h>
 #include <kernel/setup.h>
 #include <kernel/start.h>
 #include <kernel/task.h>
 #include <kernel/trap.h>
 #include <libcaprese/root_boot_info.h>
-#include <log/log.h>
 
 extern "C" {
   extern const char _kernel_start[];

@@ -2,8 +2,8 @@
 
 #include <kernel/cls.h>
 #include <kernel/lock.h>
+#include <kernel/log.h>
 #include <kernel/task.h>
-#include <log/log.h>
 
 void spinlock_t::lock() {
   while (state.test_and_set(std::memory_order_acquire)) {

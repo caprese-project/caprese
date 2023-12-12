@@ -10,10 +10,10 @@
 #include <kernel/cls.h>
 #include <kernel/ipc.h>
 #include <kernel/lock.h>
+#include <kernel/log.h>
 #include <kernel/task.h>
 #include <kernel/trap.h>
 #include <libcaprese/syscall.h>
-#include <log/log.h>
 
 namespace {
   constexpr const char* tag = "kernel/task";

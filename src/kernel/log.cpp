@@ -1,6 +1,6 @@
 #include <cstdio>
 
-#include <log/log.h>
+#include <kernel/log.h>
 
 void log(log_level_t level, const char* tag, const char* fmt, va_list ap) {
   const char* level_str = "";

@@ -1,7 +1,7 @@
 #include <cerrno>
 #include <csignal>
 
-#include <log/log.h>
+#include <kernel/log.h>
 
 namespace {
   void (*__signal_handlers[NSIG])(int);

@@ -2,7 +2,7 @@
 #include <utility>
 
 #include <kernel/frame.h>
-#include <log/log.h>
+#include <kernel/log.h>
 
 namespace {
   constexpr const char* tag = "kernel/frame";

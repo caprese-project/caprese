@@ -1,9 +1,9 @@
 #include <cstdint>
 
-#include <log/log.h>
+#include <kernel/log.h>
 
 namespace {
-  constexpr const char* tag = "log/dump";
+  constexpr const char* tag = "kernel/dump";
 } // namespace
 
 void dump() {

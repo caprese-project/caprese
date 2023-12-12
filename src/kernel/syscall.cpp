@@ -6,11 +6,11 @@
 #include <kernel/core_id.h>
 #include <kernel/frame.h>
 #include <kernel/ipc.h>
+#include <kernel/log.h>
 #include <kernel/syscall.h>
 #include <kernel/task.h>
 #include <kernel/user_ptr.h>
 #include <libcaprese/syscall.h>
-#include <log/log.h>
 
 namespace {
   constexpr const char* tag = "kernel/syscall";

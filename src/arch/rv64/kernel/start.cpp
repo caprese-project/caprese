@@ -2,8 +2,8 @@
 
 #include <kernel/address.h>
 #include <kernel/boot.h>
+#include <kernel/log.h>
 #include <kernel/start.h>
-#include <log/log.h>
 
 namespace {
   constexpr const char* tag = "kernel/start";

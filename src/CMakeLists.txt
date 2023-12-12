@@ -9,8 +9,6 @@ if(NOT DEFINED CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS)
   message(FATAL_ERROR "CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS is not defined.")
 endif()
 
-set(COMMON_LIBRARIES "")
-
 function(declare_target name)
   target_compile_features(${name} PRIVATE cxx_std_23)
   target_compile_options(${name} PRIVATE ${CONFIG_COMPILE_OPTIONS})
@@ -19,37 +17,27 @@ function(declare_target name)
   target_include_directories(${name} PRIVATE ${INCLUDE_DIR})
 endfunction(declare_target)
 
-function(declare_library name type common)
+function(declare_library name type)
   add_library(${name} ${type})
   declare_target(${name})
-
-  if(common)
-    set(COMMON_LIBRARIES "${COMMON_LIBRARIES}" ${name} PARENT_SCOPE)
-  endif()
 endfunction(declare_library)
 
 function(declare_executable name)
   add_executable(${name})
   declare_target(${name})
-  target_link_libraries(${name} ${COMMON_LIBRARIES})
 endfunction(declare_executable)
 
-declare_library(caprese_kernel_libc OBJECT FALSE)
-declare_library(caprese_log STATIC TRUE)
-
-target_sources(
-  caprese_log PRIVATE
-  log/log.cpp
-)
+declare_library(caprese_kernel_libc OBJECT)
 
 target_link_libraries(caprese_kernel_libc PUBLIC caprese_libc caprese_libcxx libcaprese)
-target_link_libraries(caprese_log PUBLIC caprese_libc caprese_libcxx)
 
-declare_executable(caprese_boot_stub)
 declare_executable(caprese_kernel)
 declare_executable(caprese_boot)
+declare_executable(caprese_boot_stub)
 
 target_link_libraries(caprese_kernel caprese_kernel_libc)
+target_link_libraries(caprese_boot caprese_libc)
+target_link_libraries(caprese_boot_stub caprese_libc)
 
 target_sources(
   caprese_kernel PRIVATE
@@ -58,6 +46,7 @@ target_sources(
   kernel/cls.cpp
   kernel/ipc.cpp
   kernel/lock.cpp
+  kernel/log.cpp
   kernel/start.cpp
   kernel/syscall.cpp
   kernel/task.cpp

@@ -1,5 +1,5 @@
-#ifndef LOG_LOG_H_
-#define LOG_LOG_H_
+#ifndef KERNEL_LOG_H_
+#define KERNEL_LOG_H_
 
 #include <cstdarg>
 #include <cstdlib>
@@ -94,25 +94,25 @@ inline void logf(const char* tag, const char* fmt, ...) {
 }
 
 #ifdef NDEBUG
-#define panic(fmt, ...)                        \
-do {                                           \
-if constexpr (CONFIG_LOG_FATAL) {              \
+#define panic(fmt, ...)                            \
+do {                                               \
+if constexpr (CONFIG_LOG_FATAL) {                  \
 logf("log/panic", fmt __VA_OPT__(, ) __VA_ARGS__); \
-dump();                                        \
-}                                              \
-_Exit(0);                                      \
+dump();                                            \
+}                                                  \
+_Exit(0);                                          \
 } while (false)
 #else // ^^^ NDEBUG
-#define panic(fmt, ...)                                                                     \
-do {                                                                                        \
-if constexpr (CONFIG_LOG_FATAL) {                                                           \
+#define panic(fmt, ...)                                                                         \
+do {                                                                                            \
+if constexpr (CONFIG_LOG_FATAL) {                                                               \
 logf("log/panic", fmt " at %s:%d %s" __VA_OPT__(, ) __VA_ARGS__, __FILE__, __LINE__, __func__); \
-dump();                                                                                     \
-}                                                                                           \
-_Exit(0);                                                                                   \
+dump();                                                                                         \
+}                                                                                               \
+_Exit(0);                                                                                       \
 } while (false)
 #endif // !NDEBUG
 
 #define unimpl() panic("An unimplemented code has been reached.")
 
-#endif // LOG_LOG_H_
+#endif // KERNEL_LOG_H_

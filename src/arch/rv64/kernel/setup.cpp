@@ -6,8 +6,8 @@
 #include <kernel/align.h>
 #include <kernel/arch/dtb.h>
 #include <kernel/cap.h>
+#include <kernel/log.h>
 #include <kernel/setup.h>
-#include <log/log.h>
 
 extern "C" {
   extern const char _kernel_start[];

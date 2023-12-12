@@ -6,7 +6,7 @@
 
 #include <kernel/align.h>
 #include <kernel/arch/dtb.h>
-#include <log/log.h>
+#include <kernel/log.h>
 
 namespace {
   uint32_t _dtb_to_u32(map_ptr<char> ptr) {

@@ -2,10 +2,10 @@
 
 #include <kernel/arch/csr.h>
 #include <kernel/cls.h>
+#include <kernel/log.h>
 #include <kernel/syscall.h>
 #include <kernel/task.h>
 #include <kernel/trap.h>
-#include <log/log.h>
 
 namespace {
   constexpr const char* tag = "kernel/trap";

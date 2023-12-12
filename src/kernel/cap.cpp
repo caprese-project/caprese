@@ -11,9 +11,9 @@
 #include <kernel/cls.h>
 #include <kernel/ipc.h>
 #include <kernel/lock.h>
+#include <kernel/log.h>
 #include <kernel/task.h>
 #include <libcaprese/syscall.h>
-#include <log/log.h>
 
 namespace {
   spinlock_t id_cap_lock;

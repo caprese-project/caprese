@@ -8,11 +8,6 @@ target_sources(
   libc/stdlib.cpp
 )
 
-target_sources(
-  caprese_log PRIVATE
-  log/dump.cpp
-)
-
 function(declare_boot name)
   target_sources(
     ${name} PRIVATE
@@ -48,6 +43,7 @@ target_sources(
   kernel/context.cpp
   kernel/context.S
   kernel/core_id.cpp
+  kernel/dump.cpp
   kernel/entry.S
   kernel/frame.cpp
   kernel/setup.cpp
