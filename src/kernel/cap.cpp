@@ -220,13 +220,26 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
     return 0_map;
   }
 
+  auto& memcap = src->cap.memory;
+
   size_t page_size = get_page_size(level);
-  dst              = create_memory_object(dst, src, true, true, true, page_size, page_size);
+  dst              = create_memory_object(dst, src, memcap.readable., memcap.writable, memcap.executable, page_size, page_size);
   if (dst == nullptr) [[unlikely]] {
     return 0_map;
   }
 
-  dst->cap  = make_virt_page_cap(0, level, dst->cap.memory.phys_addr);
+  int flags = 0;
+  if (memcap.readable) {
+    flags |= VIRT_PAGE_CAP_READABLE;
+  }
+  if (memcap.writable) {
+    flags |= VIRT_PAGE_CAP_WRITABLE;
+  }
+  if (memcap.executable) {
+    flags |= VIRT_PAGE_CAP_EXECUTABLE;
+  }
+
+  dst->cap = make_virt_page_cap(flags, level, dst->cap.memory.phys_addr);
 
   return dst;
 }
