@@ -223,7 +223,7 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   auto& memcap = src->cap.memory;
 
   size_t page_size = get_page_size(level);
-  dst              = create_memory_object(dst, src, memcap.readable., memcap.writable, memcap.executable, page_size, page_size);
+  dst              = create_memory_object(dst, src, memcap.readable, memcap.writable, memcap.executable, page_size, page_size);
   if (dst == nullptr) [[unlikely]] {
     return 0_map;
   }
