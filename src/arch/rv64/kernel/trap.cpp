@@ -23,11 +23,13 @@ extern "C" {
     uint64_t scause;
     asm volatile("csrr %0, scause" : "=r"(scause));
 
+    map_ptr<task_t> cur_task = get_cls()->current_task;
+
     if (scause & SCAUSE_INTERRUPT) {
       logd(tag, "scause-interrupt: %p", scause & SCAUSE_EXCEPTION_CODE);
       if ((scause & SCAUSE_EXCEPTION_CODE) == SCAUSE_SUPERVISOR_EXTERNAL_INTERRUPT) {
       } else {
-        panic("User trap!");
+        panic("User trap! tid=0x%x", cur_task->tid);
       }
     } else {
       if ((scause & SCAUSE_EXCEPTION_CODE) == SCAUSE_ENVIRONMENT_CALL_FROM_U_MODE) {
@@ -41,7 +43,7 @@ extern "C" {
         task->frame.sepc += 4;
       } else {
         logd(tag, "scause-exception: %p", scause & SCAUSE_EXCEPTION_CODE);
-        panic("User trap!");
+        panic("User trap! tid=0x%x", cur_task->tid);
       }
     }
 
