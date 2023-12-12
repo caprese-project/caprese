@@ -28,9 +28,9 @@ void log(log_level_t level, const char* tag, const char* fmt, va_list ap) {
 
   map_ptr<task_t> cur_task = get_cls()->current_task;
   if (cur_task != nullptr) {
-    printf(TERM_COLOR_MAGENTA "[tid=%02d] " TERM_RESET, cur_task->tid);
+    printf(TERM_COLOR_YELLOW "[tid=%02d] " TERM_RESET, cur_task->tid);
   } else {
-    printf(TERM_COLOR_MAGENTA "[kernel] " TERM_RESET);
+    printf(TERM_COLOR_YELLOW "[kernel] " TERM_RESET);
   }
 
   printf(TERM_COLOR_MAGENTA "%s" TERM_RESET ": ", tag);
