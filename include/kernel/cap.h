@@ -73,6 +73,7 @@ union capability_t {
 
   struct {
     uint64_t             type: 5;
+    uint64_t             used: 1;
     map_ptr<cap_space_t> space;
   } cap_space;
 
@@ -259,12 +260,13 @@ inline capability_t make_virt_page_cap(int flags, uint64_t level, uint64_t phys_
   };
 }
 
-inline capability_t make_cap_space_cap(map_ptr<cap_space_t> cap_space) {
+inline capability_t make_cap_space_cap(map_ptr<cap_space_t> cap_space, bool used) {
   assert(cap_space != nullptr);
 
   return {
     .cap_space = {
       .type  = static_cast<uint64_t>(CAP_CAP_SPACE),
+      .used  = used,
       .space = cap_space,
     },
   };
@@ -301,6 +303,9 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
 bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot);
 bool remap_virt_page_cap(
     map_ptr<cap_slot_t> new_page_table_slot, size_t index, map_ptr<cap_slot_t> virt_page_slot, bool readable, bool writable, bool executable, map_ptr<cap_slot_t> old_page_table_slot);
+
+bool insert_cap_space(map_ptr<cap_slot_t> task_slot, map_ptr<cap_slot_t> cap_space_slot);
+bool extend_cap_space(map_ptr<cap_slot_t> task_slot, map_ptr<cap_slot_t> page_table_slot);
 
 int compare_id_cap(map_ptr<cap_slot_t> slot1, map_ptr<cap_slot_t> slot2);
 

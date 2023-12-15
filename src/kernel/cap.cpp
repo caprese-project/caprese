@@ -264,7 +264,7 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   map_ptr<cap_space_t> cap_space = make_phys_ptr(dst->cap.memory.phys_addr);
   memset(cap_space.get(), 0, sizeof(cap_space_t));
 
-  dst->cap = make_cap_space_cap(cap_space);
+  dst->cap = make_cap_space_cap(cap_space, false);
 
   return dst;
 }
@@ -294,12 +294,11 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
     return 0_map;
   }
 
-  if (task->free_slots == nullptr) [[unlikely]] {
+  map_ptr<cap_slot_t> slot = pop_free_slots(task);
+  if (slot == nullptr) [[unlikely]] {
     errno = SYS_E_OUT_OF_CAP_SPACE;
     return 0_map;
   }
-
-  map_ptr<cap_slot_t> free_slots = task->free_slots->prev;
 
   map_ptr<cap_slot_t> result = 0_map;
 
@@ -307,7 +306,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
     case CAP_NULL:
       break;
     case CAP_MEM:
-      result = create_memory_object(task->free_slots, cap_slot, arg0, arg1, arg2, arg3, arg4);
+      result = create_memory_object(slot, cap_slot, arg0, arg1, arg2, arg3, arg4);
       break;
     case CAP_TASK: {
       map_ptr<cap_slot_t> cap_space_slot = lookup_cap(task, arg0);
@@ -354,20 +353,20 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
         }
       }
 
-      result = create_task_object(task->free_slots, cap_slot, cap_space_slot, root_page_table_slot, cap_space_page_table_slots);
+      result = create_task_object(slot, cap_slot, cap_space_slot, root_page_table_slot, cap_space_page_table_slots);
       break;
     }
     case CAP_ENDPOINT:
-      result = create_endpoint_object(task->free_slots, cap_slot);
+      result = create_endpoint_object(slot, cap_slot);
       break;
     case CAP_PAGE_TABLE:
-      result = create_page_table_object(task->free_slots, cap_slot);
+      result = create_page_table_object(slot, cap_slot);
       break;
     case CAP_VIRT_PAGE:
-      result = create_virt_page_object(task->free_slots, cap_slot, arg0);
+      result = create_virt_page_object(slot, cap_slot, arg0);
       break;
     case CAP_CAP_SPACE:
-      result = create_cap_space_object(task->free_slots, cap_slot);
+      result = create_cap_space_object(slot, cap_slot);
       break;
     case CAP_ID:
       break;
@@ -378,10 +377,9 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
   }
 
   if (result == nullptr) [[unlikely]] {
+    push_free_slots(task, slot);
     return 0_map;
   }
-
-  task->free_slots = free_slots;
 
   return result;
 }
@@ -702,6 +700,66 @@ bool remap_virt_page_cap(
   virt_page_cap.executable = executable;
   virt_page_cap.index      = index;
   virt_page_cap.address    = virt_ptr<void>::from(new_page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index);
+
+  return true;
+}
+
+bool insert_cap_space(map_ptr<cap_slot_t> task_slot, map_ptr<cap_slot_t> cap_space_slot) {
+  assert(task_slot != nullptr);
+  assert(cap_space_slot != nullptr);
+  assert(get_cap_type(task_slot->cap) == CAP_TASK);
+  assert(get_cap_type(cap_space_slot->cap) == CAP_CAP_SPACE);
+
+  auto& task_cap      = task_slot->cap.task;
+  auto& cap_space_cap = cap_space_slot->cap.cap_space;
+
+  if (task_cap.task->state == task_state_t::unused || task_cap.task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
+    return false;
+  }
+
+  if (cap_space_cap.used) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
+    return false;
+  }
+
+  if (!insert_cap_space(task_cap.task, cap_space_cap.space)) [[unlikely]] {
+    return false;
+  }
+
+  cap_space_cap.used = true;
+
+  return true;
+}
+
+bool extend_cap_space(map_ptr<cap_slot_t> task_slot, map_ptr<cap_slot_t> page_table_slot) {
+  assert(task_slot != nullptr);
+  assert(page_table_slot != nullptr);
+  assert(get_cap_type(task_slot->cap) == CAP_TASK);
+  assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
+
+  auto& task_cap       = task_slot->cap.task;
+  auto& page_table_cap = page_table_slot->cap.page_table;
+
+  if (task_cap.task->state == task_state_t::unused || task_cap.task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
+    return false;
+  }
+
+  if (page_table_cap.mapped) [[unlikely]] {
+    errno = SYS_E_CAP_STATE;
+    return false;
+  }
+
+  virt_ptr<void> va = extend_cap_space(task_cap.task, page_table_cap.table);
+
+  if (va == nullptr) [[unlikely]] {
+    return false;
+  }
+
+  page_table_cap.mapped         = true;
+  page_table_cap.level          = KILO_PAGE;
+  page_table_cap.virt_addr_base = va.raw();
 
   return true;
 }

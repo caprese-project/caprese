@@ -61,6 +61,7 @@ struct alignas(PAGE_SIZE) task_t {
   map_ptr<task_t>       caller_task;
   map_ptr<task_t>       callee_task;
   map_ptr<cap_slot_t>   free_slots;
+  size_t                free_slots_count;
   map_ptr<page_table_t> root_page_table;
   message_buffer_t      msg_buf;
   recursive_spinlock_t  lock;
@@ -81,6 +82,9 @@ void init_idle_task(map_ptr<task_t> task, map_ptr<page_table_t> root_page_table)
 [[nodiscard]] map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot);
 [[nodiscard]] map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot);
 [[nodiscard]] bool                revoke_cap(map_ptr<cap_slot_t> slot);
+
+void                              push_free_slots(map_ptr<task_t> task, map_ptr<cap_slot_t> slot);
+[[nodiscard]] map_ptr<cap_slot_t> pop_free_slots(map_ptr<task_t> task);
 
 void kill_task(map_ptr<task_t> task, int exit_status);
 void switch_task(map_ptr<task_t> task);

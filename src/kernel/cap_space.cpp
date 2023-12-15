@@ -51,28 +51,25 @@ bool insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space) {
     cap_space->slots[0].prev = 0_map;
   }
 
-  std::for_each(std::rbegin(cap_space->slots), end, [task](auto&& slots) {
-    slots.prev       = task->free_slots;
-    task->free_slots = make_map_ptr(&slots);
-  });
-
   cap_space->meta_info.map         = cap_space;
   cap_space->meta_info.task        = task;
   cap_space->meta_info.space_index = task->cap_count.num_cap_space;
+
+  std::for_each(std::rbegin(cap_space->slots), end, [task](auto&& slot) { push_free_slots(task, make_map_ptr(&slot)); });
 
   ++task->cap_count.num_cap_space;
 
   return true;
 }
 
-bool extend_cap_space(map_ptr<task_t> task, map_ptr<void> page) {
+virt_ptr<void> extend_cap_space(map_ptr<task_t> task, map_ptr<page_table_t> page) {
   assert(task != nullptr);
 
   std::lock_guard lock(task->lock);
 
   if (task->cap_count.num_extension == NUM_PAGE_TABLE_ENTRY - 1) [[unlikely]] {
     errno = SYS_E_ILL_STATE;
-    return false;
+    return 0_virt;
   }
 
   virt_ptr<void> cap_space_base_va = make_virt_ptr(CONFIG_CAPABILITY_SPACE_BASE + PAGE_SIZE * NUM_PAGE_TABLE_ENTRY * task->cap_count.num_extension);
@@ -88,12 +85,12 @@ bool extend_cap_space(map_ptr<task_t> task, map_ptr<void> page) {
   pte = page_table->walk(cap_space_base_va, MEGA_PAGE_TABLE_LEVEL);
   assert(pte->is_disabled());
   pte->set_flags({});
-  pte->set_next_page(page);
+  pte->set_next_page(page.as<void>());
   pte->enable();
 
   ++task->cap_count.num_extension;
 
-  return true;
+  return cap_space_base_va;
 }
 
 map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {

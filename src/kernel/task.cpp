@@ -53,6 +53,7 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
   task->caller_task       = 0_map;
   task->callee_task       = 0_map;
   task->free_slots        = 0_map;
+  task->free_slots_count  = 0;
   task->root_page_table   = root_page_table;
   task->state             = task_state_t::suspended;
   task->ipc_state         = ipc_state_t::none;
@@ -84,7 +85,7 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
     pte->enable();
     page_table = pte->get_next_page().as<page_table_t>();
   }
-  if (!extend_cap_space(task, cap_space_page_tables[0].as<void>())) {
+  if (extend_cap_space(task, cap_space_page_tables[0]) == nullptr) {
     panic("Failed to extend cap space.");
   }
 
@@ -137,13 +138,11 @@ map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap) {
     return 0_map;
   }
 
-  if (task->free_slots == nullptr) [[unlikely]] {
+  map_ptr<cap_slot_t> slot = pop_free_slots(task);
+  if (slot == nullptr) [[unlikely]] {
     errno = SYS_E_OUT_OF_CAP_SPACE;
     return 0_map;
   }
-
-  map_ptr<cap_slot_t> slot = task->free_slots;
-  task->free_slots         = slot->prev;
 
   slot->prev = 0_map;
   slot->next = 0_map;
@@ -152,20 +151,20 @@ map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap) {
   return slot;
 }
 
-map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot) {
-  assert(task != nullptr);
+map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> dst_task, map_ptr<cap_slot_t> src_slot) {
+  assert(dst_task != nullptr);
   assert(src_slot != nullptr);
 
   map_ptr<task_t>& src_task = src_slot->get_cap_space()->meta_info.task;
 
-  std::scoped_lock lock { src_task->lock, task->lock };
+  std::scoped_lock lock { src_task->lock, dst_task->lock };
 
   if (get_cap_type(src_slot->cap) == CAP_NULL || get_cap_type(src_slot->cap) == CAP_ZOMBIE) [[unlikely]] {
     errno = SYS_E_CAP_TYPE;
     return 0_map;
   }
 
-  if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+  if (dst_task->state == task_state_t::unused || dst_task->state == task_state_t::killed) [[unlikely]] {
     errno = SYS_E_ILL_STATE;
     return 0_map;
   }
@@ -175,7 +174,7 @@ map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
     return 0_map;
   }
 
-  map_ptr<cap_slot_t> dst_slot = insert_cap(task, src_slot->cap);
+  map_ptr<cap_slot_t> dst_slot = insert_cap(dst_task, src_slot->cap);
 
   if (dst_slot == nullptr) [[unlikely]] {
     return 0_map;
@@ -184,10 +183,7 @@ map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
   dst_slot->prev = src_slot->prev;
   dst_slot->next = src_slot->next;
 
-  src_slot->cap        = make_null_cap();
-  src_slot->prev       = src_task->free_slots;
-  src_slot->next       = 0_map;
-  src_task->free_slots = src_slot;
+  push_free_slots(src_task, src_slot);
 
   return dst_slot;
 }
@@ -316,6 +312,41 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
   }
 
   return true;
+}
+
+void push_free_slots(map_ptr<task_t> task, map_ptr<cap_slot_t> slot) {
+  assert(task != nullptr);
+  assert(slot != nullptr);
+  assert(slot->get_cap_space()->meta_info.task == task);
+
+  std::lock_guard lock(task->lock);
+
+  slot->cap        = make_null_cap();
+  slot->prev       = task->free_slots;
+  slot->next       = 0_map;
+  task->free_slots = slot;
+
+  ++task->free_slots_count;
+}
+
+[[nodiscard]] map_ptr<cap_slot_t> pop_free_slots(map_ptr<task_t> task) {
+  assert(task != nullptr);
+
+  std::lock_guard lock(task->lock);
+
+  map_ptr<cap_slot_t> slot = task->free_slots;
+  if (slot == nullptr) [[unlikely]] {
+    errno = SYS_E_OUT_OF_CAP_SPACE;
+    return 0_map;
+  }
+
+  task->free_slots = slot->prev;
+  slot->prev       = 0_map;
+  slot->next       = 0_map;
+
+  --task->free_slots_count;
+
+  return slot;
 }
 
 void kill_task(map_ptr<task_t> task, int exit_status) {

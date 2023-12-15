@@ -302,6 +302,48 @@ sysret_t invoke_syscall_task_cap(uint16_t id, map_ptr<syscall_args_t> args) {
 
       return sysret_s_ok(get_cap_slot_index(dst_slot));
     }
+    case SYS_TASK_CAP_GET_FREE_SLOT_COUNT & 0xffff:
+      return sysret_s_ok(task_cap.task->free_slots_count);
+    case SYS_TASK_CAP_GET_CAP_SPACE_COUNT & 0xffff:
+      return sysret_s_ok(task_cap.task->cap_count.num_cap_space);
+    case SYS_TASK_CAP_GET_CAP_SPACE_EXT_COUNT & 0xffff:
+      return sysret_s_ok(task_cap.task->cap_count.num_extension);
+    case SYS_TASK_CAP_INSERT_CAP_SPACE & 0xffff: {
+      map_ptr<cap_slot_t> cap_space_slot = lookup_cap(get_cls()->current_task, args->args[1]);
+      if (cap_space_slot == nullptr) [[unlikely]] {
+        loge(tag, "Failed to look up cap: %d", args->args[1]);
+        return errno_to_sysret();
+      }
+      if (get_cap_type(cap_space_slot->cap) != CAP_CAP_SPACE) [[unlikely]] {
+        loge(tag, "Invalid cap type: %d", get_cap_type(cap_space_slot->cap));
+        return sysret_e_cap_type();
+      }
+
+      if (!insert_cap_space(cap_slot, cap_space_slot)) [[unlikely]] {
+        loge(tag, "Failed to insert cap space: %d", args->args[1]);
+        return errno_to_sysret();
+      }
+
+      return sysret_s_ok(0);
+    }
+    case SYS_TASK_CAP_EXTEND_CAP_SPACE & 0xffff: {
+      map_ptr<cap_slot_t> page_table_slot = lookup_cap(get_cls()->current_task, args->args[1]);
+      if (page_table_slot == nullptr) [[unlikely]] {
+        loge(tag, "Failed to look up cap: %d", args->args[1]);
+        return errno_to_sysret();
+      }
+      if (get_cap_type(page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+        loge(tag, "Invalid cap type: %d", get_cap_type(page_table_slot->cap));
+        return sysret_e_cap_type();
+      }
+
+      if (!extend_cap_space(cap_slot, page_table_slot)) [[unlikely]] {
+        loge(tag, "Failed to extend cap space: %d", args->args[1]);
+        return errno_to_sysret();
+      }
+
+      return sysret_s_ok(0);
+    }
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);
       return sysret_e_ill_code();
@@ -563,18 +605,16 @@ sysret_t invoke_syscall_id_cap(uint16_t id, map_ptr<syscall_args_t> args) {
 
   switch (id) {
     case SYS_ID_CAP_CREATE & 0xffff: {
-      if (task->free_slots == nullptr) [[unlikely]] {
+      map_ptr<cap_slot_t> slot = pop_free_slots(task);
+      if (slot == nullptr) [[unlikely]] {
         return sysret_e_out_of_cap_space();
       }
 
-      map_ptr<cap_slot_t> free_slots = task->free_slots->prev;
-      map_ptr<cap_slot_t> result     = create_id_object(task->free_slots);
-
-      if (result == nullptr) {
+      map_ptr<cap_slot_t> result = create_id_object(slot);
+      if (result == nullptr) [[unlikely]] {
+        push_free_slots(task, slot);
         return errno_to_sysret();
       }
-
-      task->free_slots = free_slots;
 
       return sysret_s_ok(get_cap_slot_index(result));
     }

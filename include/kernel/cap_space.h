@@ -27,8 +27,8 @@ struct alignas(PAGE_SIZE) cap_space_t {
 
 static_assert(sizeof(cap_space_t) == PAGE_SIZE);
 
-[[nodiscard]] bool insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space);
-[[nodiscard]] bool extend_cap_space(map_ptr<task_t> task, map_ptr<void> page);
+[[nodiscard]] bool           insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space);
+[[nodiscard]] virt_ptr<void> extend_cap_space(map_ptr<task_t> task, map_ptr<page_table_t> page);
 
 [[nodiscard]] map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc);
 [[nodiscard]] size_t              get_cap_slot_index(map_ptr<cap_slot_t> cap_slot);

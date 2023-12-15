@@ -94,7 +94,7 @@ __init_code void setup_root_task() {
   root_boot_info.root_task_cap = get_cap_slot_index(root_task_cap_slot);
 
   for (size_t i = 0; i < std::size(root_task_cap_spaces); ++i) {
-    map_ptr<cap_slot_t> cap_space_cap_slot = insert_cap(root_task_ptr, make_cap_space_cap(make_map_ptr(&root_task_cap_spaces[i])));
+    map_ptr<cap_slot_t> cap_space_cap_slot = insert_cap(root_task_ptr, make_cap_space_cap(make_map_ptr(&root_task_cap_spaces[i]), true));
     if (cap_space_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the cap space capability.");
     }
