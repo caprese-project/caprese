@@ -564,7 +564,7 @@ sysret_t invoke_syscall_id_cap(uint16_t id, map_ptr<syscall_args_t> args) {
   switch (id) {
     case SYS_ID_CAP_CREATE & 0xffff: {
       if (task->free_slots == nullptr) [[unlikely]] {
-        return sysret_e_ill_state();
+        return sysret_e_out_of_cap_space();
       }
 
       map_ptr<cap_slot_t> free_slots = task->free_slots->prev;

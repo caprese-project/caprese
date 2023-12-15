@@ -41,6 +41,10 @@ constexpr sysret_t sysret_e_ill_state() {
   return sysret_t { 0, SYS_E_ILL_STATE };
 }
 
+constexpr sysret_t sysret_e_out_of_cap_space() {
+  return sysret_t { 0, SYS_E_OUT_OF_CAP_SPACE };
+}
+
 inline sysret_t errno_to_sysret() {
   return sysret_t { 0, errno };
 }

@@ -295,7 +295,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
   }
 
   if (task->free_slots == nullptr) [[unlikely]] {
-    errno = SYS_E_ILL_STATE;
+    errno = SYS_E_OUT_OF_CAP_SPACE;
     return 0_map;
   }
 

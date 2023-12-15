@@ -138,7 +138,7 @@ map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap) {
   }
 
   if (task->free_slots == nullptr) [[unlikely]] {
-    errno = SYS_E_ILL_STATE;
+    errno = SYS_E_OUT_OF_CAP_SPACE;
     return 0_map;
   }
 
