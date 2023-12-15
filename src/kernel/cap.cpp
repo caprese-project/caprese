@@ -483,7 +483,7 @@ bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map
   assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
-    logd(tag, "Failed to unmap page table cap. index must be less than %llu.", NUM_PAGE_TABLE_ENTRY)
+    logd(tag, "Failed to unmap page table cap. index must be less than %llu.", NUM_PAGE_TABLE_ENTRY);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
