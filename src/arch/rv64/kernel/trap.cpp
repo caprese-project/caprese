@@ -38,7 +38,7 @@ extern "C" {
 
         sysret_t sysret = invoke_syscall();
         if (sysret.error != SYS_S_OK) [[unlikely]] {
-          loge(tag, "Syscall error: %s (%d)", sysret_error_to_str(sysret.error), sysret.error);
+          loge(tag, "Syscall error: %s (%ld)", sysret_error_to_str(sysret.error), sysret.error);
         }
 
         map_ptr<task_t>& task = get_cls()->current_task;
