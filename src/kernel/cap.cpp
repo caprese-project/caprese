@@ -443,26 +443,26 @@ bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_p
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
-    logd(tag, "Failed to map page table cap. Virtual address must be less than %p. (index=%llu, addr=%p, level=%d)", CONFIG_KERNEL_SPACE_BASE, index, va, (int)virt_page_cap.level);
+    logd(tag, "Failed to map page table cap. Virtual address must be less than %p. (index=%llu, addr=%p, level=%d)", CONFIG_KERNEL_SPACE_BASE, index, va, (int)page_table_cap.level);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (page_table_cap.level == KILO_PAGE_TABLE_LEVEL) [[unlikely]] {
-    logd(tag, "Failed to map page table cap. Cannot map page table cap to kilo page table. (index=%llu, addr=%p, level=%d)", index, va, (int)virt_page_cap.level);
+    logd(tag, "Failed to map page table cap. Cannot map page table cap to kilo page table. (index=%llu, addr=%p, level=%d)", index, va, (int)page_table_cap.level);
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_enabled()) [[unlikely]] {
-    logd(tag, "Failed to map page table cap. Page table entry must be disabled. (index=%llu, addr=%p, level=%d)", index, va, (int)virt_page_cap.level);
+    logd(tag, "Failed to map page table cap. Page table entry must be disabled. (index=%llu, addr=%p, level=%d)", index, va, (int)page_table_cap.level);
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (child_page_table_cap.mapped) [[unlikely]] {
-    logd(tag, "Failed to map page table cap. Page table cap must not be mapped. (index=%llu, addr=%p, level=%d)", index, va, (int)virt_page_cap.level);
+    logd(tag, "Failed to map page table cap. Page table cap must not be mapped. (index=%llu, addr=%p, level=%d)", index, va, (int)page_table_cap.level);
     errno = SYS_E_CAP_STATE;
     return false;
   }
@@ -505,26 +505,26 @@ bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
-    logd(tag, "Failed to unmap page table cap. Virtual address must be less than %p. (index=%llu, addr=%p, level=%d)", CONFIG_KERNEL_SPACE_BASE, index, va, (int)virt_page_cap.level);
+    logd(tag, "Failed to unmap page table cap. Virtual address must be less than %p. (index=%llu, addr=%p, level=%d)", CONFIG_KERNEL_SPACE_BASE, index, va, (int)page_table_cap.level);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_disabled()) [[unlikely]] {
-    logd(tag, "Failed to unmap page table cap. Page table entry must be enabled. (index=%llu, addr=%p, level=%d)", index, va, (int)virt_page_cap.level);
+    logd(tag, "Failed to unmap page table cap. Page table entry must be enabled. (index=%llu, addr=%p, level=%d)", index, va, (int)page_table_cap.level);
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (!child_page_table_cap.mapped) [[unlikely]] {
-    logd(tag, "Failed to unmap page table cap. Page table cap must be mapped. (index=%llu, addr=%p, level=%d)", index, va, (int)virt_page_cap.level);
+    logd(tag, "Failed to unmap page table cap. Page table cap must be mapped. (index=%llu, addr=%p, level=%d)", index, va, (int)page_table_cap.level);
     errno = SYS_E_CAP_STATE;
     return false;
   }
 
   if (pte.get_next_page() != child_page_table_cap.table.as<void>()) [[unlikely]] {
-    logd(tag, "Failed to unmap page table cap. child_page_table_cap is not mapped to the page table entry. (index=%llu, addr=%p, level=%d)", index, va, (int)virt_page_cap.level);
+    logd(tag, "Failed to unmap page table cap. child_page_table_cap is not mapped to the page table entry. (index=%llu, addr=%p, level=%d)", index, va, (int)page_table_cap.level);
     errno = SYS_E_ILL_STATE;
     return false;
   }
