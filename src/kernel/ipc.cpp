@@ -314,15 +314,18 @@ bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
   message_buffer_t&       dst_msg_buf = dst->msg_buf;
 
   for (size_t i = 0; i < src_msg_buf.cap_part_length; ++i) {
-    map_ptr<cap_slot_t> src_slot = lookup_cap(src, src_msg_buf.data[i]);
+    uintptr_t cap_desc = (src_msg_buf.data[i] << 1) >> 1;
+    bool      delegate = cap_desc != src_msg_buf.data[i];
+
+    map_ptr<cap_slot_t> src_slot = lookup_cap(src, cap_desc);
     if (src_slot == nullptr) [[unlikely]] {
       logd(tag, "Failed to transfer the message. Failed to lookup cap from the source buffer. (index=%llu, cap=%llu)", i, src_msg_buf.data[i]);
       return false;
     }
 
-    map_ptr<cap_slot_t> dst_slot = delegate_cap(dst, src_slot);
+    map_ptr<cap_slot_t> dst_slot = delegate ? delegate_cap(dst, src_slot) : transfer_cap(dst, src_slot);
     if (dst_slot == nullptr) [[unlikely]] {
-      logd(tag, "Failed to transfer the message. Failed to delegate cap to the destination buffer.");
+      logd(tag, "Failed to transfer the message. Failed to %s cap to the destination buffer.", delegate ? "delegate" : "transfer");
       return false;
     }
 
