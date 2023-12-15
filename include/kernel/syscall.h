@@ -49,6 +49,29 @@ inline sysret_t errno_to_sysret() {
   return sysret_t { 0, errno };
 }
 
+constexpr inline const char* sysret_error_to_str(sysret_error_t err) {
+  switch (err) {
+    case SYS_S_OK:
+      return "SYS_S_OK";
+    case SYS_E_UNKNOWN:
+      return "SYS_E_UNKNOWN";
+    case SYS_E_CAP_TYPE:
+      return "SYS_E_CAP_TYPE";
+    case SYS_E_CAP_STATE:
+      return "SYS_E_CAP_STATE";
+    case SYS_E_ILL_CODE:
+      return "SYS_E_ILL_CODE";
+    case SYS_E_ILL_ARGS:
+      return "SYS_E_ILL_ARGS";
+    case SYS_E_ILL_STATE:
+      return "SYS_E_ILL_STATE";
+    case SYS_E_OUT_OF_CAP_SPACE:
+      return "SYS_E_OUT_OF_CAP_SPACE";
+    default:
+      return "<UNKNOWN CODE>";
+  }
+}
+
 sysret_t invoke_syscall();
 sysret_t invoke_syscall_system(uint16_t id, map_ptr<syscall_args_t> args);
 sysret_t invoke_syscall_arch(uint16_t id, map_ptr<syscall_args_t> args);

@@ -6,6 +6,7 @@
 #include <kernel/syscall.h>
 #include <kernel/task.h>
 #include <kernel/trap.h>
+#include <libcaprese/syscall.h>
 
 namespace {
   constexpr const char* tag = "kernel/trap";
@@ -36,6 +37,9 @@ extern "C" {
         enable_trap();
 
         sysret_t sysret = invoke_syscall();
+        if (sysret.error != SYS_S_OK) [[unlikely]] {
+          loge(tag, "Syscall error: %s (%d)", sysret_error_to_str(sysret.error), sysret.error);
+        }
 
         map_ptr<task_t>& task = get_cls()->current_task;
         task->frame.a0        = sysret.result;
