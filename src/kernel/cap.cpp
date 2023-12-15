@@ -16,6 +16,8 @@
 #include <libcaprese/syscall.h>
 
 namespace {
+  constexpr const char* tag = "kernel/cap";
+
   spinlock_t id_cap_lock;
   uint64_t   next_id[2];
 } // namespace
@@ -45,21 +47,25 @@ map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_sl
   auto& mem_cap = src->cap.memory;
 
   if (size == 0 || std::popcount(size) != 1) [[unlikely]] {
+    logd(tag, "Failed to create memory object. Memory size must be power of 2.");
     errno = SYS_E_ILL_ARGS;
     return 0_map;
   }
 
   if (readable && !mem_cap.readable) [[unlikely]] {
+    logd(tag, "Failed to create memory object. Cannot create readable object from non-readable memory.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
   if (writable && !mem_cap.writable) [[unlikely]] {
+    logd(tag, "Failed to create memory object. Cannot create writable object from non-writable memory.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
   if (executable && !mem_cap.executable) [[unlikely]] {
+    logd(tag, "Failed to create memory object. Cannot create executable object from non-executable memory.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
@@ -68,6 +74,7 @@ map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_sl
   size_t    rem_size  = mem_cap.phys_addr + (1 << mem_cap.size_bit) - base_addr;
 
   if (rem_size < size) [[unlikely]] {
+    logd(tag, "Failed to create memory object. Not enough memory.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
@@ -122,6 +129,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
+    logd(tag, "Failed to create task object. Memory must be readable and writable.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
@@ -135,6 +143,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
 
   dst = create_memory_object(dst, src, true, true, false, PAGE_SIZE, PAGE_SIZE);
   if (dst == nullptr) [[unlikely]] {
+    logd(tag, "Failed to create task object. This is due to the failure to create a memory object.");
     return 0_map;
   }
 
@@ -167,12 +176,14 @@ map_ptr<cap_slot_t> create_endpoint_object(map_ptr<cap_slot_t> dst, map_ptr<cap_
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
+    logd(tag, "Failed to create endpoint object. Memory must be readable and writable.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
   dst = create_memory_object(dst, src, true, true, false, get_cap_size(CAP_ENDPOINT), get_cap_size(CAP_ENDPOINT));
   if (dst == nullptr) [[unlikely]] {
+    logd(tag, "Failed to create endpoint object. This is due to the failure to create a memory object.");
     return 0_map;
   }
 
@@ -192,12 +203,14 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
+    logd(tag, "Failed to create page table object. Memory must be readable and writable.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
   dst = create_memory_object(dst, src, true, true, false, PAGE_SIZE, PAGE_SIZE);
   if (dst == nullptr) [[unlikely]] {
+    logd(tag, "Failed to create page table object. This is due to the failure to create a memory object.");
     return 0_map;
   }
 
@@ -216,6 +229,7 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
   if (level > MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
+    logd(tag, "Failed to create virt page object. Level must be less than or equal to %llu.", MAX_PAGE_TABLE_LEVEL);
     errno = SYS_E_ILL_ARGS;
     return 0_map;
   }
@@ -225,6 +239,7 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   size_t page_size = get_page_size(level);
   dst              = create_memory_object(dst, src, memcap.readable, memcap.writable, memcap.executable, page_size, page_size);
   if (dst == nullptr) [[unlikely]] {
+    logd(tag, "Failed to create virt page object. This is due to the failure to create a memory object.");
     return 0_map;
   }
 
@@ -252,12 +267,14 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
+    logd(tag, "Failed to create cap space object. Memory must be readable and writable.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
   dst = create_memory_object(dst, src, true, true, false, PAGE_SIZE, PAGE_SIZE);
   if (dst == nullptr) [[unlikely]] {
+    logd(tag, "Failed to create cap space object. This is due to the failure to create a memory object.");
     return 0_map;
   }
 
@@ -283,6 +300,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
   assert(cap_slot != nullptr);
 
   if (get_cap_type(cap_slot->cap) != CAP_MEM) [[unlikely]] {
+    logd(tag, "Failed to create object. cap_slot must be memory cap.");
     errno = SYS_E_CAP_TYPE;
     return 0_map;
   }
@@ -290,12 +308,14 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
   std::lock_guard lock(task->lock);
 
   if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+    logd(tag, "Failed to create object. The task is not running.");
     errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
   map_ptr<cap_slot_t> slot = pop_free_slots(task);
   if (slot == nullptr) [[unlikely]] {
+    logd(tag, "Failed to create object. No more free slots.");
     errno = SYS_E_OUT_OF_CAP_SPACE;
     return 0_map;
   }
@@ -304,6 +324,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
 
   switch (type) {
     case CAP_NULL:
+      logw(tag, "Cannot create a null object.");
       break;
     case CAP_MEM:
       result = create_memory_object(slot, cap_slot, arg0, arg1, arg2, arg3, arg4);
@@ -311,24 +332,29 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
     case CAP_TASK: {
       map_ptr<cap_slot_t> cap_space_slot = lookup_cap(task, arg0);
       if (cap_space_slot == nullptr) [[unlikely]] {
+        logd(tag, "Failed to create task object. Failed to lookup cap slot (%llu).", arg0);
         errno = SYS_E_ILL_ARGS;
         return 0_map;
       }
       if (get_cap_type(cap_space_slot->cap) != CAP_CAP_SPACE) [[unlikely]] {
+        logd(tag, "Failed to create task object. cap slot (%llu) must be cap space cap.", arg0);
         errno = SYS_E_CAP_TYPE;
         return 0_map;
       }
 
       map_ptr<cap_slot_t> root_page_table_slot = lookup_cap(task, arg1);
       if (root_page_table_slot == nullptr) [[unlikely]] {
+        logd(tag, "Failed to create task object. Failed to lookup cap slot (%llu).", arg1);
         errno = SYS_E_ILL_ARGS;
         return 0_map;
       }
       if (get_cap_type(root_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+        logd(tag, "Failed to create task object. cap slot (%llu) must be page table cap.", arg1);
         errno = SYS_E_CAP_TYPE;
         return 0_map;
       }
       if (root_page_table_slot->cap.page_table.mapped) [[unlikely]] {
+        logd(tag, "Failed to create task object. cap slot (%llu) must not be mapped.", arg1);
         errno = SYS_E_CAP_STATE;
         return 0_map;
       }
@@ -340,14 +366,17 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       for (size_t i = 0; i < std::size(cap_space_page_table_slots); ++i) {
         cap_space_page_table_slots[i] = lookup_cap(task, cap_descs[i]);
         if (cap_space_page_table_slots[i] == nullptr) [[unlikely]] {
+          logd(tag, "Failed to create task object. Failed to lookup cap slot (%llu).", cap_descs[i]);
           errno = SYS_E_ILL_ARGS;
           return 0_map;
         }
         if (get_cap_type(cap_space_page_table_slots[i]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+          logd(tag, "Failed to create task object. cap slot (%llu) must be page table cap.", cap_descs[i]);
           errno = SYS_E_CAP_TYPE;
           return 0_map;
         }
         if (cap_space_page_table_slots[i]->cap.page_table.mapped) [[unlikely]] {
+          logd(tag, "Failed to create task object. cap slot (%llu) must not be mapped.", cap_descs[i]);
           errno = SYS_E_CAP_STATE;
           return 0_map;
         }
@@ -369,10 +398,13 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       result = create_cap_space_object(slot, cap_slot);
       break;
     case CAP_ID:
+      logw(tag, "The id object cannot be created from the memory object. Use sys_id_cap_create.");
       break;
     case CAP_ZOMBIE:
+      logw(tag, "Cannot create a zombie object.");
       break;
     case CAP_UNKNOWN:
+      logw(tag, "Cannot create an unknown object.");
       break;
   }
 
@@ -389,16 +421,19 @@ bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_p
   assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    logd(tag, "Failed to map page table cap. index must be less than %llu.", NUM_PAGE_TABLE_ENTRY);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (child_page_table_slot == nullptr) [[unlikely]] {
+    logd(tag, "Failed to map page table cap. child_page_table_slot must not be null.");
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(child_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    logd(tag, "Failed to map page table cap. child_page_table_slot must be page table cap.");
     errno = SYS_E_CAP_TYPE;
     return false;
   }
@@ -408,22 +443,26 @@ bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_p
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    logd(tag, "Failed to map page table cap. Virtual address must be less than %p.", CONFIG_KERNEL_SPACE_BASE);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (page_table_cap.level == KILO_PAGE_TABLE_LEVEL) [[unlikely]] {
+    logd(tag, "Failed to map page table cap. Cannot map page table cap to kilo page table.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_enabled()) [[unlikely]] {
+    logd(tag, "Failed to map page table cap. Page table entry must be disabled.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (child_page_table_cap.mapped) [[unlikely]] {
+    logd(tag, "Failed to map page table cap. Page table cap must not be mapped.");
     errno = SYS_E_CAP_STATE;
     return false;
   }
@@ -444,16 +483,19 @@ bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map
   assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    logd(tag, "Failed to unmap page table cap. index must be less than %llu.", NUM_PAGE_TABLE_ENTRY)
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (child_page_table_slot == nullptr) [[unlikely]] {
+    logd(tag, "Failed to unmap page table cap. child_page_table_slot must not be null.");
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(child_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    logd(tag, "Failed to unmap page table cap. child_page_table_slot must be page table cap.");
     errno = SYS_E_CAP_TYPE;
     return false;
   }
@@ -463,22 +505,26 @@ bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(page_table_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    logd(tag, "Failed to unmap page table cap. Virtual address must be less than %p.", CONFIG_KERNEL_SPACE_BASE);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_disabled()) [[unlikely]] {
+    logd(tag, "Failed to unmap page table cap. Page table entry must be enabled.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (!child_page_table_cap.mapped) [[unlikely]] {
+    logd(tag, "Failed to unmap page table cap. Page table cap must be mapped.");
     errno = SYS_E_CAP_STATE;
     return false;
   }
 
   if (pte.get_next_page() != child_page_table_cap.table.as<void>()) [[unlikely]] {
+    logd(tag, "Failed to unmap page table cap. child_page_table_cap is not mapped to the page table entry.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
@@ -495,16 +541,19 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
   assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    logd(tag, "Failed to map virt page. index must be less than %llu.", NUM_PAGE_TABLE_ENTRY);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (virt_page_slot == nullptr) [[unlikely]] {
+    logd(tag, "Failed to map virt page. virt_page_slot must not be null.");
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(virt_page_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    logd(tag, "Failed to map virt page. virt_page_slot must be virt page cap.");
     errno = SYS_E_CAP_TYPE;
     return false;
   }
@@ -514,22 +563,26 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    logd(tag, "Failed to map virt page. Virtual address must be less than %p.", CONFIG_KERNEL_SPACE_BASE);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_enabled()) [[unlikely]] {
+    logd(tag, "Failed to map virt page. Page table entry must be disabled.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (virt_page_cap.mapped) [[unlikely]] {
+    logd(tag, "Failed to map virt page. Virt page cap must not be mapped.");
     errno = SYS_E_CAP_STATE;
     return false;
   }
 
   if (virt_page_cap.level != page_table_cap.level) [[unlikely]] {
+    logd(tag, "Failed to map virt page. Virt page cap must have the same level as page table cap.");
     errno = SYS_E_CAP_STATE;
     return false;
   }
@@ -561,16 +614,19 @@ bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_
   assert(get_cap_type(page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    logd(tag, "Failed to unmap virt page. index must be less than %llu.", NUM_PAGE_TABLE_ENTRY);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (virt_page_slot == nullptr) [[unlikely]] {
+    logd(tag, "Failed to unmap virt page. virt_page_slot must not be null.");
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(virt_page_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    logd(tag, "Failed to unmap virt page. virt_page_slot must be virt page cap.");
     errno = SYS_E_CAP_TYPE;
     return false;
   }
@@ -580,17 +636,20 @@ bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_
 
   uintptr_t va = page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    logd(tag, "Failed to unmap virt page. Virtual address must be less than %p.", CONFIG_KERNEL_SPACE_BASE);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   pte_t& pte = page_table_cap.table->entries[index];
   if (pte.is_disabled()) [[unlikely]] {
+    logd(tag, "Failed to unmap virt page. Page table entry must be enabled.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (!virt_page_cap.mapped) [[unlikely]] {
+    logd(tag, "Failed to unmap virt page. Virt page cap must be mapped.");
     errno = SYS_E_CAP_STATE;
     return false;
   }
@@ -598,6 +657,7 @@ bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_
   map_ptr<void> map_ptr = make_phys_ptr(virt_page_cap.phys_addr);
 
   if (pte.get_next_page() != map_ptr) [[unlikely]] {
+    logd(tag, "Failed to unmap virt page. virt_page_cap is not mapped to the page table entry.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
@@ -615,26 +675,31 @@ bool remap_virt_page_cap(
   assert(get_cap_type(new_page_table_slot->cap) == CAP_PAGE_TABLE);
 
   if (index >= NUM_PAGE_TABLE_ENTRY) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. index must be less than %llu.", NUM_PAGE_TABLE_ENTRY);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (virt_page_slot == nullptr) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. virt_page_slot must not be null.");
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(virt_page_slot->cap) != CAP_VIRT_PAGE) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. virt_page_slot must be virt page cap.");
     errno = SYS_E_CAP_TYPE;
     return false;
   }
 
   if (old_page_table_slot == nullptr) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. old_page_table_slot must not be null.");
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (get_cap_type(old_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. old_page_table_slot must be page table cap.");
     errno = SYS_E_CAP_TYPE;
     return false;
   }
@@ -645,33 +710,39 @@ bool remap_virt_page_cap(
 
   uintptr_t va = new_page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index;
   if (va >= CONFIG_KERNEL_SPACE_BASE) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. Virtual address must be less than %p.", CONFIG_KERNEL_SPACE_BASE);
     errno = SYS_E_ILL_ARGS;
     return false;
   }
 
   if (!virt_page_cap.mapped) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. Virt page cap must be mapped.");
     errno = SYS_E_CAP_STATE;
     return false;
   }
 
   if (new_page_table_cap.level != old_page_table_cap.level) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. new_page_table_cap and old_page_table_cap must have the same level.");
     errno = SYS_E_CAP_STATE;
     return false;
   }
 
   if (new_page_table_cap.level != virt_page_cap.level) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. new_page_table_cap and virt_page_cap must have the same level.");
     errno = SYS_E_CAP_STATE;
     return false;
   }
 
   pte_t& new_pte = new_page_table_cap.table->entries[index];
   if (new_pte.is_enabled()) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. New page table entry must be disabled.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   pte_t& old_pte = old_page_table_cap.table->entries[virt_page_cap.index];
   if (old_pte.is_disabled()) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. Old page table entry must be enabled.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
@@ -679,6 +750,7 @@ bool remap_virt_page_cap(
   map_ptr<void> map_ptr = make_phys_ptr(virt_page_cap.phys_addr);
 
   if (old_pte.get_next_page() != map_ptr) [[unlikely]] {
+    logd(tag, "Failed to remap virt page. virt_page_cap is not mapped to the page table entry.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
@@ -714,11 +786,13 @@ bool insert_cap_space(map_ptr<cap_slot_t> task_slot, map_ptr<cap_slot_t> cap_spa
   auto& cap_space_cap = cap_space_slot->cap.cap_space;
 
   if (task_cap.task->state == task_state_t::unused || task_cap.task->state == task_state_t::killed) [[unlikely]] {
+    logd(tag, "Failed to insert cap space. The task is not running.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (cap_space_cap.used) [[unlikely]] {
+    logd(tag, "Failed to insert cap space. Cap space cap must not be used.");
     errno = SYS_E_CAP_STATE;
     return false;
   }
@@ -742,11 +816,13 @@ bool extend_cap_space(map_ptr<cap_slot_t> task_slot, map_ptr<cap_slot_t> page_ta
   auto& page_table_cap = page_table_slot->cap.page_table;
 
   if (task_cap.task->state == task_state_t::unused || task_cap.task->state == task_state_t::killed) [[unlikely]] {
+    logd(tag, "Failed to extend cap space. The task is not running.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
 
   if (page_table_cap.mapped) [[unlikely]] {
+    logd(tag, "Failed to extend cap space. Page table cap must not be mapped.");
     errno = SYS_E_CAP_STATE;
     return false;
   }

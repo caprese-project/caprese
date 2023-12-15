@@ -336,6 +336,7 @@ void push_free_slots(map_ptr<task_t> task, map_ptr<cap_slot_t> slot) {
 
   map_ptr<cap_slot_t> slot = task->free_slots;
   if (slot == nullptr) [[unlikely]] {
+    logd(tag, "Failed to pop from the free slot. The free slot is empty.");
     errno = SYS_E_OUT_OF_CAP_SPACE;
     return 0_map;
   }
@@ -391,6 +392,7 @@ void switch_task(map_ptr<task_t> task) {
   map_ptr<task_t> old_task = get_cls()->current_task;
 
   if (task == old_task) [[unlikely]] {
+    logw(tag, "Tried to switch to oneself. It's a meaningless operation.");
     return;
   }
 
@@ -435,6 +437,7 @@ void resume_task(map_ptr<task_t> task) {
   std::lock_guard lock(task->lock);
 
   if (task->state != task_state_t::suspended) [[unlikely]] {
+    logd(tag, "Failed to resume task. The task is not suspended.");
     return;
   }
 

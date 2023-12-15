@@ -8,8 +8,13 @@
 #include <kernel/cap_space.h>
 #include <kernel/cls.h>
 #include <kernel/lock.h>
+#include <kernel/log.h>
 #include <kernel/task.h>
 #include <libcaprese/syscall.h>
+
+namespace {
+  constexpr const char* tag = "kernel/cap_space";
+} // namespace
 
 map_ptr<cap_space_t> cap_slot_t::get_cap_space() const {
   return make_map_ptr(round_down(reinterpret_cast<uintptr_t>(this), PAGE_SIZE));
@@ -22,6 +27,7 @@ bool insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space) {
   std::lock_guard lock(task->lock);
 
   if (task->cap_count.num_cap_space / NUM_PAGE_TABLE_ENTRY > task->cap_count.num_extension) [[unlikely]] {
+    logd(tag, "Failed to insert cap_space. Need to extend space.");
     errno = SYS_E_ILL_STATE;
     return false;
   }
@@ -68,6 +74,7 @@ virt_ptr<void> extend_cap_space(map_ptr<task_t> task, map_ptr<page_table_t> page
   std::lock_guard lock(task->lock);
 
   if (task->cap_count.num_extension == NUM_PAGE_TABLE_ENTRY - 1) [[unlikely]] {
+    logd(tag, "Failed to extend cap_space. No more extension.");
     errno = SYS_E_ILL_STATE;
     return 0_virt;
   }
@@ -99,12 +106,14 @@ map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
   std::lock_guard lock(task->lock);
 
   if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+    logd(tag, "Failed to lookup cap. The task is not running.");
     errno = SYS_E_ILL_STATE;
     return 0_map;
   }
 
   uintptr_t capacity = task->cap_count.num_cap_space * std::size(static_cast<cap_space_t*>(nullptr)->slots);
   if (cap_desc >= capacity) [[unlikely]] {
+    logd(tag, "Failed to lookup cap. cap_desc is out of range.");
     errno = SYS_E_ILL_ARGS;
     return 0_map;
   }
@@ -119,6 +128,7 @@ map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
   for (ssize_t level = MAX_PAGE_TABLE_LEVEL; level >= static_cast<ssize_t>(KILO_PAGE_TABLE_LEVEL); --level) {
     pte = page_table->walk(va, level);
     if (pte->is_disabled()) [[unlikely]] {
+      logd(tag, "Failed to lookup cap. The page is not mapped.");
       errno = SYS_E_ILL_STATE;
       return 0_map;
     }

@@ -3,8 +3,13 @@
 
 #include <kernel/cls.h>
 #include <kernel/ipc.h>
+#include <kernel/log.h>
 #include <kernel/task.h>
 #include <libcaprese/syscall.h>
+
+namespace {
+  constexpr const char* tag = "kernel/ipc";
+} // namespace
 
 bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4, uintptr_t arg5) {
   assert(endpoint != nullptr);
@@ -311,11 +316,13 @@ bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
   for (size_t i = 0; i < src_msg_buf.cap_part_length; ++i) {
     map_ptr<cap_slot_t> src_slot = lookup_cap(src, src_msg_buf.data[i]);
     if (src_slot == nullptr) [[unlikely]] {
+      logd(tag, "Failed to transfer the message. Failed to lookup cap from the source buffer. (index=%llu, cap=%llu)", i, src_msg_buf.data[i]);
       return false;
     }
 
     map_ptr<cap_slot_t> dst_slot = delegate_cap(dst, src_slot);
     if (dst_slot == nullptr) [[unlikely]] {
+      logd(tag, "Failed to transfer the message. Failed to delegate cap to the destination buffer.");
       return false;
     }
 
