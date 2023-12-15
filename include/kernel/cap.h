@@ -223,6 +223,7 @@ inline capability_t make_endpoint_cap(map_ptr<endpoint_t> endpoint) {
 
 inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool mapped, uint64_t level, uint64_t virt_addr_base) {
   assert(page_table != nullptr);
+  assert(!mapped || virt_addr_base % get_page_size(level + 1) == 0);
 
   return {
     .page_table = {
