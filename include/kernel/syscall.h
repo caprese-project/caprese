@@ -65,6 +65,10 @@ constexpr inline const char* sysret_error_to_str(sysret_error_t err) {
       return "SYS_E_ILL_ARGS";
     case SYS_E_ILL_STATE:
       return "SYS_E_ILL_STATE";
+    case SYS_E_CANCELED:
+      return "SYS_E_CANCELED";
+    case SYS_E_BLOCKED:
+      return "SYS_E_BLOCKED";
     case SYS_E_OUT_OF_CAP_SPACE:
       return "SYS_E_OUT_OF_CAP_SPACE";
     default:
