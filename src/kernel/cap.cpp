@@ -907,5 +907,13 @@ int compare_id_cap(map_ptr<cap_slot_t> slot1, map_ptr<cap_slot_t> slot2) {
     return 1;
   }
 
+  if (id_cap1.val3 < id_cap2.val3) {
+    return -1;
+  }
+
+  if (id_cap1.val3 > id_cap2.val3) {
+    return 1;
+  }
+
   return 0;
 }
