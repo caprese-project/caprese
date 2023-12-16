@@ -326,7 +326,7 @@ bool revoke_cap(map_ptr<cap_slot_t> slot) {
 
   while (cap_slot != slot) {
     map_ptr<cap_slot_t> prev_slot = cap_slot->prev;
-    destroy_cap_slot(slot);
+    destroy_cap_slot(cap_slot);
     cap_slot = prev_slot;
   }
 
