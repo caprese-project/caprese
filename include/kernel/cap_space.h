@@ -30,6 +30,12 @@ static_assert(sizeof(cap_space_t) == PAGE_SIZE);
 [[nodiscard]] bool           insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space);
 [[nodiscard]] virt_ptr<void> extend_cap_space(map_ptr<task_t> task, map_ptr<page_table_t> page);
 
+[[nodiscard]] map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot);
+[[nodiscard]] map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot);
+[[nodiscard]] map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot);
+[[nodiscard]] bool                revoke_cap(map_ptr<cap_slot_t> slot);
+[[nodiscard]] bool                destroy_cap(map_ptr<cap_slot_t> slot);
+
 [[nodiscard]] map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc);
 [[nodiscard]] size_t              get_cap_slot_index(map_ptr<cap_slot_t> cap_slot);
 

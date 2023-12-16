@@ -306,6 +306,34 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
   return cur_task->ipc_state == ipc_state_t::none;
 }
 
+void ipc_cancel(map_ptr<endpoint_t> endpoint) {
+  std::unique_lock ep_lock(endpoint->lock);
+
+  while (endpoint->receiver_queue.head != nullptr) {
+    map_ptr<task_t> receiver = endpoint->receiver_queue.head;
+
+    std::lock_guard lock(receiver->lock);
+
+    remove_waiting_queue(endpoint->receiver_queue, receiver);
+
+    receiver->state     = task_state_t::ready;
+    receiver->ipc_state = ipc_state_t::canceled;
+    push_ready_queue(receiver);
+  }
+
+  while (endpoint->sender_queue.head != nullptr) {
+    map_ptr<task_t> sender = endpoint->sender_queue.head;
+
+    std::lock_guard lock(sender->lock);
+
+    remove_waiting_queue(endpoint->sender_queue, sender);
+
+    sender->state     = task_state_t::ready;
+    sender->ipc_state = ipc_state_t::canceled;
+    push_ready_queue(sender);
+  }
+}
+
 bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
   assert(dst != nullptr);
   assert(src != nullptr);

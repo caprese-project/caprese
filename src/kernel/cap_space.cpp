@@ -5,6 +5,7 @@
 #include <mutex>
 
 #include <kernel/align.h>
+#include <kernel/cap.h>
 #include <kernel/cap_space.h>
 #include <kernel/cls.h>
 #include <kernel/lock.h>
@@ -98,6 +99,263 @@ virt_ptr<void> extend_cap_space(map_ptr<task_t> task, map_ptr<page_table_t> page
   ++task->cap_count.num_extension;
 
   return cap_space_base_va;
+}
+
+map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> dst_task, map_ptr<cap_slot_t> src_slot) {
+  assert(dst_task != nullptr);
+  assert(src_slot != nullptr);
+
+  map_ptr<task_t>& src_task = src_slot->get_cap_space()->meta_info.task;
+
+  std::scoped_lock lock { src_task->lock, dst_task->lock };
+
+  if (get_cap_type(src_slot->cap) == CAP_NULL || get_cap_type(src_slot->cap) == CAP_ZOMBIE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
+    return 0_map;
+  }
+
+  if (dst_task->state == task_state_t::unused || dst_task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
+    return 0_map;
+  }
+
+  if (src_task->state == task_state_t::unused || src_task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
+    return 0_map;
+  }
+
+  map_ptr<cap_slot_t> dst_slot = insert_cap(dst_task, src_slot->cap);
+
+  if (dst_slot == nullptr) [[unlikely]] {
+    return 0_map;
+  }
+
+  dst_slot->prev = src_slot->prev;
+  dst_slot->next = src_slot->next;
+
+  push_free_slots(src_task, src_slot);
+
+  return dst_slot;
+}
+
+map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot) {
+  map_ptr<task_t>& src_task = src_slot->get_cap_space()->meta_info.task;
+
+  std::scoped_lock lock { src_task->lock, task->lock };
+
+  if (get_cap_type(src_slot->cap) == CAP_NULL || get_cap_type(src_slot->cap) == CAP_ZOMBIE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
+    return 0_map;
+  }
+
+  if (task->state == task_state_t::unused || task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
+    return 0_map;
+  }
+
+  if (src_task->state == task_state_t::unused || src_task->state == task_state_t::killed) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
+    return 0_map;
+  }
+
+  map_ptr<cap_slot_t> dst_slot = insert_cap(task, src_slot->cap);
+
+  if (dst_slot == nullptr) [[unlikely]] {
+    return 0_map;
+  }
+
+  dst_slot->prev = src_slot;
+  dst_slot->next = src_slot->next;
+  src_slot->cap  = make_null_cap();
+  src_slot->next = dst_slot;
+
+  return dst_slot;
+}
+
+map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
+  assert(src_slot != nullptr);
+
+  map_ptr<task_t>& src_task = src_slot->get_cap_space()->meta_info.task;
+
+  std::lock_guard lock(src_task->lock);
+
+  map_ptr<cap_slot_t> dst_slot = 0_map;
+
+  switch (get_cap_type(src_slot->cap)) {
+    case CAP_NULL:
+      break;
+    case CAP_MEM:
+      break;
+    case CAP_TASK:
+      dst_slot = insert_cap(src_task, src_slot->cap);
+      break;
+    case CAP_ENDPOINT:
+      dst_slot = insert_cap(src_task, src_slot->cap);
+      break;
+    case CAP_PAGE_TABLE:
+      break;
+    case CAP_VIRT_PAGE:
+      break;
+    case CAP_CAP_SPACE:
+      break;
+    case CAP_ID:
+      dst_slot = insert_cap(src_task, src_slot->cap);
+      break;
+    case CAP_ZOMBIE:
+      break;
+    case CAP_UNKNOWN:
+      break;
+  }
+
+  if (dst_slot == nullptr) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
+    return 0_map;
+  }
+
+  dst_slot->prev = src_slot;
+  dst_slot->next = src_slot->next;
+  src_slot->next = dst_slot;
+
+  return dst_slot;
+}
+
+[[nodiscard]] bool revoke_cap(map_ptr<cap_slot_t> slot) {
+  assert(slot != nullptr);
+
+  map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
+
+  std::lock_guard lock(task->lock);
+
+  if (task->state == task_state_t::unused) [[unlikely]] {
+    panic("Unexpected task state.");
+  }
+
+  map_ptr<cap_slot_t> cap_slot = slot;
+  while (cap_slot->next != nullptr) {
+    cap_slot = cap_slot->next;
+  }
+
+  while (cap_slot != slot) {
+    cap_type_t          type      = get_cap_type(slot->cap);
+    map_ptr<cap_slot_t> prev_slot = cap_slot->prev;
+    cap_type_t          prev_type = get_cap_type(prev_slot->cap);
+
+    // prev_slot is delegated cap.
+    if (prev_type == CAP_NULL) {
+      prev_slot->cap = cap_slot->cap;
+    }
+    // slot is created by create_object.
+    else if (prev_type == CAP_MEM) {
+      switch (type) {
+        case CAP_MEM:
+          destroy_memory_object(slot);
+          break;
+        case CAP_TASK:
+          destroy_task_object(slot);
+          break;
+        case CAP_ENDPOINT:
+          destroy_endpoint_object(slot);
+          break;
+        case CAP_PAGE_TABLE:
+          destroy_page_table_object(slot);
+          break;
+        case CAP_VIRT_PAGE:
+          destroy_virt_page_object(slot);
+          break;
+        case CAP_CAP_SPACE:
+          destroy_cap_space_object(slot);
+          break;
+        default:
+          panic("Unexcepted cap type.");
+      }
+    }
+    // prev_slot is copied cap.
+    else if (prev_type == type) {
+      switch (type) {
+        case CAP_TASK:
+          if (slot->cap.task.task != prev_slot->cap.task.task) [[unlikely]] {
+            panic("Unexpected cap state");
+          }
+          break;
+        case CAP_ENDPOINT:
+          if (slot->cap.endpoint.endpoint != prev_slot->cap.endpoint.endpoint) [[unlikely]] {
+            panic("Unexpected cap state");
+          }
+          break;
+        case CAP_ID:
+          if (slot->cap.id.val1 != prev_slot->cap.id.val1 || slot->cap.id.val2 != prev_slot->cap.id.val2) [[unlikely]] {
+            panic("Unexpected cap state");
+          }
+          break;
+        default:
+          panic("Unexcepted cap type.");
+      }
+    }
+    // Should not happen.
+    else {
+      panic("Unexpected cap state");
+    }
+
+    prev_slot->next = 0_map;
+    push_free_slots(task, slot);
+    cap_slot = prev_slot;
+  }
+
+  return true;
+}
+
+bool destroy_cap(map_ptr<cap_slot_t> slot) {
+  assert(slot != nullptr);
+
+  if (!revoke_cap(slot)) [[unlikely]] {
+    return false;
+  }
+
+  map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
+
+  std::lock_guard lock(task->lock);
+
+  if (task->state == task_state_t::unused) [[unlikely]] {
+    panic("Unexpected task state.");
+  }
+
+  switch (get_cap_type(slot->cap)) {
+    case CAP_NULL:
+      break;
+    case CAP_MEM:
+      destroy_memory_object(slot);
+      break;
+    case CAP_TASK:
+      destroy_task_object(slot);
+      break;
+    case CAP_ENDPOINT:
+      destroy_endpoint_object(slot);
+      break;
+    case CAP_PAGE_TABLE:
+      destroy_page_table_object(slot);
+      break;
+    case CAP_VIRT_PAGE:
+      destroy_virt_page_object(slot);
+      break;
+    case CAP_CAP_SPACE:
+      destroy_cap_space_object(slot);
+      break;
+    case CAP_ID:
+      break;
+    case CAP_ZOMBIE:
+      break;
+    case CAP_UNKNOWN:
+      break;
+  }
+
+  map_ptr<cap_slot_t> prev_slot = slot->prev;
+  if (prev_slot != nullptr) {
+    prev_slot->next = 0_map;
+  }
+
+  push_free_slots(task, slot);
+
+  return true;
 }
 
 map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {

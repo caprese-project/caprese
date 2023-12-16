@@ -78,12 +78,6 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
 void init_idle_task(map_ptr<task_t> task, map_ptr<page_table_t> root_page_table);
 
 [[nodiscard]] map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap);
-[[nodiscard]] map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot);
-[[nodiscard]] map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_slot);
-[[nodiscard]] map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot);
-[[nodiscard]] bool                revoke_cap(map_ptr<cap_slot_t> slot);
-[[nodiscard]] bool                destroy_cap(map_ptr<cap_slot_t> slot);
-
 void                              push_free_slots(map_ptr<task_t> task, map_ptr<cap_slot_t> slot);
 [[nodiscard]] map_ptr<cap_slot_t> pop_free_slots(map_ptr<task_t> task);
 

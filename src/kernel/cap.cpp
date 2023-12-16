@@ -19,7 +19,7 @@ namespace {
   constexpr const char* tag = "kernel/cap";
 
   spinlock_t id_cap_lock;
-  uint64_t   next_id[2];
+  uint64_t   next_id[3];
 } // namespace
 
 capability_t make_unique_id_cap() {
@@ -27,18 +27,24 @@ capability_t make_unique_id_cap() {
 
   uint64_t val1 = next_id[0];
   uint64_t val2 = next_id[1];
+  uint64_t val3 = next_id[2];
 
-  if (next_id[1] == std::numeric_limits<uint64_t>::max()) [[unlikely]] {
-    ++next_id[0];
-    next_id[1] = 0;
+  if (next_id[2] == std::numeric_limits<uint64_t>::max()) [[unlikely]] {
+    if (next_id[1] == std::numeric_limits<uint64_t>::max()) [[unlikely]] {
+      ++next_id[0];
+      next_id[1] = 0;
+    } else {
+      ++next_id[1];
+    }
+    next_id[2] = 0;
   } else {
-    ++next_id[1];
+    ++next_id[2];
   }
 
-  return make_id_cap(val1, val2);
+  return make_id_cap(val1, val2, val3);
 }
 
-map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, size_t size, size_t alignment) {
+map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, size_t size, size_t alignment) {
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
@@ -46,32 +52,14 @@ map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_sl
 
   auto& mem_cap = src->cap.memory;
 
-  if (size == 0 || std::popcount(size) != 1) [[unlikely]] {
-    logd(tag, "Failed to create memory object. Memory size must be power of 2.");
+  if (size == 0) [[unlikely]] {
+    logd(tag, "Failed to create memory object. Memory size must be greater than 0.");
     errno = SYS_E_ILL_ARGS;
     return 0_map;
   }
 
-  if (readable && !mem_cap.readable) [[unlikely]] {
-    logd(tag, "Failed to create memory object. Cannot create readable object from non-readable memory.");
-    errno = SYS_E_CAP_STATE;
-    return 0_map;
-  }
-
-  if (writable && !mem_cap.writable) [[unlikely]] {
-    logd(tag, "Failed to create memory object. Cannot create writable object from non-writable memory.");
-    errno = SYS_E_CAP_STATE;
-    return 0_map;
-  }
-
-  if (executable && !mem_cap.executable) [[unlikely]] {
-    logd(tag, "Failed to create memory object. Cannot create executable object from non-executable memory.");
-    errno = SYS_E_CAP_STATE;
-    return 0_map;
-  }
-
   uintptr_t base_addr = round_up(mem_cap.phys_addr + mem_cap.used_size, alignment);
-  size_t    rem_size  = mem_cap.phys_addr + (1 << mem_cap.size_bit) - base_addr;
+  size_t    rem_size  = mem_cap.phys_addr + mem_cap.size - base_addr;
 
   if (rem_size < size) [[unlikely]] {
     logd(tag, "Failed to create memory object. Not enough memory.");
@@ -79,8 +67,7 @@ map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_sl
     return 0_map;
   }
 
-  int flags = (static_cast<int>(mem_cap.device) << 0) | (static_cast<int>(readable) << 1) | (static_cast<int>(writable) << 2) | (static_cast<int>(executable) << 3);
-  dst->cap  = make_memory_cap(flags, std::countr_zero(size), make_phys_ptr(base_addr));
+  dst->cap = make_memory_cap(mem_cap.device, size, make_phys_ptr(base_addr));
 
   if (src->next != nullptr) [[unlikely]] {
     src->next->prev = dst;
@@ -128,8 +115,8 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   }
 
   auto& mem_cap = src->cap.memory;
-  if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
-    logd(tag, "Failed to create task object. Memory must be readable and writable.");
+  if (mem_cap.device) [[unlikely]] {
+    logd(tag, "Failed to create task object. Memory must not be device.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
@@ -141,7 +128,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
     cap_space_page_tables[i] = cap_space_page_table_slots[i]->cap.page_table.table;
   }
 
-  dst = create_memory_object(dst, src, true, true, false, PAGE_SIZE, PAGE_SIZE);
+  dst = create_memory_object(dst, src, PAGE_SIZE, PAGE_SIZE);
   if (dst == nullptr) [[unlikely]] {
     logd(tag, "Failed to create task object. This is due to the failure to create a memory object.");
     return 0_map;
@@ -175,13 +162,13 @@ map_ptr<cap_slot_t> create_endpoint_object(map_ptr<cap_slot_t> dst, map_ptr<cap_
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
   auto& mem_cap = src->cap.memory;
-  if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
-    logd(tag, "Failed to create endpoint object. Memory must be readable and writable.");
+  if (mem_cap.device) [[unlikely]] {
+    logd(tag, "Failed to create endpoint object. Memory must not be device.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
-  dst = create_memory_object(dst, src, true, true, false, get_cap_size(CAP_ENDPOINT), get_cap_size(CAP_ENDPOINT));
+  dst = create_memory_object(dst, src, get_cap_size(CAP_ENDPOINT), get_cap_size(CAP_ENDPOINT));
   if (dst == nullptr) [[unlikely]] {
     logd(tag, "Failed to create endpoint object. This is due to the failure to create a memory object.");
     return 0_map;
@@ -202,13 +189,13 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
   auto& mem_cap = src->cap.memory;
-  if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
-    logd(tag, "Failed to create page table object. Memory must be readable and writable.");
+  if (mem_cap.device) [[unlikely]] {
+    logd(tag, "Failed to create page table object. Memory must not be device.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
-  dst = create_memory_object(dst, src, true, true, false, PAGE_SIZE, PAGE_SIZE);
+  dst = create_memory_object(dst, src, PAGE_SIZE, PAGE_SIZE);
   if (dst == nullptr) [[unlikely]] {
     logd(tag, "Failed to create page table object. This is due to the failure to create a memory object.");
     return 0_map;
@@ -217,12 +204,12 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
   map_ptr<page_table_t> page_table = make_phys_ptr(dst->cap.memory.phys_addr);
   memset(page_table.get(), 0, sizeof(page_table_t));
 
-  dst->cap = make_page_table_cap(page_table, false, 0, 0);
+  dst->cap = make_page_table_cap(page_table, false, 0, 0, 0_map);
 
   return dst;
 }
 
-map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, uint64_t level) {
+map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, uint64_t level) {
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
@@ -234,27 +221,14 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
     return 0_map;
   }
 
-  auto& memcap = src->cap.memory;
-
   size_t page_size = get_page_size(level);
-  dst              = create_memory_object(dst, src, memcap.readable, memcap.writable, memcap.executable, page_size, page_size);
+  dst              = create_memory_object(dst, src, page_size, page_size);
   if (dst == nullptr) [[unlikely]] {
     logd(tag, "Failed to create virt page object. This is due to the failure to create a memory object.");
     return 0_map;
   }
 
-  int flags = 0;
-  if (memcap.readable) {
-    flags |= VIRT_PAGE_CAP_READABLE;
-  }
-  if (memcap.writable) {
-    flags |= VIRT_PAGE_CAP_WRITABLE;
-  }
-  if (memcap.executable) {
-    flags |= VIRT_PAGE_CAP_EXECUTABLE;
-  }
-
-  dst->cap = make_virt_page_cap(flags, level, dst->cap.memory.phys_addr);
+  dst->cap = make_virt_page_cap(readable, writable, executable, level, dst->cap.memory.phys_addr);
 
   return dst;
 }
@@ -266,13 +240,13 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   assert(get_cap_type(dst->cap) == CAP_NULL);
 
   auto& mem_cap = src->cap.memory;
-  if (mem_cap.device || !mem_cap.readable || !mem_cap.writable) [[unlikely]] {
-    logd(tag, "Failed to create cap space object. Memory must be readable and writable.");
+  if (mem_cap.device) [[unlikely]] {
+    logd(tag, "Failed to create cap space object. Memory must not be device.");
     errno = SYS_E_CAP_STATE;
     return 0_map;
   }
 
-  dst = create_memory_object(dst, src, true, true, false, PAGE_SIZE, PAGE_SIZE);
+  dst = create_memory_object(dst, src, PAGE_SIZE, PAGE_SIZE);
   if (dst == nullptr) [[unlikely]] {
     logd(tag, "Failed to create cap space object. This is due to the failure to create a memory object.");
     return 0_map;
@@ -327,7 +301,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       logw(tag, "Cannot create a null object.");
       break;
     case CAP_MEM:
-      result = create_memory_object(slot, cap_slot, arg0, arg1, arg2, arg3, arg4);
+      result = create_memory_object(slot, cap_slot, arg0, arg1);
       break;
     case CAP_TASK: {
       map_ptr<cap_slot_t> cap_space_slot = lookup_cap(task, arg0);
@@ -392,7 +366,7 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       result = create_page_table_object(slot, cap_slot);
       break;
     case CAP_VIRT_PAGE:
-      result = create_virt_page_object(slot, cap_slot, arg0);
+      result = create_virt_page_object(slot, cap_slot, arg0, arg1, arg2, arg3);
       break;
     case CAP_CAP_SPACE:
       result = create_cap_space_object(slot, cap_slot);
@@ -414,6 +388,57 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
   }
 
   return result;
+}
+
+void destroy_memory_object(map_ptr<cap_slot_t> slot) {
+  assert(slot->next == nullptr);
+  assert(get_cap_type(slot->cap) == CAP_MEM);
+  slot->cap.memory.used_size = 0;
+}
+
+void destroy_task_object(map_ptr<cap_slot_t> slot) {
+  assert(slot->next == nullptr);
+  assert(get_cap_type(slot->cap) == CAP_TASK);
+  kill_task(slot->cap.task.task, 0);
+}
+
+void destroy_endpoint_object(map_ptr<cap_slot_t> slot) {
+  assert(slot->next == nullptr);
+  assert(get_cap_type(slot->cap) == CAP_ENDPOINT);
+  ipc_cancel(slot->cap.endpoint.endpoint);
+}
+
+void destroy_page_table_object(map_ptr<cap_slot_t> slot) {
+  assert(slot->next == nullptr);
+  assert(get_cap_type(slot->cap) == CAP_PAGE_TABLE);
+
+  map_ptr<page_table_t> parent_table = slot->cap.page_table.parent_table;
+  if (parent_table != nullptr) {
+    map_ptr<pte_t> pte = parent_table->walk(make_virt_ptr(slot->cap.page_table.virt_addr_base), slot->cap.page_table.level + 1);
+    assert(pte->is_enabled());
+    assert(pte->get_next_page() == slot->cap.page_table.table.as<void>());
+    pte->disable();
+  }
+}
+
+void destroy_virt_page_object(map_ptr<cap_slot_t> slot) {
+  assert(slot->next == nullptr);
+  assert(get_cap_type(slot->cap) == CAP_VIRT_PAGE);
+
+  map_ptr<page_table_t> parent_table = slot->cap.virt_page.parent_table;
+  if (parent_table != nullptr) {
+    map_ptr<pte_t> pte = parent_table->walk(slot->cap.virt_page.address, slot->cap.virt_page.level);
+    assert(pte->is_enabled());
+    assert(pte->get_next_page() == phys_ptr<void>::from(slot->cap.virt_page.phys_addr).as_map());
+    pte->disable();
+  }
+}
+
+void destroy_cap_space_object(map_ptr<cap_slot_t> slot) {
+  assert(slot->next == nullptr);
+  assert(get_cap_type(slot->cap) == CAP_CAP_SPACE);
+
+  // TODO: impl
 }
 
 bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot) {
@@ -474,6 +499,7 @@ bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_p
   child_page_table_cap.mapped         = true;
   child_page_table_cap.level          = page_table_cap.level - 1;
   child_page_table_cap.virt_addr_base = va;
+  child_page_table_cap.parent_table   = page_table_cap.table;
 
   return true;
 }
@@ -531,7 +557,8 @@ bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map
 
   pte.disable();
 
-  child_page_table_cap.mapped = false;
+  child_page_table_cap.mapped       = false;
+  child_page_table_cap.parent_table = 0_map;
 
   return true;
 }
@@ -599,12 +626,13 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
   pte.set_next_page(make_phys_ptr(virt_page_cap.phys_addr));
   pte.enable();
 
-  virt_page_cap.mapped     = true;
-  virt_page_cap.readable   = readable;
-  virt_page_cap.writable   = writable;
-  virt_page_cap.executable = executable;
-  virt_page_cap.index      = index;
-  virt_page_cap.address    = virt_ptr<void>::from(va);
+  virt_page_cap.mapped       = true;
+  virt_page_cap.readable     = readable;
+  virt_page_cap.writable     = writable;
+  virt_page_cap.executable   = executable;
+  virt_page_cap.index        = index;
+  virt_page_cap.address      = virt_ptr<void>::from(va);
+  virt_page_cap.parent_table = page_table_cap.table;
 
   return true;
 }
@@ -664,7 +692,8 @@ bool unmap_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_
 
   pte.disable();
 
-  virt_page_cap.mapped = false;
+  virt_page_cap.mapped       = false;
+  virt_page_cap.parent_table = 0_map;
 
   return true;
 }
@@ -767,11 +796,12 @@ bool remap_virt_page_cap(
   new_pte.set_next_page(map_ptr);
   new_pte.enable();
 
-  virt_page_cap.readable   = readable;
-  virt_page_cap.writable   = writable;
-  virt_page_cap.executable = executable;
-  virt_page_cap.index      = index;
-  virt_page_cap.address    = virt_ptr<void>::from(new_page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index);
+  virt_page_cap.readable     = readable;
+  virt_page_cap.writable     = writable;
+  virt_page_cap.executable   = executable;
+  virt_page_cap.index        = index;
+  virt_page_cap.address      = virt_ptr<void>::from(new_page_table_cap.virt_addr_base + get_page_size(virt_page_cap.level) * index);
+  virt_page_cap.parent_table = new_page_table_cap.table;
 
   return true;
 }
@@ -833,9 +863,21 @@ bool extend_cap_space(map_ptr<cap_slot_t> task_slot, map_ptr<cap_slot_t> page_ta
     return false;
   }
 
+  map_ptr<page_table_t> page_table = task_cap.task->root_page_table;
+  map_ptr<pte_t>        pte        = 0_map;
+  for (size_t level = MAX_PAGE_TABLE_LEVEL; level >= GIGA_PAGE_TABLE_LEVEL; --level) {
+    pte = page_table->walk(va, level);
+    assert(pte->is_enabled());
+    page_table = pte->get_next_page().as<page_table_t>();
+  }
+
+  pte = page_table->walk(va, MEGA_PAGE_TABLE_LEVEL);
+  assert(pte->is_enabled());
+
   page_table_cap.mapped         = true;
   page_table_cap.level          = KILO_PAGE;
   page_table_cap.virt_addr_base = va.raw();
+  page_table_cap.parent_table   = pte->get_next_page().as<page_table_t>();
 
   return true;
 }

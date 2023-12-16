@@ -25,6 +25,7 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint);
 bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint);
 bool ipc_reply(map_ptr<endpoint_t> endpoint);
 bool ipc_call(map_ptr<endpoint_t> endpoint);
+void ipc_cancel(map_ptr<endpoint_t> endpoint);
 
 bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src);
 

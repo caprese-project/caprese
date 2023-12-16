@@ -19,15 +19,13 @@ union capability_t {
     uint64_t type   : 5;
     uint64_t unused1: 59;
     uint64_t unused2;
+    uint64_t unused3;
   } null;
 
   struct {
-    uint64_t type      : 5;
-    uint64_t device    : 1;
-    uint64_t readable  : 1;
-    uint64_t writable  : 1;
-    uint64_t executable: 1;
-    uint64_t size_bit  : 6;
+    uint64_t type  : 5;
+    uint64_t device: 1;
+    uint64_t size: std::countr_zero<uintptr_t>(CONFIG_MAX_PHYSICAL_ADDRESS);
     uint64_t phys_addr: std::countr_zero<uintptr_t>(CONFIG_MAX_PHYSICAL_ADDRESS);
     uint64_t used_size: std::countr_zero<uintptr_t>(CONFIG_MAX_PHYSICAL_ADDRESS);
   } memory;
@@ -42,6 +40,7 @@ union capability_t {
     uint64_t        register_settable: 1;
     uint64_t        kill_notifiable  : 1;
     map_ptr<task_t> task;
+    uint64_t        unused;
   } task;
 
   struct {
@@ -49,6 +48,7 @@ union capability_t {
     uint64_t            sendable  : 1;
     uint64_t            receivable: 1;
     map_ptr<endpoint_t> endpoint;
+    uint64_t            unused;
   } endpoint;
 
   struct {
@@ -57,40 +57,45 @@ union capability_t {
     uint64_t              level : 2;
     uint64_t              virt_addr_base: std::countr_zero<uint64_t>(CONFIG_MAX_VIRTUAL_ADDRESS);
     map_ptr<page_table_t> table;
+    map_ptr<page_table_t> parent_table;
   } page_table;
 
   struct {
-    uint64_t       type      : 5;
-    uint64_t       mapped    : 1;
-    uint64_t       readable  : 1;
-    uint64_t       writable  : 1;
-    uint64_t       executable: 1;
-    uint64_t       level     : 2;
-    uint64_t       index: std::countr_zero<uint64_t>(NUM_PAGE_TABLE_ENTRY);
-    uint64_t       phys_addr: std::countr_zero<uint64_t>(CONFIG_MAX_PHYSICAL_ADDRESS);
-    virt_ptr<void> address;
+    uint64_t              type      : 5;
+    uint64_t              mapped    : 1;
+    uint64_t              readable  : 1;
+    uint64_t              writable  : 1;
+    uint64_t              executable: 1;
+    uint64_t              level     : 2;
+    uint64_t              index: std::countr_zero<uint64_t>(NUM_PAGE_TABLE_ENTRY);
+    uint64_t              phys_addr: std::countr_zero<uint64_t>(CONFIG_MAX_PHYSICAL_ADDRESS);
+    virt_ptr<void>        address;
+    map_ptr<page_table_t> parent_table;
   } virt_page;
 
   struct {
     uint64_t             type: 5;
     uint64_t             used: 1;
     map_ptr<cap_space_t> space;
+    uint64_t             unused;
   } cap_space;
 
   struct {
     uint64_t type: 5;
     uint64_t val1: 59;
     uint64_t val2;
+    uint64_t val3;
   } id;
 
   struct {
     uint64_t       type    : 5;
     uint64_t       size_bit: 6;
     phys_ptr<void> address;
+    uint64_t       unused;
   } zombie;
 };
 
-static_assert(sizeof(capability_t) == sizeof(uint64_t) * 2);
+static_assert(sizeof(capability_t) == sizeof(uint64_t) * 3);
 
 constexpr size_t get_cap_size(cap_type_t type) {
   switch (type) {
@@ -101,7 +106,7 @@ constexpr size_t get_cap_size(cap_type_t type) {
     case CAP_TASK:
       return PAGE_SIZE;
     case CAP_ENDPOINT:
-      return 64;
+      return 48;
     case CAP_PAGE_TABLE:
       return PAGE_SIZE;
     case CAP_VIRT_PAGE:
@@ -153,30 +158,23 @@ constexpr cap_type_t get_cap_type(capability_t cap) {
 constexpr capability_t make_null_cap() {
   return {
     .null = {
-      .type = static_cast<uint64_t>(CAP_NULL),
+      .type    = static_cast<uint64_t>(CAP_NULL),
       .unused1 = 0,
       .unused2 = 0,
+      .unused3 = 0,
     },
   };
 }
 
-constexpr int MEMORY_CAP_DEVICE     = 1 << 0;
-constexpr int MEMORY_CAP_READABLE   = 1 << 1;
-constexpr int MEMORY_CAP_WRITABLE   = 1 << 2;
-constexpr int MEMORY_CAP_EXECUTABLE = 1 << 3;
-
-inline capability_t make_memory_cap(int flags, unsigned size_bit, phys_ptr<void> base_addr) {
+inline capability_t make_memory_cap(bool device, size_t size, phys_ptr<void> base_addr) {
   assert(base_addr.raw() < CONFIG_MAX_PHYSICAL_ADDRESS);
-  assert(size_bit < (1 << 6));
+  assert(size < CONFIG_MAX_PHYSICAL_ADDRESS);
 
   return {
     .memory = {
       .type       = static_cast<uint64_t>(CAP_MEM),
-      .device     = static_cast<uint64_t>((flags & MEMORY_CAP_DEVICE) >> 0),
-      .readable   = static_cast<uint64_t>((flags & MEMORY_CAP_READABLE) >> 1),
-      .writable   = static_cast<uint64_t>((flags & MEMORY_CAP_WRITABLE) >> 2),
-      .executable = static_cast<uint64_t>((flags & MEMORY_CAP_EXECUTABLE) >> 3),
-      .size_bit   = size_bit,
+      .device     = static_cast<uint64_t>(device),
+      .size       = size,
       .phys_addr  = base_addr.raw(),
       .used_size = 0,
     },
@@ -205,6 +203,7 @@ inline capability_t make_task_cap(int flags, map_ptr<task_t> task) {
       .register_settable = static_cast<uint64_t>((flags & TASK_CAP_REGISTER_SETTABLE) >> 5),
       .kill_notifiable   = static_cast<uint64_t>((flags & TASK_CAP_KILL_NOTIFIABLE) >> 6),
       .task              = task,
+      .unused            = 0,
     },
   };
 }
@@ -218,13 +217,15 @@ inline capability_t make_endpoint_cap(map_ptr<endpoint_t> endpoint) {
       .sendable   = 1,
       .receivable = 1,
       .endpoint   = endpoint,
+      .unused     = 0,
     },
   };
 }
 
-inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool mapped, uint64_t level, uint64_t virt_addr_base) {
+inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool mapped, uint64_t level, uint64_t virt_addr_base, map_ptr<page_table_t> parent_table) {
   assert(page_table != nullptr);
   assert(!mapped || virt_addr_base % get_page_size(level + 1) == 0);
+  assert(!mapped || level == MAX_PAGE_TABLE_LEVEL || parent_table != nullptr);
 
   return {
     .page_table = {
@@ -233,29 +234,27 @@ inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool m
       .level          = level,
       .virt_addr_base = virt_addr_base,
       .table          = page_table,
+      .parent_table   = parent_table,
     },
   };
 }
 
-constexpr int VIRT_PAGE_CAP_READABLE   = 1 << 0;
-constexpr int VIRT_PAGE_CAP_WRITABLE   = 1 << 1;
-constexpr int VIRT_PAGE_CAP_EXECUTABLE = 1 << 2;
-
-inline capability_t make_virt_page_cap(int flags, uint64_t level, uint64_t phys_addr) {
+inline capability_t make_virt_page_cap(bool readable, bool writable, bool executable, uint64_t level, uint64_t phys_addr) {
   assert(phys_addr < CONFIG_MAX_PHYSICAL_ADDRESS);
   assert(level <= MAX_PAGE_TABLE_LEVEL);
 
   return {
     .virt_page = {
-      .type       = static_cast<uint64_t>(CAP_VIRT_PAGE),
-      .mapped     = false,
-      .readable   = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_READABLE) >> 0),
-      .writable   = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_WRITABLE) >> 1),
-      .executable = static_cast<uint64_t>((flags & VIRT_PAGE_CAP_EXECUTABLE) >> 2),
-      .level      = level,
-      .index      = 0,
-      .phys_addr  = phys_addr,
-      .address    = 0_virt,
+      .type         = static_cast<uint64_t>(CAP_VIRT_PAGE),
+      .mapped       = false,
+      .readable     = readable,
+      .writable     = writable,
+      .executable   = executable,
+      .level        = level,
+      .index        = 0,
+      .phys_addr    = phys_addr,
+      .address      = 0_virt,
+      .parent_table = 0_map,
     },
   };
 }
@@ -265,37 +264,47 @@ inline capability_t make_cap_space_cap(map_ptr<cap_space_t> cap_space, bool used
 
   return {
     .cap_space = {
-      .type  = static_cast<uint64_t>(CAP_CAP_SPACE),
-      .used  = used,
-      .space = cap_space,
+      .type   = static_cast<uint64_t>(CAP_CAP_SPACE),
+      .used   = used,
+      .space  = cap_space,
+      .unused = 0,
     },
   };
 }
 
-inline capability_t make_id_cap(uint64_t val1, uint64_t val2) {
+inline capability_t make_id_cap(uint64_t val1, uint64_t val2, uint64_t val3) {
   assert(val1 < (1ull << 59));
   return {
     .id = {
       .type = static_cast<uint64_t>(CAP_ID),
       .val1 = val1,
       .val2 = val2,
+      .val3 = val3,
     },
   };
 }
 
 capability_t make_unique_id_cap();
 
-map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, size_t size, size_t alignment);
+map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, size_t size, size_t alignment);
 map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
                                        map_ptr<cap_slot_t> src,
                                        map_ptr<cap_slot_t> cap_space_slot,
                                        map_ptr<cap_slot_t> root_page_table_slot,
                                        map_ptr<cap_slot_t> (&cap_space_page_table_slots)[NUM_INTER_PAGE_TABLE + 1]);
+map_ptr<cap_slot_t> create_endpoint_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
 map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
 map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, bool readable, bool writable, bool executable, uint64_t level);
 map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
 map_ptr<cap_slot_t> create_id_object(map_ptr<cap_slot_t> dst);
 map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_slot, cap_type_t type, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4);
+
+void destroy_memory_object(map_ptr<cap_slot_t> slot);
+void destroy_task_object(map_ptr<cap_slot_t> slot);
+void destroy_endpoint_object(map_ptr<cap_slot_t> slot);
+void destroy_page_table_object(map_ptr<cap_slot_t> slot);
+void destroy_virt_page_object(map_ptr<cap_slot_t> slot);
+void destroy_cap_space_object(map_ptr<cap_slot_t> slot);
 
 bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot);
 bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot);

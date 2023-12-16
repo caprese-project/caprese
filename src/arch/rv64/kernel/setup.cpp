@@ -186,7 +186,7 @@ namespace {
     device_region[device_region_count++] = region;
   }
 
-  __init_code void insert_memory_region_caps(map_ptr<task_t> root_task, map_ptr<root_boot_info_t> root_boot_info, region_t region, int flags, size_t index = 0) {
+  __init_code void insert_memory_region_caps(map_ptr<task_t> root_task, map_ptr<root_boot_info_t> root_boot_info, region_t region, bool device, size_t index = 0) {
     if (region.start >= region.end) [[unlikely]] {
       return;
     }
@@ -196,7 +196,7 @@ namespace {
       subtract_region(region, reserved_region[index], dst);
       for (region_t reg : dst) {
         if (reg.start < reg.end) {
-          insert_memory_region_caps(root_task, root_boot_info, reg, flags, index + 1);
+          insert_memory_region_caps(root_task, root_boot_info, reg, device, index + 1);
         }
       }
 
@@ -210,8 +210,8 @@ namespace {
 
       if (region.start.raw() & (1ull << size_bit)) {
         if (size >= (1ull << size_bit)) {
-          capability_t cap = make_memory_cap(flags, size_bit, region.start.as<void>());
-          logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, flags & MEMORY_CAP_DEVICE ? "device" : "memory");
+          capability_t cap = make_memory_cap(device, size_bit, region.start.as<void>());
+          logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, device ? "device" : "memory");
 
           map_ptr<cap_slot_t> cap_slot = insert_cap(root_task, cap);
           if (cap_slot == nullptr) [[unlikely]] {
@@ -232,8 +232,8 @@ namespace {
       size_t size = region.end.raw() - region.start.raw();
 
       if (size >= (1ull << size_bit)) {
-        capability_t cap = make_memory_cap(flags, size_bit, region.start.as<void>());
-        logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, flags & MEMORY_CAP_DEVICE ? "device" : "memory");
+        capability_t cap = make_memory_cap(device, size_bit, region.start.as<void>());
+        logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, device ? "device" : "memory");
 
         map_ptr<cap_slot_t> cap_slot = insert_cap(root_task, cap);
         if (cap_slot == nullptr) [[unlikely]] {
@@ -302,11 +302,11 @@ __init_code void setup_memory_capabilities(map_ptr<task_t> root_task, map_ptr<bo
   });
 
   for (size_t i = 0; i < memory_region_count; ++i) {
-    insert_memory_region_caps(root_task, root_boot_info, memory_region[i], MEMORY_CAP_READABLE | MEMORY_CAP_WRITABLE | MEMORY_CAP_EXECUTABLE);
+    insert_memory_region_caps(root_task, root_boot_info, memory_region[i], false);
   }
 
   for (size_t i = 0; i < device_region_count; ++i) {
-    insert_memory_region_caps(root_task, root_boot_info, device_region[i], MEMORY_CAP_DEVICE | MEMORY_CAP_READABLE | MEMORY_CAP_WRITABLE);
+    insert_memory_region_caps(root_task, root_boot_info, device_region[i], true);
   }
 }
 

@@ -161,16 +161,10 @@ sysret_t invoke_syscall_mem_cap(uint16_t id, map_ptr<syscall_args_t> args) {
   switch (id) {
     case SYS_MEM_CAP_DEVICE & 0xffff:
       return sysret_s_ok(mem_cap.device);
-    case SYS_MEM_CAP_READABLE & 0xffff:
-      return sysret_s_ok(mem_cap.readable);
-    case SYS_MEM_CAP_WRITABLE & 0xffff:
-      return sysret_s_ok(mem_cap.writable);
-    case SYS_MEM_CAP_EXECUTABLE & 0xffff:
-      return sysret_s_ok(mem_cap.executable);
     case SYS_MEM_CAP_PHYS_ADDR & 0xffff:
       return sysret_s_ok(mem_cap.phys_addr);
-    case SYS_MEM_CAP_SIZE_BIT & 0xffff:
-      return sysret_s_ok(mem_cap.size_bit);
+    case SYS_MEM_CAP_SIZE & 0xffff:
+      return sysret_s_ok(mem_cap.size);
     case SYS_MEM_CAP_USED_SIZE & 0xffff:
       return sysret_s_ok(mem_cap.used_size);
     case SYS_MEM_CAP_CREATE_OBJECT & 0xffff: {
