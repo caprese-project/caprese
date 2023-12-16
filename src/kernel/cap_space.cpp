@@ -15,6 +15,95 @@
 
 namespace {
   constexpr const char* tag = "kernel/cap_space";
+
+  void destroy_object(map_ptr<cap_slot_t> slot) {
+    assert(slot != nullptr);
+
+    cap_type_t type = get_cap_type(slot->cap);
+
+    switch (type) {
+      case CAP_MEM:
+        destroy_memory_object(slot);
+        break;
+      case CAP_TASK:
+        destroy_task_object(slot);
+        break;
+      case CAP_ENDPOINT:
+        destroy_endpoint_object(slot);
+        break;
+      case CAP_PAGE_TABLE:
+        destroy_page_table_object(slot);
+        break;
+      case CAP_VIRT_PAGE:
+        destroy_virt_page_object(slot);
+        break;
+      case CAP_CAP_SPACE:
+        destroy_cap_space_object(slot);
+        break;
+      default:
+        panic("Unexcepted cap type.");
+    }
+  }
+
+  [[nodiscard]] void destroy_cap_slot(map_ptr<cap_slot_t> slot) {
+    assert(slot != nullptr);
+    assert(slot->next == nullptr);
+
+    cap_type_t       type = get_cap_type(slot->cap);
+    map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
+
+    std::lock_guard lock(task->lock);
+
+    if (task->state == task_state_t::unused) [[unlikely]] {
+      panic("Unexpected task state.");
+    }
+
+    if (slot->prev != nullptr) {
+      map_ptr<cap_slot_t> prev_slot = slot->prev;
+      cap_type_t          prev_type = get_cap_type(prev_slot->cap);
+
+      // prev_slot is delegated cap.
+      if (prev_type == CAP_NULL) {
+        prev_slot->cap = slot->cap;
+      }
+      // slot is created by create_object.
+      else if (prev_type == CAP_MEM) {
+        destroy_object(slot);
+      }
+      // prev_slot is copied cap.
+      else if (prev_type == type) {
+        switch (type) {
+          case CAP_TASK:
+            if (slot->cap.task.task != prev_slot->cap.task.task) [[unlikely]] {
+              panic("Unexpected cap state");
+            }
+            break;
+          case CAP_ENDPOINT:
+            if (slot->cap.endpoint.endpoint != prev_slot->cap.endpoint.endpoint) [[unlikely]] {
+              panic("Unexpected cap state");
+            }
+            break;
+          case CAP_ID:
+            if (slot->cap.id.val1 != prev_slot->cap.id.val1 || slot->cap.id.val2 != prev_slot->cap.id.val2) [[unlikely]] {
+              panic("Unexpected cap state");
+            }
+            break;
+          default:
+            panic("Unexcepted cap type.");
+        }
+      }
+      // Should not happen.
+      else {
+        panic("Unexpected cap state");
+      }
+
+      prev_slot->next = 0_map;
+    } else {
+      destroy_object(slot);
+    }
+
+    push_free_slots(task, slot);
+  }
 } // namespace
 
 map_ptr<cap_space_t> cap_slot_t::get_cap_space() const {
@@ -219,7 +308,7 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
   return dst_slot;
 }
 
-[[nodiscard]] bool revoke_cap(map_ptr<cap_slot_t> slot) {
+bool revoke_cap(map_ptr<cap_slot_t> slot) {
   assert(slot != nullptr);
 
   map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
@@ -236,68 +325,8 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
   }
 
   while (cap_slot != slot) {
-    cap_type_t          type      = get_cap_type(slot->cap);
     map_ptr<cap_slot_t> prev_slot = cap_slot->prev;
-    cap_type_t          prev_type = get_cap_type(prev_slot->cap);
-
-    // prev_slot is delegated cap.
-    if (prev_type == CAP_NULL) {
-      prev_slot->cap = cap_slot->cap;
-    }
-    // slot is created by create_object.
-    else if (prev_type == CAP_MEM) {
-      switch (type) {
-        case CAP_MEM:
-          destroy_memory_object(slot);
-          break;
-        case CAP_TASK:
-          destroy_task_object(slot);
-          break;
-        case CAP_ENDPOINT:
-          destroy_endpoint_object(slot);
-          break;
-        case CAP_PAGE_TABLE:
-          destroy_page_table_object(slot);
-          break;
-        case CAP_VIRT_PAGE:
-          destroy_virt_page_object(slot);
-          break;
-        case CAP_CAP_SPACE:
-          destroy_cap_space_object(slot);
-          break;
-        default:
-          panic("Unexcepted cap type.");
-      }
-    }
-    // prev_slot is copied cap.
-    else if (prev_type == type) {
-      switch (type) {
-        case CAP_TASK:
-          if (slot->cap.task.task != prev_slot->cap.task.task) [[unlikely]] {
-            panic("Unexpected cap state");
-          }
-          break;
-        case CAP_ENDPOINT:
-          if (slot->cap.endpoint.endpoint != prev_slot->cap.endpoint.endpoint) [[unlikely]] {
-            panic("Unexpected cap state");
-          }
-          break;
-        case CAP_ID:
-          if (slot->cap.id.val1 != prev_slot->cap.id.val1 || slot->cap.id.val2 != prev_slot->cap.id.val2) [[unlikely]] {
-            panic("Unexpected cap state");
-          }
-          break;
-        default:
-          panic("Unexcepted cap type.");
-      }
-    }
-    // Should not happen.
-    else {
-      panic("Unexpected cap state");
-    }
-
-    prev_slot->next = 0_map;
-    push_free_slots(task, slot);
+    destroy_cap_slot(slot);
     cap_slot = prev_slot;
   }
 
@@ -311,49 +340,7 @@ bool destroy_cap(map_ptr<cap_slot_t> slot) {
     return false;
   }
 
-  map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
-
-  std::lock_guard lock(task->lock);
-
-  if (task->state == task_state_t::unused) [[unlikely]] {
-    panic("Unexpected task state.");
-  }
-
-  switch (get_cap_type(slot->cap)) {
-    case CAP_NULL:
-      break;
-    case CAP_MEM:
-      destroy_memory_object(slot);
-      break;
-    case CAP_TASK:
-      destroy_task_object(slot);
-      break;
-    case CAP_ENDPOINT:
-      destroy_endpoint_object(slot);
-      break;
-    case CAP_PAGE_TABLE:
-      destroy_page_table_object(slot);
-      break;
-    case CAP_VIRT_PAGE:
-      destroy_virt_page_object(slot);
-      break;
-    case CAP_CAP_SPACE:
-      destroy_cap_space_object(slot);
-      break;
-    case CAP_ID:
-      break;
-    case CAP_ZOMBIE:
-      break;
-    case CAP_UNKNOWN:
-      break;
-  }
-
-  map_ptr<cap_slot_t> prev_slot = slot->prev;
-  if (prev_slot != nullptr) {
-    prev_slot->next = 0_map;
-  }
-
-  push_free_slots(task, slot);
+  destroy_cap_slot(slot);
 
   return true;
 }
