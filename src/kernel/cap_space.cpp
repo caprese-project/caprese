@@ -255,6 +255,11 @@ map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
 
   dst_slot->prev = src_slot;
   dst_slot->next = src_slot->next;
+
+  if (dst_slot->next != nullptr) {
+    dst_slot->next->prev = dst_slot;
+  }
+
   src_slot->cap  = make_null_cap();
   src_slot->next = dst_slot;
 
@@ -303,6 +308,11 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
 
   dst_slot->prev = src_slot;
   dst_slot->next = src_slot->next;
+
+  if (dst_slot->next != nullptr) {
+    dst_slot->next->prev = dst_slot;
+  }
+
   src_slot->next = dst_slot;
 
   return dst_slot;

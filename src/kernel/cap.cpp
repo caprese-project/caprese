@@ -49,6 +49,8 @@ map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_sl
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
+  assert(dst->prev == nullptr);
+  assert(dst->next == nullptr);
 
   auto& mem_cap = src->cap.memory;
 
@@ -93,6 +95,8 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
+  assert(dst->prev == nullptr);
+  assert(dst->next == nullptr);
   assert(cap_space_slot != nullptr);
   assert(get_cap_type(cap_space_slot->cap) == CAP_CAP_SPACE);
   assert(root_page_table_slot != nullptr);
@@ -160,6 +164,8 @@ map_ptr<cap_slot_t> create_endpoint_object(map_ptr<cap_slot_t> dst, map_ptr<cap_
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
+  assert(dst->prev == nullptr);
+  assert(dst->next == nullptr);
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device) [[unlikely]] {
@@ -187,6 +193,8 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
+  assert(dst->prev == nullptr);
+  assert(dst->next == nullptr);
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device) [[unlikely]] {
@@ -214,6 +222,8 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
+  assert(dst->prev == nullptr);
+  assert(dst->next == nullptr);
 
   if (level > MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
     logd(tag, "Failed to create virt page object. Level must be less than or equal to %llu.", MAX_PAGE_TABLE_LEVEL);
@@ -238,6 +248,8 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
+  assert(dst->prev == nullptr);
+  assert(dst->next == nullptr);
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device) [[unlikely]] {
@@ -263,6 +275,8 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
 map_ptr<cap_slot_t> create_id_object(map_ptr<cap_slot_t> dst) {
   assert(dst != nullptr);
   assert(get_cap_type(dst->cap) == CAP_NULL);
+  assert(dst->prev == nullptr);
+  assert(dst->next == nullptr);
 
   dst->cap = make_unique_id_cap();
 
@@ -308,29 +322,29 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
       if (cap_space_slot == nullptr) [[unlikely]] {
         logd(tag, "Failed to create task object. Failed to lookup cap slot (%llu).", arg0);
         errno = SYS_E_ILL_ARGS;
-        return 0_map;
+        break;
       }
       if (get_cap_type(cap_space_slot->cap) != CAP_CAP_SPACE) [[unlikely]] {
         logd(tag, "Failed to create task object. cap slot (%llu) must be cap space cap.", arg0);
         errno = SYS_E_CAP_TYPE;
-        return 0_map;
+        break;
       }
 
       map_ptr<cap_slot_t> root_page_table_slot = lookup_cap(task, arg1);
       if (root_page_table_slot == nullptr) [[unlikely]] {
         logd(tag, "Failed to create task object. Failed to lookup cap slot (%llu).", arg1);
         errno = SYS_E_ILL_ARGS;
-        return 0_map;
+        break;
       }
       if (get_cap_type(root_page_table_slot->cap) != CAP_PAGE_TABLE) [[unlikely]] {
         logd(tag, "Failed to create task object. cap slot (%llu) must be page table cap.", arg1);
         errno = SYS_E_CAP_TYPE;
-        return 0_map;
+        break;
       }
       if (root_page_table_slot->cap.page_table.mapped) [[unlikely]] {
         logd(tag, "Failed to create task object. cap slot (%llu) must not be mapped.", arg1);
         errno = SYS_E_CAP_STATE;
-        return 0_map;
+        break;
       }
 
       map_ptr<cap_slot_t> cap_space_page_table_slots[NUM_INTER_PAGE_TABLE + 1];
@@ -342,17 +356,17 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
         if (cap_space_page_table_slots[i] == nullptr) [[unlikely]] {
           logd(tag, "Failed to create task object. Failed to lookup cap slot (%llu).", cap_descs[i]);
           errno = SYS_E_ILL_ARGS;
-          return 0_map;
+          break;
         }
         if (get_cap_type(cap_space_page_table_slots[i]->cap) != CAP_PAGE_TABLE) [[unlikely]] {
           logd(tag, "Failed to create task object. cap slot (%llu) must be page table cap.", cap_descs[i]);
           errno = SYS_E_CAP_TYPE;
-          return 0_map;
+          break;
         }
         if (cap_space_page_table_slots[i]->cap.page_table.mapped) [[unlikely]] {
           logd(tag, "Failed to create task object. cap slot (%llu) must not be mapped.", cap_descs[i]);
           errno = SYS_E_CAP_STATE;
-          return 0_map;
+          break;
         }
       }
 
