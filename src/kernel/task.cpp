@@ -314,6 +314,26 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
   return true;
 }
 
+bool destroy_cap(map_ptr<cap_slot_t> slot) {
+  assert(slot != nullptr);
+
+  if (!revoke_cap(slot)) [[unlikely]] {
+    return false;
+  }
+
+  map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
+
+  std::lock_guard lock(task->lock);
+
+  if (task->state == task_state_t::unused) [[unlikely]] {
+    panic("Unexpected task state.");
+  }
+
+  // TODO: impl
+
+  return true;
+}
+
 void push_free_slots(map_ptr<task_t> task, map_ptr<cap_slot_t> slot) {
   assert(task != nullptr);
   assert(slot != nullptr);
