@@ -210,7 +210,7 @@ namespace {
 
       if (region.start.raw() & (1ull << size_bit)) {
         if (size >= (1ull << size_bit)) {
-          capability_t cap = make_memory_cap(device, size_bit, region.start.as<void>());
+          capability_t cap = make_memory_cap(device, 1ull << size_bit, region.start.as<void>());
           logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, device ? "device" : "memory");
 
           map_ptr<cap_slot_t> cap_slot = insert_cap(root_task, cap);
@@ -232,7 +232,7 @@ namespace {
       size_t size = region.end.raw() - region.start.raw();
 
       if (size >= (1ull << size_bit)) {
-        capability_t cap = make_memory_cap(device, size_bit, region.start.as<void>());
+        capability_t cap = make_memory_cap(device, 1ull << size_bit, region.start.as<void>());
         logd(tag, "Memory capability created. addr=%p, size=%p(2^%-2d), type=%s", region.start, 1ull << size_bit, size_bit, device ? "device" : "memory");
 
         map_ptr<cap_slot_t> cap_slot = insert_cap(root_task, cap);
