@@ -12,7 +12,16 @@ struct cap_slot_t {
   map_ptr<cap_slot_t> prev;
   map_ptr<cap_slot_t> next;
 
-  map_ptr<cap_space_t> get_cap_space() const;
+  [[nodiscard]] map_ptr<cap_space_t> get_cap_space() const;
+  [[nodiscard]] bool                 is_unused() const;
+  [[nodiscard]] bool                 is_isolated() const;
+  [[nodiscard]] bool                 is_head() const;
+  [[nodiscard]] bool                 is_tail() const;
+
+  void                insert_before(map_ptr<cap_slot_t> slot);
+  void                insert_after(map_ptr<cap_slot_t> slot);
+  map_ptr<cap_slot_t> erase_this();
+  void                replace(map_ptr<cap_slot_t> slot);
 };
 
 struct alignas(PAGE_SIZE) cap_space_t {

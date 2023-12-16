@@ -143,10 +143,7 @@ map_ptr<cap_slot_t> insert_cap(map_ptr<task_t> task, capability_t cap) {
     errno = SYS_E_OUT_OF_CAP_SPACE;
     return 0_map;
   }
-
-  slot->prev = 0_map;
-  slot->next = 0_map;
-  slot->cap  = cap;
+  slot->cap = cap;
 
   return slot;
 }
@@ -158,9 +155,13 @@ void push_free_slots(map_ptr<task_t> task, map_ptr<cap_slot_t> slot) {
 
   std::lock_guard lock(task->lock);
 
-  slot->cap        = make_null_cap();
-  slot->prev       = task->free_slots;
-  slot->next       = 0_map;
+  slot->erase_this();
+  slot->cap = make_null_cap();
+
+  if (task->free_slots != nullptr) {
+    task->free_slots->insert_before(slot);
+  }
+
   task->free_slots = slot;
 
   ++task->free_slots_count;
@@ -172,15 +173,14 @@ void push_free_slots(map_ptr<task_t> task, map_ptr<cap_slot_t> slot) {
   std::lock_guard lock(task->lock);
 
   map_ptr<cap_slot_t> slot = task->free_slots;
+
   if (slot == nullptr) [[unlikely]] {
     logd(tag, "Failed to pop from the free slot. The free slot is empty.");
     errno = SYS_E_OUT_OF_CAP_SPACE;
     return 0_map;
   }
 
-  task->free_slots = slot->prev;
-  slot->prev       = 0_map;
-  slot->next       = 0_map;
+  task->free_slots = slot->erase_this();
 
   --task->free_slots_count;
 

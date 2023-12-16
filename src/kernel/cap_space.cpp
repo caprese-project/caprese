@@ -47,7 +47,7 @@ namespace {
 
   [[nodiscard]] void destroy_cap_slot(map_ptr<cap_slot_t> slot) {
     assert(slot != nullptr);
-    assert(slot->next == nullptr);
+    assert(slot->is_tail());
 
     cap_type_t       type = get_cap_type(slot->cap);
     map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
@@ -58,7 +58,7 @@ namespace {
       panic("Unexpected task state.");
     }
 
-    if (slot->prev != nullptr) {
+    if (!slot->is_head()) {
       map_ptr<cap_slot_t> prev_slot = slot->prev;
       cap_type_t          prev_type = get_cap_type(prev_slot->cap);
 
@@ -96,18 +96,128 @@ namespace {
       else {
         panic("Unexpected cap state");
       }
-
-      prev_slot->next = 0_map;
     } else {
       destroy_object(slot);
     }
 
+    slot->erase_this();
     push_free_slots(task, slot);
   }
 } // namespace
 
 map_ptr<cap_space_t> cap_slot_t::get_cap_space() const {
   return make_map_ptr(round_down(reinterpret_cast<uintptr_t>(this), PAGE_SIZE));
+}
+
+bool cap_slot_t::is_unused() const {
+  return get_cap_type(cap) == CAP_NULL && prev == nullptr && next == nullptr;
+}
+
+bool cap_slot_t::is_isolated() const {
+  return prev == nullptr && next == nullptr;
+}
+
+bool cap_slot_t::is_head() const {
+  return prev == nullptr;
+}
+
+bool cap_slot_t::is_tail() const {
+  return next == nullptr;
+}
+
+void cap_slot_t::insert_before(map_ptr<cap_slot_t> slot) {
+  assert(slot != nullptr);
+  assert(slot->is_isolated());
+
+  map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
+
+  std::lock_guard lock(task->lock);
+
+  if (task->state == task_state_t::unused) [[unlikely]] {
+    panic("Unexpected task state.");
+  }
+
+  if (prev != nullptr) {
+    prev->next = slot;
+  }
+
+  slot->prev = prev;
+  slot->next = make_map_ptr(this);
+  prev       = slot;
+}
+
+void cap_slot_t::insert_after(map_ptr<cap_slot_t> slot) {
+  assert(slot != nullptr);
+  assert(slot->is_isolated());
+
+  map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
+
+  std::lock_guard lock(task->lock);
+
+  if (task->state == task_state_t::unused) [[unlikely]] {
+    panic("Unexpected task state.");
+  }
+
+  if (next != nullptr) {
+    next->prev = slot;
+  }
+
+  slot->prev = make_map_ptr(this);
+  slot->next = next;
+  next       = slot;
+}
+
+map_ptr<cap_slot_t> cap_slot_t::erase_this() {
+  map_ptr<task_t>& task = get_cap_space()->meta_info.task;
+
+  std::lock_guard lock(task->lock);
+
+  if (task->state == task_state_t::unused) [[unlikely]] {
+    panic("Unexpected task state.");
+  }
+
+  map_ptr<cap_slot_t> result = 0_map;
+
+  if (prev != nullptr) {
+    prev->next = next;
+    result     = prev;
+  }
+
+  if (next != nullptr) {
+    next->prev = prev;
+    result     = next;
+  }
+
+  prev = 0_map;
+  next = 0_map;
+
+  return result;
+}
+
+void cap_slot_t::replace(map_ptr<cap_slot_t> slot) {
+  assert(slot != nullptr);
+  assert(this->is_isolated());
+
+  map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
+
+  std::lock_guard lock(task->lock);
+
+  if (task->state == task_state_t::unused) [[unlikely]] {
+    panic("Unexpected task state.");
+  }
+
+  if (slot->prev != nullptr) {
+    slot->prev->next = make_map_ptr(this);
+  }
+
+  if (slot->next != nullptr) {
+    slot->next->prev = make_map_ptr(this);
+  }
+
+  prev       = slot->prev;
+  next       = slot->next;
+  slot->prev = 0_map;
+  slot->next = 0_map;
 }
 
 bool insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space) {
@@ -219,9 +329,7 @@ map_ptr<cap_slot_t> transfer_cap(map_ptr<task_t> dst_task, map_ptr<cap_slot_t> s
     return 0_map;
   }
 
-  dst_slot->prev = src_slot->prev;
-  dst_slot->next = src_slot->next;
-
+  dst_slot->replace(src_slot);
   push_free_slots(src_task, src_slot);
 
   return dst_slot;
@@ -253,15 +361,8 @@ map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
     return 0_map;
   }
 
-  dst_slot->prev = src_slot;
-  dst_slot->next = src_slot->next;
-
-  if (dst_slot->next != nullptr) {
-    dst_slot->next->prev = dst_slot;
-  }
-
-  src_slot->cap  = make_null_cap();
-  src_slot->next = dst_slot;
+  src_slot->insert_after(dst_slot);
+  src_slot->cap = make_null_cap();
 
   return dst_slot;
 }
@@ -306,14 +407,7 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
     return 0_map;
   }
 
-  dst_slot->prev = src_slot;
-  dst_slot->next = src_slot->next;
-
-  if (dst_slot->next != nullptr) {
-    dst_slot->next->prev = dst_slot;
-  }
-
-  src_slot->next = dst_slot;
+  src_slot->insert_after(dst_slot);
 
   return dst_slot;
 }
@@ -330,7 +424,7 @@ bool revoke_cap(map_ptr<cap_slot_t> slot) {
   }
 
   map_ptr<cap_slot_t> cap_slot = slot;
-  while (cap_slot->next != nullptr) {
+  while (!cap_slot->is_tail()) {
     cap_slot = cap_slot->next;
   }
 

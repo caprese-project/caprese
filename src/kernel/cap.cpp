@@ -48,9 +48,7 @@ map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_sl
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(get_cap_type(dst->cap) == CAP_NULL);
-  assert(dst->prev == nullptr);
-  assert(dst->next == nullptr);
+  assert(dst->is_unused());
 
   auto& mem_cap = src->cap.memory;
 
@@ -69,19 +67,9 @@ map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_sl
     return 0_map;
   }
 
-  dst->cap = make_memory_cap(mem_cap.device, size, make_phys_ptr(base_addr));
-
-  if (src->next != nullptr) [[unlikely]] {
-    src->next->prev = dst;
-    dst->next       = src->next;
-  } else {
-    dst->next = 0_map;
-  }
-
-  src->next = dst;
-  dst->prev = src;
-
+  dst->cap          = make_memory_cap(mem_cap.device, size, make_phys_ptr(base_addr));
   mem_cap.used_size = base_addr + size - mem_cap.phys_addr;
+  src->insert_after(dst);
 
   return dst;
 }
@@ -94,9 +82,7 @@ map_ptr<cap_slot_t> create_task_object(map_ptr<cap_slot_t> dst,
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(get_cap_type(dst->cap) == CAP_NULL);
-  assert(dst->prev == nullptr);
-  assert(dst->next == nullptr);
+  assert(dst->is_unused());
   assert(cap_space_slot != nullptr);
   assert(get_cap_type(cap_space_slot->cap) == CAP_CAP_SPACE);
   assert(root_page_table_slot != nullptr);
@@ -163,9 +149,7 @@ map_ptr<cap_slot_t> create_endpoint_object(map_ptr<cap_slot_t> dst, map_ptr<cap_
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(get_cap_type(dst->cap) == CAP_NULL);
-  assert(dst->prev == nullptr);
-  assert(dst->next == nullptr);
+  assert(dst->is_unused());
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device) [[unlikely]] {
@@ -192,9 +176,7 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(get_cap_type(dst->cap) == CAP_NULL);
-  assert(dst->prev == nullptr);
-  assert(dst->next == nullptr);
+  assert(dst->is_unused());
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device) [[unlikely]] {
@@ -221,9 +203,7 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(get_cap_type(dst->cap) == CAP_NULL);
-  assert(dst->prev == nullptr);
-  assert(dst->next == nullptr);
+  assert(dst->is_unused());
 
   if (level > MAX_PAGE_TABLE_LEVEL) [[unlikely]] {
     logd(tag, "Failed to create virt page object. Level must be less than or equal to %llu.", MAX_PAGE_TABLE_LEVEL);
@@ -247,9 +227,7 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
   assert(src != nullptr);
   assert(get_cap_type(src->cap) == CAP_MEM);
   assert(dst != nullptr);
-  assert(get_cap_type(dst->cap) == CAP_NULL);
-  assert(dst->prev == nullptr);
-  assert(dst->next == nullptr);
+  assert(dst->is_unused());
 
   auto& mem_cap = src->cap.memory;
   if (mem_cap.device) [[unlikely]] {
@@ -274,9 +252,7 @@ map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap
 
 map_ptr<cap_slot_t> create_id_object(map_ptr<cap_slot_t> dst) {
   assert(dst != nullptr);
-  assert(get_cap_type(dst->cap) == CAP_NULL);
-  assert(dst->prev == nullptr);
-  assert(dst->next == nullptr);
+  assert(dst->is_unused());
 
   dst->cap = make_unique_id_cap();
 
@@ -405,25 +381,25 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
 }
 
 void destroy_memory_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->next == nullptr);
+  assert(slot->is_tail());
   assert(get_cap_type(slot->cap) == CAP_MEM);
   slot->cap.memory.used_size = 0;
 }
 
 void destroy_task_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->next == nullptr);
+  assert(slot->is_tail());
   assert(get_cap_type(slot->cap) == CAP_TASK);
   kill_task(slot->cap.task.task, 0);
 }
 
 void destroy_endpoint_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->next == nullptr);
+  assert(slot->is_tail());
   assert(get_cap_type(slot->cap) == CAP_ENDPOINT);
   ipc_cancel(slot->cap.endpoint.endpoint);
 }
 
 void destroy_page_table_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->next == nullptr);
+  assert(slot->is_tail());
   assert(get_cap_type(slot->cap) == CAP_PAGE_TABLE);
 
   map_ptr<page_table_t> parent_table = slot->cap.page_table.parent_table;
@@ -436,7 +412,7 @@ void destroy_page_table_object(map_ptr<cap_slot_t> slot) {
 }
 
 void destroy_virt_page_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->next == nullptr);
+  assert(slot->is_tail());
   assert(get_cap_type(slot->cap) == CAP_VIRT_PAGE);
 
   map_ptr<page_table_t> parent_table = slot->cap.virt_page.parent_table;
@@ -449,7 +425,7 @@ void destroy_virt_page_object(map_ptr<cap_slot_t> slot) {
 }
 
 void destroy_cap_space_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->next == nullptr);
+  assert(slot->is_tail());
   assert(get_cap_type(slot->cap) == CAP_CAP_SPACE);
 
   // TODO: impl
