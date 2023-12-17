@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include <kernel/cls.h>
 #include <kernel/log.h>
 
 namespace {
@@ -43,6 +44,8 @@ void dump() {
   asm volatile("sd x29, %0" : "=m"(x[29]));
   asm volatile("sd x30, %0" : "=m"(x[30]));
   asm volatile("sd x31, %0" : "=m"(x[31]));
+
+  logf(tag, "--- Kernel Register Info ---");
 
   logf(tag, "x0  (zero):   %p", x[0]);
   logf(tag, "x1  (ra):     %p", x[1]);
@@ -194,4 +197,64 @@ void dump() {
   logf(tag, "scause:       %p", scause);
   logf(tag, "stval:        %p", stval);
   logf(tag, "sip:          %p", sip);
+
+  map_ptr<task_t> task = get_cls()->current_task;
+  if (task != nullptr) {
+    logf(tag, "--- Current Task Info ---");
+    logf(tag, "tid:           %u", task->tid);
+    logf(tag, "num cap space: %u", task->cap_count.num_cap_space);
+    logf(tag, "num extension: %u", task->cap_count.num_extension);
+    logf(tag, "num free slot: %llu", task->free_slots_count);
+    logf(tag, "state:         %s (%d)", task_state_to_str(task->state), task->state);
+    logf(tag, "ipc state:     %s (%d)", ipc_state_to_str(task->ipc_state), task->ipc_state);
+    logf(tag, "context ra:    %p", task->context.ra);
+    logf(tag, "context sp:    %p", task->context.sp);
+    logf(tag, "context s0:    %p", task->context.s0);
+    logf(tag, "context s1:    %p", task->context.s1);
+    logf(tag, "context s2:    %p", task->context.s2);
+    logf(tag, "context s3:    %p", task->context.s3);
+    logf(tag, "context s4:    %p", task->context.s4);
+    logf(tag, "context s5:    %p", task->context.s5);
+    logf(tag, "context s6:    %p", task->context.s6);
+    logf(tag, "context s7:    %p", task->context.s7);
+    logf(tag, "context s8:    %p", task->context.s8);
+    logf(tag, "context s9:    %p", task->context.s9);
+    logf(tag, "context s10:   %p", task->context.s10);
+    logf(tag, "context s11:   %p", task->context.s11);
+    logf(tag, "frame ra:      %p", task->frame.ra);
+    logf(tag, "frame sp:      %p", task->frame.sp);
+    logf(tag, "frame gp:      %p", task->frame.gp);
+    logf(tag, "frame tp:      %p", task->frame.tp);
+    logf(tag, "frame t0:      %p", task->frame.t0);
+    logf(tag, "frame t1:      %p", task->frame.t1);
+    logf(tag, "frame t2:      %p", task->frame.t2);
+    logf(tag, "frame s0:      %p", task->frame.s0);
+    logf(tag, "frame s1:      %p", task->frame.s1);
+    logf(tag, "frame a0:      %p", task->frame.a0);
+    logf(tag, "frame a1:      %p", task->frame.a1);
+    logf(tag, "frame a2:      %p", task->frame.a2);
+    logf(tag, "frame a3:      %p", task->frame.a3);
+    logf(tag, "frame a4:      %p", task->frame.a4);
+    logf(tag, "frame a5:      %p", task->frame.a5);
+    logf(tag, "frame a6:      %p", task->frame.a6);
+    logf(tag, "frame a7:      %p", task->frame.a7);
+    logf(tag, "frame s2:      %p", task->frame.s2);
+    logf(tag, "frame s3:      %p", task->frame.s3);
+    logf(tag, "frame s4:      %p", task->frame.s4);
+    logf(tag, "frame s5:      %p", task->frame.s5);
+    logf(tag, "frame s6:      %p", task->frame.s6);
+    logf(tag, "frame s7:      %p", task->frame.s7);
+    logf(tag, "frame s8:      %p", task->frame.s8);
+    logf(tag, "frame s9:      %p", task->frame.s9);
+    logf(tag, "frame s10:     %p", task->frame.s10);
+    logf(tag, "frame s11:     %p", task->frame.s11);
+    logf(tag, "frame t3:      %p", task->frame.t3);
+    logf(tag, "frame t4:      %p", task->frame.t4);
+    logf(tag, "frame t5:      %p", task->frame.t5);
+    logf(tag, "frame t6:      %p", task->frame.t6);
+    logf(tag, "frame sepc:    %p", task->frame.sepc);
+    logf(tag, "frame satp:    %p", task->frame.satp);
+    logf(tag, "frame hartid:  %p", task->frame.hartid);
+    logf(tag, "frame stack:   %p", task->frame.stack);
+  }
 }

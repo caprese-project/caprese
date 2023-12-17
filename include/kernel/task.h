@@ -49,6 +49,42 @@ enum struct ipc_state_t : uint8_t {
   canceled  = 4,
 };
 
+inline const char* task_state_to_str(task_state_t state) {
+  switch (state) {
+    case task_state_t::unused:
+      return "unused";
+    case task_state_t::running:
+      return "running";
+    case task_state_t::ready:
+      return "ready";
+    case task_state_t::waiting:
+      return "waiting";
+    case task_state_t::suspended:
+      return "suspended";
+    case task_state_t::killed:
+      return "killed";
+    default:
+      return "unknown";
+  }
+}
+
+inline const char* ipc_state_to_str(ipc_state_t state) {
+  switch (state) {
+    case ipc_state_t::none:
+      return "none";
+    case ipc_state_t::sending:
+      return "sending";
+    case ipc_state_t::receiving:
+      return "receiving";
+    case ipc_state_t::calling:
+      return "calling";
+    case ipc_state_t::canceled:
+      return "canceled";
+    default:
+      return "unknown";
+  }
+}
+
 struct alignas(PAGE_SIZE) task_t {
   context_t             context;
   frame_t               frame;
