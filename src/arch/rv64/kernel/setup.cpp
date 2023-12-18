@@ -360,6 +360,10 @@ __init_code void setup_arch_root_boot_info(map_ptr<boot_info_t> boot_info) {
 
     logd(tag, "Mapped page %p -> %p (4k, dtb)", va_base.raw() + va_offset, page.as_phys());
   }
+
+  root_boot_info->root_task_end_address = round_up(CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS + payload_size + dtb_size, PAGE_SIZE);
+
+  logd(tag, "The end address of the root task is %p", root_boot_info->root_task_end_address);
 }
 
 __init_code void* bake_stack(map_ptr<void> stack, map_ptr<void> data, size_t size) {
