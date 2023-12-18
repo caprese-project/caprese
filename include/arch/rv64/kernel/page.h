@@ -99,7 +99,7 @@ struct alignas(PAGE_SIZE) page_table_t {
   pte_t entries[NUM_PAGE_TABLE_ENTRY];
 
   inline map_ptr<pte_t> walk(virt_ptr<void> va, size_t level) {
-    assert(va.raw() < CONFIG_MAX_VIRTUAL_ADDRESS);
+    assert(va < CONFIG_MAX_VIRTUAL_ADDRESS);
     assert(level <= MAX_PAGE_TABLE_LEVEL);
     size_t index = (va.raw() >> (9 * level + PAGE_SIZE_BIT)) & 0x1ff;
     return make_map_ptr(&entries[index]);

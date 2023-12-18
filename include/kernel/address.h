@@ -42,22 +42,32 @@ struct base_ptr {
     return *get();
   }
 
-  constexpr auto operator<=>(const base_ptr& other) const = default;
-
-  constexpr bool operator==(const base_ptr& other) const {
+  template<typename U>
+  constexpr bool operator==(const Derived<U>& other) const {
     return _ptr == other._ptr;
-  }
-
-  constexpr bool operator!=(const base_ptr& other) const {
-    return _ptr != other._ptr;
   }
 
   constexpr bool operator==(nullptr_t) const {
     return _ptr == 0;
   }
 
-  constexpr bool operator!=(nullptr_t) const {
-    return _ptr != 0;
+  template<std::integral U>
+  constexpr bool operator==(U addr) const {
+    return _ptr == static_cast<decltype(_ptr)>(addr);
+  }
+
+  template<typename U>
+  constexpr auto operator<=>(const Derived<U>& other) const {
+    return _ptr <=> other._ptr;
+  }
+
+  constexpr auto operator<=>(nullptr_t) const {
+    return _ptr <=> 0;
+  }
+
+  template<std::integral U>
+  constexpr auto operator<=>(U addr) const {
+    return _ptr <=> static_cast<decltype(_ptr)>(addr);
   }
 
   template<std::integral U, typename V = T, std::enable_if_t<!std::is_void_v<V>, nullptr_t> = nullptr>

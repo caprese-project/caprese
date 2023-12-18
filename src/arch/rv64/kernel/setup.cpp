@@ -206,7 +206,7 @@ namespace {
     uint16_t size_bit = 0;
 
     while (region.start < region.end) {
-      size_t size = region.end.raw() - region.start.raw();
+      size_t size = region.end - region.start;
 
       if (region.start.raw() & (1ull << size_bit)) {
         if (size >= (1ull << size_bit)) {
@@ -229,7 +229,7 @@ namespace {
     }
 
     while (region.start < region.end) {
-      size_t size = region.end.raw() - region.start.raw();
+      size_t size = region.end - region.start;
 
       if (size >= (1ull << size_bit)) {
         capability_t cap = make_memory_cap(device, 1ull << size_bit, region.start.as<void>());
@@ -338,8 +338,8 @@ __init_code void setup_arch_root_boot_info(map_ptr<boot_info_t> boot_info) {
   root_boot_info->arch_info.dtb_vp_caps_offset = root_boot_info->mem_caps_offset + root_boot_info->num_mem_caps;
 
   map_ptr<page_table_t> page_table   = boot_info->payload_page_tables[KILO_PAGE_TABLE_LEVEL];
-  size_t                dtb_size     = static_cast<size_t>(end - start);
-  size_t                payload_size = static_cast<size_t>(_payload_end - _payload_start);
+  size_t                dtb_size     = end - start;
+  size_t                payload_size = _payload_end - _payload_start;
   virt_ptr<void>        va_base      = make_virt_ptr(CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS + payload_size);
 
   for (uintptr_t va_offset = 0; va_offset < dtb_size; va_offset += PAGE_SIZE) {
@@ -351,14 +351,14 @@ __init_code void setup_arch_root_boot_info(map_ptr<boot_info_t> boot_info) {
     pte->set_next_page(page);
     pte->enable();
 
-    map_ptr<cap_slot_t> virt_page_cap_slot = insert_cap(boot_info->root_task, make_virt_page_cap(true, false, false, KILO_PAGE_TABLE_LEVEL, page.as_phys().raw()));
+    map_ptr<cap_slot_t> virt_page_cap_slot = insert_cap(boot_info->root_task, make_virt_page_cap(true, false, false, true, KILO_PAGE_TABLE_LEVEL, page.as_phys(), va_base + va_offset));
     if (virt_page_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the virtual page capability.");
     }
 
     root_boot_info->caps[root_boot_info->arch_info.dtb_vp_caps_offset + root_boot_info->arch_info.num_dtb_vp_caps++] = get_cap_slot_index(virt_page_cap_slot);
 
-    logd(tag, "Mapped page %p -> %p (4k, dtb)", va_base.raw() + va_offset, page.as_phys());
+    logd(tag, "Mapped page %p -> %p (4k, dtb)", va_base + va_offset, page.as_phys());
   }
 
   root_boot_info->root_task_end_address = round_up(CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS + payload_size + dtb_size, PAGE_SIZE);

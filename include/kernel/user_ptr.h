@@ -43,7 +43,7 @@ struct user_ptr {
         size = sizeof(T) - written;
       }
 
-      memcpy(reinterpret_cast<void*>(dst.raw() + written), reinterpret_cast<const void*>(pte->get_next_page().raw() + offset), size);
+      memcpy((dst + written).get(), (pte->get_next_page() + offset).get(), size);
       written += size;
     }
 
@@ -83,7 +83,7 @@ struct user_ptr {
         size = sizeof(T) - written;
       }
 
-      memcpy(reinterpret_cast<void*>(pte->get_next_page().raw() + offset), reinterpret_cast<void*>(src.raw() + written), size);
+      memcpy((pte->get_next_page() + offset).get(), (src + written).get(), size);
       written += size;
     }
 

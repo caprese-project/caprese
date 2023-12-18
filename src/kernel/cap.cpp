@@ -194,7 +194,7 @@ map_ptr<cap_slot_t> create_page_table_object(map_ptr<cap_slot_t> dst, map_ptr<ca
   map_ptr<page_table_t> page_table = make_phys_ptr(dst->cap.memory.phys_addr);
   memset(page_table.get(), 0, sizeof(page_table_t));
 
-  dst->cap = make_page_table_cap(page_table, false, 0, 0, 0_map);
+  dst->cap = make_page_table_cap(page_table, false, 0, 0_virt, 0_map);
 
   return dst;
 }
@@ -218,7 +218,7 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
     return 0_map;
   }
 
-  dst->cap = make_virt_page_cap(readable, writable, executable, level, dst->cap.memory.phys_addr);
+  dst->cap = make_virt_page_cap(readable, writable, executable, false, level, make_phys_ptr(dst->cap.memory.phys_addr), 0_virt);
 
   return dst;
 }

@@ -167,7 +167,7 @@ constexpr capability_t make_null_cap() {
 }
 
 inline capability_t make_memory_cap(bool device, size_t size, phys_ptr<void> base_addr) {
-  assert(base_addr.raw() < CONFIG_MAX_PHYSICAL_ADDRESS);
+  assert(base_addr < CONFIG_MAX_PHYSICAL_ADDRESS);
   assert(size < CONFIG_MAX_PHYSICAL_ADDRESS);
 
   return {
@@ -222,9 +222,9 @@ inline capability_t make_endpoint_cap(map_ptr<endpoint_t> endpoint) {
   };
 }
 
-inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool mapped, uint64_t level, uint64_t virt_addr_base, map_ptr<page_table_t> parent_table) {
+inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool mapped, uint64_t level, virt_ptr<void> virt_addr_base, map_ptr<page_table_t> parent_table) {
   assert(page_table != nullptr);
-  assert(!mapped || virt_addr_base % get_page_size(level + 1) == 0);
+  assert(!mapped || virt_addr_base.raw() % get_page_size(level + 1) == 0);
   assert(!mapped || level == MAX_PAGE_TABLE_LEVEL || parent_table != nullptr);
 
   return {
@@ -232,28 +232,28 @@ inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool m
       .type           = static_cast<uint64_t>(CAP_PAGE_TABLE),
       .mapped         = mapped,
       .level          = level,
-      .virt_addr_base = virt_addr_base,
+      .virt_addr_base = virt_addr_base.raw(),
       .table          = page_table,
       .parent_table   = parent_table,
     },
   };
 }
 
-inline capability_t make_virt_page_cap(bool readable, bool writable, bool executable, uint64_t level, uint64_t phys_addr) {
+inline capability_t make_virt_page_cap(bool readable, bool writable, bool executable, bool mapped, uint64_t level, phys_ptr<void> phys_addr, virt_ptr<void> virt_addr) {
   assert(phys_addr < CONFIG_MAX_PHYSICAL_ADDRESS);
   assert(level <= MAX_PAGE_TABLE_LEVEL);
 
   return {
     .virt_page = {
       .type         = static_cast<uint64_t>(CAP_VIRT_PAGE),
-      .mapped       = false,
+      .mapped       = mapped,
       .readable     = readable,
       .writable     = writable,
       .executable   = executable,
       .level        = level,
       .index        = 0,
-      .phys_addr    = phys_addr,
-      .address      = 0_virt,
+      .phys_addr    = phys_addr.raw(),
+      .address      = virt_addr.raw(),
       .parent_table = 0_map,
     },
   };
