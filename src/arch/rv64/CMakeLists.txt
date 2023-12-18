@@ -40,6 +40,7 @@ add_dependencies(caprese_boot_linker caprese_kernel_payload_size)
 target_sources(
   caprese_kernel PRIVATE
   kernel/arch/dtb.cpp
+  kernel/boot_info.cpp
   kernel/context.cpp
   kernel/context.S
   kernel/core_id.cpp

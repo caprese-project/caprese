@@ -65,6 +65,9 @@ SECTIONS
   .init :
   {
     *(.init.*)
+    . = ALIGN(16);
+    _root_boot_info = .;
+    . += 0x1000;
   }
 }
 

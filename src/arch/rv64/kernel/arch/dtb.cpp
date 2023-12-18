@@ -257,3 +257,19 @@ void for_each_dtb_prop(map_ptr<dtb_node_t> node, bool (*callback)(map_ptr<dtb_no
     _dtb_align(&src);
   }
 }
+
+std::pair<phys_ptr<void>, phys_ptr<void>> get_dtb_region(map_ptr<char> dtb) {
+  assert(dtb != nullptr);
+
+  map_ptr<fdt_header_t> header = dtb.as<fdt_header_t>();
+  if (header->magic != std::byteswap(FDT_HEADER_MAGIC)) [[unlikely]] {
+    loge("arch/dtb", "Invalid FDT magic: %x", header->magic);
+    return std::pair<phys_ptr<void>, phys_ptr<void>> { 0_phys, 0_phys };
+  }
+
+  size_t         total = std::byteswap(header->totalsize);
+  phys_ptr<void> start = dtb.as<void>();
+  phys_ptr<void> end   = (dtb + total).as<void>();
+
+  return std::pair<phys_ptr<void>, phys_ptr<void>> { start, end };
+}

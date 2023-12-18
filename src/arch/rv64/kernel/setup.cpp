@@ -217,7 +217,7 @@ namespace {
           if (cap_slot == nullptr) [[unlikely]] {
             panic("Failed to insert cap.");
           }
-          root_boot_info->mem_caps[root_boot_info->num_mem_caps++] = get_cap_slot_index(cap_slot);
+          root_boot_info->caps[root_boot_info->mem_caps_offset + root_boot_info->num_mem_caps++] = get_cap_slot_index(cap_slot);
 
           region.start += 1ull << size_bit;
         } else {
@@ -239,7 +239,7 @@ namespace {
         if (cap_slot == nullptr) [[unlikely]] {
           panic("Failed to insert cap.");
         }
-        root_boot_info->mem_caps[root_boot_info->num_mem_caps++] = get_cap_slot_index(cap_slot);
+        root_boot_info->caps[root_boot_info->mem_caps_offset + root_boot_info->num_mem_caps++] = get_cap_slot_index(cap_slot);
 
         region.start += 1ull << size_bit;
       } else {
@@ -249,8 +249,7 @@ namespace {
   }
 } // namespace
 
-__init_code void setup_memory_capabilities(map_ptr<task_t> root_task, map_ptr<boot_info_t> boot_info, map_ptr<root_boot_info_t> root_boot_info) {
-  assert(root_task != nullptr);
+__init_code void setup_memory_capabilities(map_ptr<boot_info_t> boot_info) {
   assert(boot_info != nullptr);
 
   if constexpr (CONFIG_LOG_DEBUG) {
@@ -275,6 +274,14 @@ __init_code void setup_memory_capabilities(map_ptr<task_t> root_task, map_ptr<bo
       .start = make_map_ptr(_root_task_stack_start),
       .end   = make_map_ptr(_root_task_stack_end),
   });
+
+  auto [dtb_start, dtb_end] = get_dtb_region(boot_info->dtb);
+  size_t dtb_size           = round_up(dtb_end - dtb_start, PAGE_SIZE);
+
+  const region_t dtb_region {
+    .start = dtb_start.as<const char>(),
+    .end   = dtb_start.as<const char>() + dtb_size,
+  };
 
   for_each_dtb_node(boot_info->dtb, [](map_ptr<dtb_node_t> node) {
     if (strcmp("cpus", node->name) == 0) {
@@ -301,21 +308,58 @@ __init_code void setup_memory_capabilities(map_ptr<task_t> root_task, map_ptr<bo
     return true;
   });
 
+  map_ptr<task_t> root_task = boot_info->root_task;
+
   for (size_t i = 0; i < memory_region_count; ++i) {
-    insert_memory_region_caps(root_task, root_boot_info, memory_region[i], false);
+    region_t dst[2];
+    subtract_region(memory_region[i], dtb_region, dst);
+    for (auto& region : dst) {
+      if (region.start < region.end) {
+        insert_memory_region_caps(root_task, boot_info->root_boot_info, region, false);
+      }
+    }
   }
 
   for (size_t i = 0; i < device_region_count; ++i) {
-    insert_memory_region_caps(root_task, root_boot_info, device_region[i], true);
+    insert_memory_region_caps(root_task, boot_info->root_boot_info, device_region[i], true);
   }
 }
 
-__init_code void setup_arch_root_boot_info(map_ptr<boot_info_t> boot_info, map_ptr<root_boot_info_t> root_boot_info) {
+__init_code void setup_arch_root_boot_info(map_ptr<boot_info_t> boot_info) {
   assert(boot_info != nullptr);
-  assert(root_boot_info != nullptr);
 
-  root_boot_info->arch_info.dtb_start = boot_info->dtb.as_phys().raw();
-  root_boot_info->arch_info.dtb_end   = root_boot_info->arch_info.dtb_start + std::byteswap(boot_info->dtb.as<fdt_header_t>()->totalsize);
+  map_ptr<root_boot_info_t> root_boot_info = boot_info->root_boot_info;
+
+  auto [start, end] = get_dtb_region(boot_info->dtb);
+
+  root_boot_info->arch_info.dtb_start          = start.raw();
+  root_boot_info->arch_info.dtb_end            = end.raw();
+  root_boot_info->arch_info.num_dtb_vp_caps    = 0;
+  root_boot_info->arch_info.dtb_vp_caps_offset = root_boot_info->mem_caps_offset + root_boot_info->num_mem_caps;
+
+  map_ptr<page_table_t> page_table   = boot_info->payload_page_tables[KILO_PAGE_TABLE_LEVEL];
+  size_t                dtb_size     = static_cast<size_t>(end - start);
+  size_t                payload_size = static_cast<size_t>(_payload_end - _payload_start);
+  virt_ptr<void>        va_base      = make_virt_ptr(CONFIG_ROOT_TASK_PAYLOAD_BASE_ADDRESS + payload_size);
+
+  for (uintptr_t va_offset = 0; va_offset < dtb_size; va_offset += PAGE_SIZE) {
+    map_ptr<void> page = (start + va_offset).as_map();
+
+    map_ptr<pte_t> pte = page_table->walk(va_base + va_offset, KILO_PAGE_TABLE_LEVEL);
+    assert(pte->is_disabled());
+    pte->set_flags({ .readable = 1, .writable = 0, .executable = 0, .user = 1, .global = 0 });
+    pte->set_next_page(page);
+    pte->enable();
+
+    map_ptr<cap_slot_t> virt_page_cap_slot = insert_cap(boot_info->root_task, make_virt_page_cap(true, false, false, KILO_PAGE_TABLE_LEVEL, page.as_phys().raw()));
+    if (virt_page_cap_slot == nullptr) [[unlikely]] {
+      panic("Failed to insert the virtual page capability.");
+    }
+
+    root_boot_info->caps[root_boot_info->arch_info.dtb_vp_caps_offset + root_boot_info->arch_info.num_dtb_vp_caps++] = get_cap_slot_index(virt_page_cap_slot);
+
+    logd(tag, "Mapped page %p -> %p (4k, dtb)", va_base.raw() + va_offset, page.as_phys());
+  }
 }
 
 __init_code void* bake_stack(map_ptr<void> stack, map_ptr<void> data, size_t size) {

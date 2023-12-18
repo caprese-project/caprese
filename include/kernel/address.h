@@ -60,14 +60,34 @@ struct base_ptr {
     return _ptr != 0;
   }
 
-  template<std::integral U>
+  template<std::integral U, typename V = T, std::enable_if_t<!std::is_void_v<V>, nullptr_t> = nullptr>
   constexpr Derived<T> operator+(U offset) const {
     return Derived<T>::from(_ptr + sizeof(T) * offset);
   }
 
-  template<std::integral U>
+  template<std::integral U, typename V = T, std::enable_if_t<std::is_void_v<V>, nullptr_t> = nullptr>
+  constexpr Derived<T> operator+(U offset) const {
+    return Derived<T>::from(_ptr + offset);
+  }
+
+  template<std::integral U, typename V = T, std::enable_if_t<!std::is_void_v<V>, nullptr_t> = nullptr>
   constexpr Derived<T> operator-(U offset) const {
     return Derived<T>::from(_ptr - sizeof(T) * offset);
+  }
+
+  template<std::integral U, typename V = T, std::enable_if_t<std::is_void_v<V>, nullptr_t> = nullptr>
+  constexpr Derived<T> operator-(U offset) const {
+    return Derived<T>::from(_ptr - offset);
+  }
+
+  template<typename U = T, std::enable_if_t<!std::is_void_v<U>, nullptr_t> = nullptr>
+  constexpr ptrdiff_t operator-(const Derived<U>& other) const {
+    return (_ptr - other._ptr) / sizeof(U);
+  }
+
+  template<typename U = T, std::enable_if_t<std::is_void_v<U>, nullptr_t> = nullptr>
+  constexpr ptrdiff_t operator-(const Derived<U>& other) const {
+    return _ptr - other._ptr;
   }
 
   template<std::integral U>

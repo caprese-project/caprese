@@ -2,6 +2,7 @@
 #define ARCH_RV64_KERNEL_ARCH_DTB_H_
 
 #include <cstdint>
+#include <utility>
 
 #include <kernel/address.h>
 
@@ -149,5 +150,7 @@ dtb_prop_type_t find_prop_type(const char* name);
 
 void for_each_dtb_node(map_ptr<char> dtb, bool (*callback)(map_ptr<dtb_node_t>));
 void for_each_dtb_prop(map_ptr<dtb_node_t> node, bool (*callback)(map_ptr<dtb_node_t>, map_ptr<dtb_prop_t>));
+
+std::pair<phys_ptr<void>, phys_ptr<void>> get_dtb_region(map_ptr<char> dtb);
 
 #endif // ARCH_RV64_KERNEL_ARCH_DTB_H_
