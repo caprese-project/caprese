@@ -351,7 +351,7 @@ __init_code void setup_arch_root_boot_info(map_ptr<boot_info_t> boot_info) {
     pte->set_next_page(page);
     pte->enable();
 
-    map_ptr<cap_slot_t> virt_page_cap_slot = insert_cap(boot_info->root_task, make_virt_page_cap(true, false, false, true, KILO_PAGE_TABLE_LEVEL, page.as_phys(), va_base + va_offset));
+    map_ptr<cap_slot_t> virt_page_cap_slot = insert_cap(boot_info->root_task, make_virt_page_cap(true, false, false, true, KILO_PAGE_TABLE_LEVEL, page.as_phys(), va_base + va_offset, page_table));
     if (virt_page_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the virtual page capability.");
     }

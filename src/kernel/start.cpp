@@ -157,8 +157,9 @@ __init_code void map_root_task(virt_ptr<void> va_base, const char* begin, const 
     pte->set_next_page(page);
     pte->enable();
 
-    map_ptr<cap_slot_t> virt_page_cap_slot = insert_cap(boot_info->root_task,
-                                                        make_virt_page_cap(flags.readable, flags.writable, flags.executable, true, KILO_PAGE_TABLE_LEVEL, page.as_phys(), va_base + va_offset));
+    map_ptr<cap_slot_t>
+        virt_page_cap_slot = insert_cap(boot_info->root_task,
+                                        make_virt_page_cap(flags.readable, flags.writable, flags.executable, true, KILO_PAGE_TABLE_LEVEL, page.as_phys(), va_base + va_offset, page_table));
     if (virt_page_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the virtual page capability.");
     }

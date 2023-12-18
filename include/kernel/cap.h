@@ -239,7 +239,8 @@ inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool m
   };
 }
 
-inline capability_t make_virt_page_cap(bool readable, bool writable, bool executable, bool mapped, uint64_t level, phys_ptr<void> phys_addr, virt_ptr<void> virt_addr) {
+inline capability_t make_virt_page_cap(
+    bool readable, bool writable, bool executable, bool mapped, uint64_t level, phys_ptr<void> phys_addr, virt_ptr<void> virt_addr, map_ptr<page_table_t> parent_table) {
   assert(phys_addr < CONFIG_MAX_PHYSICAL_ADDRESS);
   assert(level <= MAX_PAGE_TABLE_LEVEL);
 
@@ -251,10 +252,10 @@ inline capability_t make_virt_page_cap(bool readable, bool writable, bool execut
       .writable     = writable,
       .executable   = executable,
       .level        = level,
-      .index        = 0,
+      .index        = get_page_table_index(virt_addr, level),
       .phys_addr    = phys_addr.raw(),
       .address      = virt_addr.raw(),
-      .parent_table = 0_map,
+      .parent_table = parent_table,
     },
   };
 }

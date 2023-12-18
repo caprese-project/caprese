@@ -218,7 +218,7 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
     return 0_map;
   }
 
-  dst->cap = make_virt_page_cap(readable, writable, executable, false, level, make_phys_ptr(dst->cap.memory.phys_addr), 0_virt);
+  dst->cap = make_virt_page_cap(readable, writable, executable, false, level, make_phys_ptr(dst->cap.memory.phys_addr), 0_virt, 0_map);
 
   return dst;
 }

@@ -34,6 +34,10 @@ constexpr size_t get_page_size_bit(size_t level) {
   return PAGE_SIZE_BIT + (9 * level);
 }
 
+constexpr size_t get_page_table_index(virt_ptr<void> va, size_t level) {
+  return (va.raw() >> get_page_size_bit(level)) & 0x1ff;
+}
+
 struct pte_flags_t {
   uint64_t readable  : 1;
   uint64_t writable  : 1;
@@ -101,7 +105,7 @@ struct alignas(PAGE_SIZE) page_table_t {
   inline map_ptr<pte_t> walk(virt_ptr<void> va, size_t level) {
     assert(va < CONFIG_MAX_VIRTUAL_ADDRESS);
     assert(level <= MAX_PAGE_TABLE_LEVEL);
-    size_t index = (va.raw() >> (9 * level + PAGE_SIZE_BIT)) & 0x1ff;
+    size_t index = get_page_table_index(va, level);
     return make_map_ptr(&entries[index]);
   }
 };
