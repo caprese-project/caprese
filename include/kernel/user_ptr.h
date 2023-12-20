@@ -43,7 +43,7 @@ struct user_ptr {
         size = sizeof(T) - written;
       }
 
-      memcpy((dst + written).get(), (pte->get_next_page() + offset).get(), size);
+      memcpy((dst.template as<void>() + written).get(), (pte->get_next_page() + offset).get(), size);
       written += size;
     }
 
