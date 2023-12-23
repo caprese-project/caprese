@@ -428,12 +428,10 @@ bool revoke_cap(map_ptr<cap_slot_t> slot) {
     while (cap_slot != slot) {
       map_ptr<cap_slot_t> prev_slot = cap_slot->prev;
       prev_slot->cap                = cap_slot->cap;
+      cap_slot->prev                = 0_map;
       if (cap_slot->next != nullptr) {
-        cap_slot->next->prev = 0_map;
-        prev_slot->insert_after(cap_slot->next);
+        prev_slot->insert_after(cap_slot->erase_this());
       }
-      cap_slot->next = 0_map;
-      cap_slot->prev = 0_map;
       push_free_slots(cap_slot->get_cap_space()->meta_info.task, cap_slot);
       cap_slot = prev_slot;
     }
