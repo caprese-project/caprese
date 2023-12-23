@@ -183,7 +183,7 @@ namespace {
     }
 
     logd(tag, "Device region: %p - %p", region.start, region.end);
-    device_region[device_region_count++] = region;
+    device_region[device_region_count++] = { region.start, make_phys_ptr(round_up(region.end.raw(), PAGE_SIZE)) };
   }
 
   __init_code void insert_memory_region_caps(map_ptr<task_t> root_task, map_ptr<root_boot_info_t> root_boot_info, region_t region, bool device, size_t index = 0) {
