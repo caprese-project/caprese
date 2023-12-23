@@ -214,7 +214,7 @@ void kill_task(map_ptr<task_t> task, int exit_status) {
     panic("The root task has been killed.");
   }
 
-  logd(tag, "Task 0x%x has been killed.", task->tid);
+  logd(tag, "Task 0x%x has been killed. status: %d", task->tid, exit_status);
 
   if (task == get_cls()->current_task) [[unlikely]] {
     resched();
