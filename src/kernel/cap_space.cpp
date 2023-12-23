@@ -394,7 +394,7 @@ bool revoke_cap(map_ptr<cap_slot_t> slot) {
   assert(slot != nullptr);
 
   cap_type_t type = get_cap_type(slot->cap);
-  if (type != CAP_MEM || type != CAP_ZOMBIE) [[unlikely]] {
+  if (type != CAP_MEM && type != CAP_ZOMBIE) [[unlikely]] {
     errno = SYS_E_CAP_TYPE;
     return false;
   }
