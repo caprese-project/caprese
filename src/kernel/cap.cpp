@@ -380,6 +380,42 @@ map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_
   return result;
 }
 
+bool is_same_object(map_ptr<cap_slot_t> lhs, map_ptr<cap_slot_t> rhs) {
+  assert(lhs != nullptr);
+  assert(rhs != nullptr);
+
+  while (get_cap_type(lhs->cap) == CAP_ZOMBIE) {
+    lhs = lhs->next;
+  }
+
+  while (get_cap_type(rhs->cap) == CAP_ZOMBIE) {
+    rhs = rhs->next;
+  }
+
+  // If it's not copyable, it should point to the same address.
+  if (lhs == rhs) {
+    return true;
+  }
+
+  cap_type_t lhs_type = get_cap_type(lhs->cap);
+  cap_type_t rhs_type = get_cap_type(rhs->cap);
+
+  if (lhs_type != rhs_type) {
+    return false;
+  }
+
+  switch (lhs_type) {
+    case CAP_TASK:
+      return lhs->cap.task.task == rhs->cap.task.task;
+    case CAP_ENDPOINT:
+      return lhs->cap.endpoint.endpoint == rhs->cap.endpoint.endpoint;
+    case CAP_ID:
+      return lhs->cap.id.val1 == rhs->cap.id.val1 && lhs->cap.id.val2 == rhs->cap.id.val2 && lhs->cap.id.val3 == rhs->cap.id.val3;
+    default:
+      return false;
+  }
+}
+
 void destroy_memory_object(map_ptr<cap_slot_t> slot) {
   assert(slot->is_tail());
   assert(get_cap_type(slot->cap) == CAP_MEM);

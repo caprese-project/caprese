@@ -45,11 +45,10 @@ namespace {
     }
   }
 
-  [[nodiscard]] void destroy_cap_slot(map_ptr<cap_slot_t> slot) {
+  void destroy_cap_slot(map_ptr<cap_slot_t> slot) {
     assert(slot != nullptr);
     assert(slot->is_tail());
 
-    cap_type_t       type = get_cap_type(slot->cap);
     map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
 
     std::lock_guard lock(task->lock);
@@ -63,38 +62,12 @@ namespace {
       cap_type_t          prev_type = get_cap_type(prev_slot->cap);
 
       // prev_slot is delegated cap.
-      if (prev_type == CAP_NULL) {
+      if (prev_type == CAP_ZOMBIE) {
         prev_slot->cap = slot->cap;
       }
       // slot is created by create_object.
-      else if (prev_type == CAP_MEM) {
+      else if (!is_same_object(prev_slot, slot)) {
         destroy_object(slot);
-      }
-      // prev_slot is copied cap.
-      else if (prev_type == type) {
-        switch (type) {
-          case CAP_TASK:
-            if (slot->cap.task.task != prev_slot->cap.task.task) [[unlikely]] {
-              panic("Unexpected cap state");
-            }
-            break;
-          case CAP_ENDPOINT:
-            if (slot->cap.endpoint.endpoint != prev_slot->cap.endpoint.endpoint) [[unlikely]] {
-              panic("Unexpected cap state");
-            }
-            break;
-          case CAP_ID:
-            if (slot->cap.id.val1 != prev_slot->cap.id.val1 || slot->cap.id.val2 != prev_slot->cap.id.val2) [[unlikely]] {
-              panic("Unexpected cap state");
-            }
-            break;
-          default:
-            panic("Unexcepted cap type.");
-        }
-      }
-      // Should not happen.
-      else {
-        panic("Unexpected cap state");
       }
     } else {
       destroy_object(slot);
@@ -148,7 +121,7 @@ void cap_slot_t::insert_before(map_ptr<cap_slot_t> slot) {
 
 void cap_slot_t::insert_after(map_ptr<cap_slot_t> slot) {
   assert(slot != nullptr);
-  assert(slot->is_isolated());
+  assert(slot->is_head());
 
   map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
 
@@ -158,13 +131,18 @@ void cap_slot_t::insert_after(map_ptr<cap_slot_t> slot) {
     panic("Unexpected task state.");
   }
 
-  if (next != nullptr) {
-    next->prev = slot;
+  map_ptr<cap_slot_t> tail = slot;
+  while (!tail->is_tail()) {
+    tail = tail->next;
+  }
+
+  if (this->next != nullptr) {
+    this->next->prev = tail;
   }
 
   slot->prev = make_map_ptr(this);
-  slot->next = next;
-  next       = slot;
+  tail->next = this->next;
+  this->next = slot;
 }
 
 map_ptr<cap_slot_t> cap_slot_t::erase_this() {
@@ -361,8 +339,8 @@ map_ptr<cap_slot_t> delegate_cap(map_ptr<task_t> task, map_ptr<cap_slot_t> src_s
     return 0_map;
   }
 
+  src_slot->cap = make_zombie_cap();
   src_slot->insert_after(dst_slot);
-  src_slot->cap = make_null_cap();
 
   return dst_slot;
 }
@@ -415,6 +393,12 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
 bool revoke_cap(map_ptr<cap_slot_t> slot) {
   assert(slot != nullptr);
 
+  cap_type_t type = get_cap_type(slot->cap);
+  if (type != CAP_MEM || type != CAP_ZOMBIE) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
+    return false;
+  }
+
   map_ptr<task_t>& task = slot->get_cap_space()->meta_info.task;
 
   std::lock_guard lock(task->lock);
@@ -423,15 +407,38 @@ bool revoke_cap(map_ptr<cap_slot_t> slot) {
     panic("Unexpected task state.");
   }
 
-  map_ptr<cap_slot_t> cap_slot = slot;
-  while (!cap_slot->is_tail()) {
-    cap_slot = cap_slot->next;
-  }
+  if (type == CAP_MEM) {
+    map_ptr<cap_slot_t> cap_slot = slot;
+    while (!cap_slot->is_tail()) {
+      cap_slot = cap_slot->next;
+    }
+    while (cap_slot != slot) {
+      map_ptr<cap_slot_t> prev_slot = cap_slot->prev;
+      destroy_cap_slot(cap_slot);
+      cap_slot = prev_slot;
+    }
+  } else {
+    assert(type == CAP_ZOMBIE);
 
-  while (cap_slot != slot) {
-    map_ptr<cap_slot_t> prev_slot = cap_slot->prev;
-    destroy_cap_slot(cap_slot);
-    cap_slot = prev_slot;
+    map_ptr<cap_slot_t> cap_slot = slot->next;
+    while (get_cap_type(cap_slot->cap) == CAP_ZOMBIE) {
+      cap_slot = cap_slot->next;
+    }
+
+    while (cap_slot != slot) {
+      map_ptr<cap_slot_t> prev_slot = cap_slot->prev;
+      prev_slot->cap                = cap_slot->cap;
+      if (cap_slot->next != nullptr) {
+        cap_slot->next->prev = 0_map;
+        prev_slot->insert_after(cap_slot->next);
+      }
+      cap_slot->next = 0_map;
+      cap_slot->prev = 0_map;
+      push_free_slots(cap_slot->get_cap_space()->meta_info.task, cap_slot);
+      cap_slot = prev_slot;
+    }
+
+    assert(get_cap_type(cap_slot->cap) != CAP_ZOMBIE);
   }
 
   return true;
@@ -440,11 +447,30 @@ bool revoke_cap(map_ptr<cap_slot_t> slot) {
 bool destroy_cap(map_ptr<cap_slot_t> slot) {
   assert(slot != nullptr);
 
-  if (!revoke_cap(slot)) [[unlikely]] {
+  cap_type_t type = get_cap_type(slot->cap);
+  if (type == CAP_NULL) [[unlikely]] {
+    errno = SYS_E_CAP_TYPE;
     return false;
   }
 
-  destroy_cap_slot(slot);
+  if (type == CAP_MEM || type == CAP_ZOMBIE) {
+    if (!revoke_cap(slot)) [[unlikely]] {
+      return false;
+    }
+  }
+
+  if ((slot->prev == nullptr || !is_same_object(slot->prev, slot)) && (slot->next == nullptr || !is_same_object(slot->next, slot))) {
+    destroy_object(slot);
+    push_free_slots(slot->get_cap_space()->meta_info.task, slot);
+  } else if (slot->prev != nullptr && get_cap_type(slot->prev->cap) == CAP_ZOMBIE) {
+    assert(is_same_object(slot->prev, slot));
+    if (!revoke_cap(slot->prev)) [[unlikely]] {
+      return false;
+    }
+  } else {
+    slot->erase_this();
+    push_free_slots(slot->get_cap_space()->meta_info.task, slot);
+  }
 
   return true;
 }

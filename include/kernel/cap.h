@@ -88,10 +88,10 @@ union capability_t {
   } id;
 
   struct {
-    uint64_t       type    : 5;
-    uint64_t       size_bit: 6;
-    phys_ptr<void> address;
-    uint64_t       unused;
+    uint64_t type   : 5;
+    uint64_t unused1: 59;
+    uint64_t unused2;
+    uint64_t unused3;
   } zombie;
 };
 
@@ -285,6 +285,17 @@ inline capability_t make_id_cap(uint64_t val1, uint64_t val2, uint64_t val3) {
   };
 }
 
+inline capability_t make_zombie_cap() {
+  return {
+    .zombie = {
+      .type    = static_cast<uint64_t>(CAP_ZOMBIE),
+      .unused1 = 0,
+      .unused2 = 0,
+      .unused3 = 0,
+    },
+  };
+}
+
 capability_t make_unique_id_cap();
 
 map_ptr<cap_slot_t> create_memory_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src, size_t size, size_t alignment);
@@ -299,6 +310,8 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
 map_ptr<cap_slot_t> create_cap_space_object(map_ptr<cap_slot_t> dst, map_ptr<cap_slot_t> src);
 map_ptr<cap_slot_t> create_id_object(map_ptr<cap_slot_t> dst);
 map_ptr<cap_slot_t> create_object(map_ptr<task_t> task, map_ptr<cap_slot_t> cap_slot, cap_type_t type, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4);
+
+bool is_same_object(map_ptr<cap_slot_t> lhs, map_ptr<cap_slot_t> rhs);
 
 void destroy_memory_object(map_ptr<cap_slot_t> slot);
 void destroy_task_object(map_ptr<cap_slot_t> slot);
