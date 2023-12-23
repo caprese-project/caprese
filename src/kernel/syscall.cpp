@@ -90,6 +90,9 @@ sysret_t invoke_syscall_cap(uint16_t id, map_ptr<syscall_args_t> args) {
     case SYS_CAP_TYPE & 0xffff: {
       map_ptr<cap_slot_t> cap_slot = lookup_cap(task, args->args[0]);
       if (cap_slot == nullptr) [[unlikely]] {
+        if (errno == SYS_S_OK) {
+          return sysret_s_ok(static_cast<uintptr_t>(CAP_NULL));
+        }
         loge(tag, "Failed to look up cap: %d", args->args[0]);
         return errno_to_sysret();
       }

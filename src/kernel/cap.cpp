@@ -423,19 +423,19 @@ void destroy_memory_object(map_ptr<cap_slot_t> slot) {
 }
 
 void destroy_task_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->is_tail());
+  assert(slot->is_tail() || !is_same_object(slot, slot->next));
   assert(get_cap_type(slot->cap) == CAP_TASK);
   kill_task(slot->cap.task.task, 0);
 }
 
 void destroy_endpoint_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->is_tail());
+  assert(slot->is_tail() || !is_same_object(slot, slot->next));
   assert(get_cap_type(slot->cap) == CAP_ENDPOINT);
   ipc_cancel(slot->cap.endpoint.endpoint);
 }
 
 void destroy_page_table_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->is_tail());
+  assert(slot->is_tail() || !is_same_object(slot, slot->next));
   assert(get_cap_type(slot->cap) == CAP_PAGE_TABLE);
 
   map_ptr<page_table_t> parent_table = slot->cap.page_table.parent_table;
@@ -448,7 +448,7 @@ void destroy_page_table_object(map_ptr<cap_slot_t> slot) {
 }
 
 void destroy_virt_page_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->is_tail());
+  assert(slot->is_tail() || !is_same_object(slot, slot->next));
   assert(get_cap_type(slot->cap) == CAP_VIRT_PAGE);
 
   map_ptr<page_table_t> parent_table = slot->cap.virt_page.parent_table;
@@ -461,10 +461,17 @@ void destroy_virt_page_object(map_ptr<cap_slot_t> slot) {
 }
 
 void destroy_cap_space_object(map_ptr<cap_slot_t> slot) {
-  assert(slot->is_tail());
+  assert(slot->is_tail() || !is_same_object(slot, slot->next));
   assert(get_cap_type(slot->cap) == CAP_CAP_SPACE);
 
   // TODO: impl
+}
+
+void destroy_id_object([[maybe_unused]] map_ptr<cap_slot_t> slot) {
+  assert(slot->is_tail() || !is_same_object(slot, slot->next));
+  assert(get_cap_type(slot->cap) == CAP_ID);
+
+  // Do nothing.
 }
 
 bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot) {

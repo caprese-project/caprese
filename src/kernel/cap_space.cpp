@@ -40,6 +40,9 @@ namespace {
       case CAP_CAP_SPACE:
         destroy_cap_space_object(slot);
         break;
+      case CAP_ID:
+        destroy_id_object(slot);
+        break;
       default:
         panic("Unexcepted cap type.");
     }
@@ -110,13 +113,13 @@ void cap_slot_t::insert_before(map_ptr<cap_slot_t> slot) {
     panic("Unexpected task state.");
   }
 
-  if (prev != nullptr) {
-    prev->next = slot;
+  if (this->prev != nullptr) {
+    this->prev->next = slot;
+    slot->prev       = this->prev;
   }
 
-  slot->prev = prev;
   slot->next = make_map_ptr(this);
-  prev       = slot;
+  this->prev = slot;
 }
 
 void cap_slot_t::insert_after(map_ptr<cap_slot_t> slot) {
@@ -138,11 +141,11 @@ void cap_slot_t::insert_after(map_ptr<cap_slot_t> slot) {
 
   if (this->next != nullptr) {
     this->next->prev = tail;
+    tail->next       = this->next;
   }
 
-  slot->prev = make_map_ptr(this);
-  tail->next = this->next;
   this->next = slot;
+  slot->prev = make_map_ptr(this);
 }
 
 map_ptr<cap_slot_t> cap_slot_t::erase_this() {
@@ -186,16 +189,15 @@ void cap_slot_t::replace(map_ptr<cap_slot_t> slot) {
 
   if (slot->prev != nullptr) {
     slot->prev->next = make_map_ptr(this);
+    this->prev       = slot->prev;
+    slot->prev       = 0_map;
   }
 
   if (slot->next != nullptr) {
     slot->next->prev = make_map_ptr(this);
+    this->next       = slot->next;
+    slot->next       = 0_map;
   }
-
-  prev       = slot->prev;
-  next       = slot->next;
-  slot->prev = 0_map;
-  slot->next = 0_map;
 }
 
 bool insert_cap_space(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space) {
@@ -361,9 +363,11 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
       break;
     case CAP_TASK:
       dst_slot = insert_cap(src_task, src_slot->cap);
+      src_slot->insert_after(dst_slot);
       break;
     case CAP_ENDPOINT:
       dst_slot = insert_cap(src_task, src_slot->cap);
+      src_slot->insert_after(dst_slot);
       break;
     case CAP_PAGE_TABLE:
       break;
@@ -384,8 +388,6 @@ map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot) {
     errno = SYS_E_CAP_TYPE;
     return 0_map;
   }
-
-  src_slot->insert_after(dst_slot);
 
   return dst_slot;
 }
@@ -425,18 +427,24 @@ bool revoke_cap(map_ptr<cap_slot_t> slot) {
       cap_slot = cap_slot->next;
     }
 
+    capability_t        cap       = cap_slot->cap;
+    map_ptr<cap_slot_t> next_slot = cap_slot->next;
+
     while (cap_slot != slot) {
       map_ptr<cap_slot_t> prev_slot = cap_slot->prev;
-      prev_slot->cap                = cap_slot->cap;
-      cap_slot->prev                = 0_map;
-      if (cap_slot->next != nullptr) {
-        prev_slot->insert_after(cap_slot->erase_this());
-      }
+
+      cap_slot->erase_this();
       push_free_slots(cap_slot->get_cap_space()->meta_info.task, cap_slot);
+
       cap_slot = prev_slot;
     }
 
-    assert(get_cap_type(cap_slot->cap) != CAP_ZOMBIE);
+    assert(slot->next == nullptr);
+
+    slot->cap = cap;
+    if (next_slot != nullptr) {
+      slot->insert_after(next_slot);
+    }
   }
 
   return true;
@@ -509,6 +517,11 @@ map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
   }
 
   map_ptr<cap_space_t> cap_space = page_table.as<cap_space_t>();
+  if (get_cap_type(cap_space->slots[slot_index].cap) == CAP_NULL) [[unlikely]] {
+    errno = SYS_S_OK;
+    return 0_map;
+  }
+
   return make_map_ptr(&cap_space->slots[slot_index]);
 }
 

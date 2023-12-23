@@ -319,6 +319,7 @@ void destroy_endpoint_object(map_ptr<cap_slot_t> slot);
 void destroy_page_table_object(map_ptr<cap_slot_t> slot);
 void destroy_virt_page_object(map_ptr<cap_slot_t> slot);
 void destroy_cap_space_object(map_ptr<cap_slot_t> slot);
+void destroy_id_object(map_ptr<cap_slot_t> slot);
 
 bool map_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot);
 bool unmap_page_table_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_ptr<cap_slot_t> child_page_table_slot);
