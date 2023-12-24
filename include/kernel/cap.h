@@ -63,6 +63,7 @@ union capability_t {
   struct {
     uint64_t              type      : 5;
     uint64_t              mapped    : 1;
+    uint64_t              device    : 1;
     uint64_t              readable  : 1;
     uint64_t              writable  : 1;
     uint64_t              executable: 1;
@@ -240,7 +241,7 @@ inline capability_t make_page_table_cap(map_ptr<page_table_t> page_table, bool m
 }
 
 inline capability_t make_virt_page_cap(
-    bool readable, bool writable, bool executable, bool mapped, uint64_t level, phys_ptr<void> phys_addr, virt_ptr<void> virt_addr, map_ptr<page_table_t> parent_table) {
+    bool device, bool readable, bool writable, bool executable, bool mapped, uint64_t level, phys_ptr<void> phys_addr, virt_ptr<void> virt_addr, map_ptr<page_table_t> parent_table) {
   assert(phys_addr < CONFIG_MAX_PHYSICAL_ADDRESS);
   assert(level <= MAX_PAGE_TABLE_LEVEL);
 
@@ -248,6 +249,7 @@ inline capability_t make_virt_page_cap(
     .virt_page = {
       .type         = static_cast<uint64_t>(CAP_VIRT_PAGE),
       .mapped       = mapped,
+      .device       = device,
       .readable     = readable,
       .writable     = writable,
       .executable   = executable,

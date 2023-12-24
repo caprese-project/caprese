@@ -218,7 +218,7 @@ map_ptr<cap_slot_t> create_virt_page_object(map_ptr<cap_slot_t> dst, map_ptr<cap
     return 0_map;
   }
 
-  dst->cap = make_virt_page_cap(readable, writable, executable, false, level, make_phys_ptr(dst->cap.memory.phys_addr), 0_virt, 0_map);
+  dst->cap = make_virt_page_cap(dst->cap.memory.device, readable, writable, executable, false, level, make_phys_ptr(dst->cap.memory.phys_addr), 0_virt, 0_map);
 
   return dst;
 }
@@ -647,7 +647,9 @@ bool map_virt_page_cap(map_ptr<cap_slot_t> page_table_slot, size_t index, map_pt
     return false;
   }
 
-  memset(phys_ptr<void>::from(virt_page_cap.phys_addr).as_map().get(), 0, get_page_size(virt_page_cap.level));
+  if (!virt_page_cap.device) {
+    memset(phys_ptr<void>::from(virt_page_cap.phys_addr).as_map().get(), 0, get_page_size(virt_page_cap.level));
+  }
 
   pte.set_flags({
       .readable   = readable,
