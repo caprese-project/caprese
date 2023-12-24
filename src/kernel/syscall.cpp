@@ -569,34 +569,14 @@ sysret_t invoke_syscall_virt_page_cap(uint16_t id, map_ptr<syscall_args_t> args)
     case SYS_VIRT_PAGE_CAP_MAPPED & 0xffff:
       return sysret_s_ok(virt_page_cap.mapped);
     case SYS_VIRT_PAGE_CAP_READABLE & 0xffff:
-      if (!virt_page_cap.mapped) [[unlikely]] {
-        loge(tag, "This virt page cap is not mapped: %d", args->args[0]);
-        return sysret_e_cap_state();
-      }
       return sysret_s_ok(virt_page_cap.readable);
     case SYS_VIRT_PAGE_CAP_WRITABLE & 0xffff:
-      if (!virt_page_cap.mapped) [[unlikely]] {
-        loge(tag, "This virt page cap is not mapped: %d", args->args[0]);
-        return sysret_e_cap_state();
-      }
       return sysret_s_ok(virt_page_cap.writable);
     case SYS_VIRT_PAGE_CAP_EXECUTABLE & 0xffff:
-      if (!virt_page_cap.mapped) [[unlikely]] {
-        loge(tag, "This virt page cap is not mapped: %d", args->args[0]);
-        return sysret_e_cap_state();
-      }
       return sysret_s_ok(virt_page_cap.executable);
     case SYS_VIRT_PAGE_CAP_LEVEL & 0xffff:
-      if (!virt_page_cap.mapped) [[unlikely]] {
-        loge(tag, "This virt page cap is not mapped: %d", args->args[0]);
-        return sysret_e_cap_state();
-      }
       return sysret_s_ok(virt_page_cap.level);
     case SYS_VIRT_PAGE_CAP_PHYS_ADDR & 0xffff:
-      if (!virt_page_cap.mapped) [[unlikely]] {
-        loge(tag, "This virt page cap is not mapped: %d", args->args[0]);
-        return sysret_e_cap_state();
-      }
       return sysret_s_ok(virt_page_cap.phys_addr);
     case SYS_VIRT_PAGE_CAP_VIRT_ADDR & 0xffff:
       if (!virt_page_cap.mapped) [[unlikely]] {
