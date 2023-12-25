@@ -342,7 +342,7 @@ bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
   const message_buffer_t& src_msg_buf = src->msg_buf;
   message_buffer_t&       dst_msg_buf = dst->msg_buf;
 
-  if (src_msg_buf.cap_part_length + src_msg_buf.data_part_length >= std::size(src_msg_buf.data)) [[unlikely]] {
+  if (src_msg_buf.cap_part_length + src_msg_buf.data_part_length > std::size(src_msg_buf.data)) [[unlikely]] {
     logd(tag, "Failed to transfer the message. The source message buffer is too large. (cap_part_length=%llu, data_part_length=%llu)", src_msg_buf.cap_part_length, src_msg_buf.data_part_length);
     return false;
   }
