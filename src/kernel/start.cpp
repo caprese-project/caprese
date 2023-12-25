@@ -118,6 +118,9 @@ __init_code void setup_cap_space() {
   boot_info->root_boot_info->mem_caps_offset = 0;
   setup_memory_capabilities(boot_info);
 
+  boot_info->root_boot_info->num_virt_page_caps    = 0;
+  boot_info->root_boot_info->virt_page_caps_offset = boot_info->root_boot_info->mem_caps_offset + boot_info->root_boot_info->num_mem_caps;
+
   logi(tag, "Setting up capability space... done");
 }
 
@@ -163,6 +166,7 @@ __init_code void map_root_task(virt_ptr<void> va_base, const char* begin, const 
     if (virt_page_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the virtual page capability.");
     }
+    boot_info->root_boot_info->caps[boot_info->root_boot_info->virt_page_caps_offset + boot_info->root_boot_info->num_virt_page_caps++] = get_cap_slot_index(virt_page_cap_slot);
 
     logd(tag, "Mapped page %p -> %p (4k)", va_base + va_offset, page.as_phys());
   }

@@ -335,7 +335,7 @@ __init_code void setup_arch_root_boot_info(map_ptr<boot_info_t> boot_info) {
   root_boot_info->arch_info.dtb_start          = start.raw();
   root_boot_info->arch_info.dtb_end            = end.raw();
   root_boot_info->arch_info.num_dtb_vp_caps    = 0;
-  root_boot_info->arch_info.dtb_vp_caps_offset = root_boot_info->mem_caps_offset + root_boot_info->num_mem_caps;
+  root_boot_info->arch_info.dtb_vp_caps_offset = root_boot_info->virt_page_caps_offset + root_boot_info->num_virt_page_caps;
 
   map_ptr<page_table_t> page_table   = boot_info->payload_page_tables[KILO_PAGE_TABLE_LEVEL];
   size_t                dtb_size     = end - start;
@@ -351,7 +351,8 @@ __init_code void setup_arch_root_boot_info(map_ptr<boot_info_t> boot_info) {
     pte->set_next_page(page);
     pte->enable();
 
-    map_ptr<cap_slot_t> virt_page_cap_slot = insert_cap(boot_info->root_task, make_virt_page_cap(false, true, false, false, true, KILO_PAGE_TABLE_LEVEL, page.as_phys(), va_base + va_offset, page_table));
+    map_ptr<cap_slot_t> virt_page_cap_slot = insert_cap(boot_info->root_task,
+                                                        make_virt_page_cap(false, true, false, false, true, KILO_PAGE_TABLE_LEVEL, page.as_phys(), va_base + va_offset, page_table));
     if (virt_page_cap_slot == nullptr) [[unlikely]] {
       panic("Failed to insert the virtual page capability.");
     }

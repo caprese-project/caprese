@@ -38,5 +38,5 @@ map_ptr<boot_info_t> get_boot_info() {
 }
 
 size_t get_root_boot_info_size(map_ptr<root_boot_info_t> root_boot_info) {
-  return sizeof(root_boot_info_t) + sizeof(cap_t) * (root_boot_info->num_mem_caps + root_boot_info->arch_info.num_dtb_vp_caps);
+  return sizeof(root_boot_info_t) + sizeof(cap_t) * (root_boot_info->num_mem_caps + root_boot_info->num_virt_page_caps + root_boot_info->arch_info.num_dtb_vp_caps);
 }
