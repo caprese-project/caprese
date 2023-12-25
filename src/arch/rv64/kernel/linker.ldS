@@ -55,8 +55,7 @@ SECTIONS
     . = ALIGN(0x1000);
     _payload_end = .;
     _root_task_stack_start = .;
-    /* TODO: Make the stack size configurable. */
-    . += 0x1000;
+    . += CONFIG_ROOT_TASK_STACK_SIZE;
     _root_task_stack_end = .;
   }
 
