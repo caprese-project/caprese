@@ -142,6 +142,21 @@ sysret_t invoke_syscall_cap(uint16_t id, map_ptr<syscall_args_t> args) {
         return errno_to_sysret();
       }
     }
+    case SYS_CAP_SAME & 0xffff: {
+      map_ptr<cap_slot_t> lhs_cap_slot = lookup_cap(task, args->args[0]);
+      if (lhs_cap_slot == nullptr) [[unlikely]] {
+        loge(tag, "Failed to look up cap: %d", args->args[0]);
+        return errno_to_sysret();
+      }
+
+      map_ptr<cap_slot_t> rhs_cap_slot = lookup_cap(task, args->args[1]);
+      if (rhs_cap_slot == nullptr) [[unlikely]] {
+        loge(tag, "Failed to look up cap: %d", args->args[1]);
+        return errno_to_sysret();
+      }
+
+      return sysret_s_ok(is_same_cap(lhs_cap_slot, rhs_cap_slot));
+    }
     default:
       loge(tag, "Invalid syscall id: 0x%x", id);
       return sysret_e_ill_code();

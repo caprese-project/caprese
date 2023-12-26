@@ -44,6 +44,7 @@ static_assert(sizeof(cap_space_t) == PAGE_SIZE);
 [[nodiscard]] map_ptr<cap_slot_t> copy_cap(map_ptr<cap_slot_t> src_slot);
 [[nodiscard]] bool                revoke_cap(map_ptr<cap_slot_t> slot);
 [[nodiscard]] bool                destroy_cap(map_ptr<cap_slot_t> slot);
+[[nodiscard]] bool                is_same_cap(map_ptr<cap_slot_t> lhs, map_ptr<cap_slot_t> rhs);
 
 [[nodiscard]] map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc);
 [[nodiscard]] size_t              get_cap_slot_index(map_ptr<cap_slot_t> cap_slot);

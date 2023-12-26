@@ -481,6 +481,40 @@ bool destroy_cap(map_ptr<cap_slot_t> slot) {
   return true;
 }
 
+bool is_same_cap(map_ptr<cap_slot_t> lhs, map_ptr<cap_slot_t> rhs) {
+  assert(lhs != nullptr);
+  assert(rhs != nullptr);
+
+  if (get_cap_type(lhs->cap) != get_cap_type(rhs->cap)) {
+    return false;
+  }
+
+  switch (get_cap_type(lhs->cap)) {
+    case CAP_NULL:
+      return false;
+    case CAP_MEM:
+      return false;
+    case CAP_TASK:
+      return lhs->cap.task.task == rhs->cap.task.task;
+    case CAP_ENDPOINT:
+      return lhs->cap.endpoint.endpoint == rhs->cap.endpoint.endpoint;
+    case CAP_VIRT_PAGE:
+      return false;
+    case CAP_PAGE_TABLE:
+      return false;
+    case CAP_CAP_SPACE:
+      return false;
+    case CAP_ID:
+      return lhs->cap.id.val1 == rhs->cap.id.val1 && lhs->cap.id.val2 == rhs->cap.id.val2 && lhs->cap.id.val3 == rhs->cap.id.val3;
+    case CAP_ZOMBIE:
+      return false;
+    case CAP_UNKNOWN:
+      return false;
+  }
+
+  return false;
+}
+
 map_ptr<cap_slot_t> lookup_cap(map_ptr<task_t> task, uintptr_t cap_desc) {
   assert(task != nullptr);
 
