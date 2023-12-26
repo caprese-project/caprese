@@ -376,7 +376,7 @@ bool read_msg_buf(map_ptr<task_t> task, uintptr_t ptr) {
     return false;
   }
 
-  size_t data_size = std::min(task->msg_buf.cap_part_length + task->msg_buf.data_part_length, std::size(task->msg_buf.data));
+  size_t data_size = sizeof(task->msg_buf.data[0]) * std::min(task->msg_buf.cap_part_length + task->msg_buf.data_part_length, std::size(task->msg_buf.data));
 
   if (!read_user_memory(task, ptr + header_size, make_map_ptr(&task->msg_buf.data), data_size)) [[unlikely]] {
     return false;
@@ -392,7 +392,7 @@ bool write_msg_buf(map_ptr<task_t> task, uintptr_t ptr) {
     return false;
   }
 
-  size_t data_size = std::min(task->msg_buf.cap_part_length + task->msg_buf.data_part_length, std::size(task->msg_buf.data));
+  size_t data_size = sizeof(task->msg_buf.data[0]) * std::min(task->msg_buf.cap_part_length + task->msg_buf.data_part_length, std::size(task->msg_buf.data));
 
   if (!write_user_memory(task, make_map_ptr(&task->msg_buf.data), ptr + header_size, data_size)) [[unlikely]] {
     return false;
