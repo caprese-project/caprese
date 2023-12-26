@@ -19,7 +19,8 @@ namespace {
   }
 
   FILE stdio_file = {
-    .__buf_mode   = _IONBF,
+    .__fd         = 0,
+    .__mode       = _IONBF,
     .__ungetc_buf = static_cast<char>(EOF),
     .__buf        = nullptr,
     .__buf_size   = 0,
