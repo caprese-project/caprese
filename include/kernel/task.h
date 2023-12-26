@@ -128,6 +128,9 @@ map_ptr<task_t> pop_ready_task();
 
 [[nodiscard]] map_ptr<task_t> lookup_tid(tid_t tid);
 
+[[nodiscard]] bool read_msg_buf(map_ptr<task_t> task, uintptr_t ptr);
+[[nodiscard]] bool write_msg_buf(map_ptr<task_t> task, uintptr_t ptr);
+
 void resched();
 void yield();
 

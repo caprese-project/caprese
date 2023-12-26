@@ -50,6 +50,7 @@ target_sources(
   kernel/start.cpp
   kernel/syscall.cpp
   kernel/task.cpp
+  kernel/user_memory.cpp
 )
 add_subdirectory(arch/${CONFIG_ARCH})
 

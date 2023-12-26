@@ -13,6 +13,7 @@
 #include <kernel/log.h>
 #include <kernel/task.h>
 #include <kernel/trap.h>
+#include <kernel/user_memory.h>
 #include <libcaprese/syscall.h>
 
 namespace {
@@ -366,6 +367,38 @@ map_ptr<task_t> lookup_tid(tid_t tid) {
 
   signal(SIGSEGV, old_handler);
   return task;
+}
+
+bool read_msg_buf(map_ptr<task_t> task, uintptr_t ptr) {
+  constexpr size_t header_size = offsetof(message_buffer_t, data);
+
+  if (!read_user_memory(task, ptr, make_map_ptr(&task->msg_buf), header_size)) [[unlikely]] {
+    return false;
+  }
+
+  size_t data_size = task->msg_buf.cap_part_length + task->msg_buf.data_part_length;
+
+  if (!read_user_memory(task, ptr + header_size, make_map_ptr(&task->msg_buf.data), data_size)) [[unlikely]] {
+    return false;
+  }
+
+  return true;
+}
+
+bool write_msg_buf(map_ptr<task_t> task, uintptr_t ptr) {
+  constexpr size_t header_size = offsetof(message_buffer_t, data);
+
+  if (!write_user_memory(task, make_map_ptr(&task->msg_buf), ptr, header_size)) [[unlikely]] {
+    return false;
+  }
+
+  size_t data_size = task->msg_buf.cap_part_length + task->msg_buf.data_part_length;
+
+  if (!write_user_memory(task, make_map_ptr(&task->msg_buf.data), ptr + header_size, data_size)) [[unlikely]] {
+    return false;
+  }
+
+  return true;
 }
 
 void resched() {
