@@ -17,17 +17,12 @@ void get_syscall_args(map_ptr<syscall_args_t> args) {
   args->code    = task->frame.a7;
 }
 
-sysret_t invoke_syscall_arch(uint16_t id, [[maybe_unused]] map_ptr<syscall_args_t> args) {
-  switch (id) {
-    case SYS_ARCH_MMU_MODE & 0xffff:
+sysret_t invoke_sys_arch_mmu_mode(map_ptr<syscall_args_t>) {
 #if defined(CONFIG_MMU_SV39)
-      return sysret_s_ok(RISCV_MMU_SV39);
+  return sysret_s_ok(RISCV_MMU_SV39);
 #elif defined(CONFIG_MMU_SV48)
-      return sysret_s_ok(RISCV_MMU_SV48);
+  return sysret_s_ok(RISCV_MMU_SV48);
 #else
-      return sysret_s_ok(0);
+  return sysret_s_ok(0);
 #endif
-    default:
-      return sysret_e_ill_code();
-  }
 }

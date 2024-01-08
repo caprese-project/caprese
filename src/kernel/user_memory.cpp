@@ -75,3 +75,38 @@ bool write_user_memory(map_ptr<task_t> task, map_ptr<void> src, uintptr_t dst, s
 
   return true;
 }
+
+bool forward_user_memory(map_ptr<task_t> src_task, map_ptr<task_t> dst_task, uintptr_t src, uintptr_t dst, size_t size) {
+  size_t forwarded = 0;
+
+  while (forwarded < size) {
+    auto [src_pte, src_level] = walk(src_task, src + forwarded);
+    if (src_pte == nullptr) {
+      return false;
+    }
+
+    auto [dst_pte, dst_level] = walk(dst_task, dst + forwarded);
+    if (dst_pte == nullptr) {
+      return false;
+    }
+
+    size_t src_page_size = get_page_size(src_level);
+    size_t src_offset    = (src + forwarded) & (src_page_size - 1);
+    size_t src_length    = src_page_size - src_offset;
+    if (src_length > size - forwarded) {
+      src_length = size - forwarded;
+    }
+
+    size_t dst_page_size = get_page_size(dst_level);
+    size_t dst_offset    = (dst + forwarded) & (dst_page_size - 1);
+    size_t dst_length    = dst_page_size - dst_offset;
+    if (dst_length > size - forwarded) {
+      dst_length = size - forwarded;
+    }
+
+    memcpy((dst_pte->get_next_page() + dst_offset).get(), (src_pte->get_next_page() + src_offset).get(), src_length);
+    forwarded += src_length;
+  }
+
+  return true;
+}

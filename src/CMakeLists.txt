@@ -51,6 +51,14 @@ target_sources(
   kernel/syscall.cpp
   kernel/task.cpp
   kernel/user_memory.cpp
+  kernel/syscall/ns_cap.cpp
+  kernel/syscall/ns_endpoint_cap.cpp
+  kernel/syscall/ns_id_cap.cpp
+  kernel/syscall/ns_mem_cap.cpp
+  kernel/syscall/ns_page_table_cap.cpp
+  kernel/syscall/ns_system.cpp
+  kernel/syscall/ns_task_cap.cpp
+  kernel/syscall/ns_virt_page_cap.cpp
 )
 add_subdirectory(arch/${CONFIG_ARCH})
 

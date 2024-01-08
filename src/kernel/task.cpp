@@ -56,8 +56,11 @@ void init_task(map_ptr<task_t> task, map_ptr<cap_space_t> cap_space, map_ptr<pag
   task->free_slots        = 0_map;
   task->free_slots_count  = 0;
   task->root_page_table   = root_page_table;
+  task->kill_notify       = 0_map;
   task->state             = task_state_t::suspended;
   task->ipc_state         = ipc_state_t::none;
+  task->ipc_msg_state     = ipc_msg_state_t::empty;
+  task->event_type        = event_type_t::none;
   task->exit_status       = 0;
 
   memset(root_page_table.get(), 0, sizeof(page_table_t));
@@ -200,7 +203,26 @@ void kill_task(map_ptr<task_t> task, int exit_status) {
       remove_ready_queue(task);
       break;
     case task_state_t::waiting:
-      // TODO: impl
+      if (task->endpoint != nullptr) {
+        std::lock_guard ep_lock(task->endpoint->lock);
+
+        switch (task->ipc_state) {
+          case ipc_state_t::sending:
+            remove_waiting_queue(task->endpoint->sender_queue, task);
+            break;
+          case ipc_state_t::receiving:
+            remove_waiting_queue(task->endpoint->receiver_queue, task);
+            break;
+          case ipc_state_t::calling: {
+            std::lock_guard callee_lock(task->callee_task->lock);
+            assert(task->callee_task->caller_task == task);
+            task->callee_task->caller_task = 0_map;
+            break;
+          }
+          default:
+            panic("Unexpected ipc state: %s", ipc_state_to_str(task->ipc_state));
+        }
+      }
       break;
     default:
       break;
@@ -210,6 +232,10 @@ void kill_task(map_ptr<task_t> task, int exit_status) {
 
   task->state       = task_state_t::killed;
   task->exit_status = exit_status;
+
+  if (task->kill_notify != nullptr) {
+    ipc_send_kill_notify(task->kill_notify, task);
+  }
 
   if (task->tid.index == 1) [[unlikely]] {
     panic("The root task has been killed.");
@@ -281,6 +307,20 @@ void resume_task(map_ptr<task_t> task) {
 
   task->state = task_state_t::ready;
   push_ready_queue(task);
+}
+
+void set_kill_notify(map_ptr<task_t> task, map_ptr<endpoint_t> ep) {
+  assert(task != nullptr);
+  assert(ep != nullptr);
+
+  std::lock_guard lock(task->lock);
+
+  if (task->state == task_state_t::unused) [[unlikely]] {
+    errno = SYS_E_ILL_STATE;
+    return;
+  }
+
+  task->kill_notify = ep;
 }
 
 void push_ready_queue(map_ptr<task_t> task) {
@@ -367,38 +407,6 @@ map_ptr<task_t> lookup_tid(tid_t tid) {
 
   signal(SIGSEGV, old_handler);
   return task;
-}
-
-bool read_msg_buf(map_ptr<task_t> task, uintptr_t ptr) {
-  constexpr size_t header_size = offsetof(message_buffer_t, data);
-
-  if (!read_user_memory(task, ptr, make_map_ptr(&task->msg_buf), header_size)) [[unlikely]] {
-    return false;
-  }
-
-  size_t data_size = sizeof(task->msg_buf.data[0]) * std::min(task->msg_buf.cap_part_length + task->msg_buf.data_part_length, std::size(task->msg_buf.data));
-
-  if (!read_user_memory(task, ptr + header_size, make_map_ptr(&task->msg_buf.data), data_size)) [[unlikely]] {
-    return false;
-  }
-
-  return true;
-}
-
-bool write_msg_buf(map_ptr<task_t> task, uintptr_t ptr) {
-  constexpr size_t header_size = offsetof(message_buffer_t, data);
-
-  if (!write_user_memory(task, make_map_ptr(&task->msg_buf), ptr, header_size)) [[unlikely]] {
-    return false;
-  }
-
-  size_t data_size = sizeof(task->msg_buf.data[0]) * std::min(task->msg_buf.cap_part_length + task->msg_buf.data_part_length, std::size(task->msg_buf.data));
-
-  if (!write_user_memory(task, make_map_ptr(&task->msg_buf.data), ptr + header_size, data_size)) [[unlikely]] {
-    return false;
-  }
-
-  return true;
 }
 
 void resched() {

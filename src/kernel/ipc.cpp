@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cerrno>
 #include <iterator>
 #include <mutex>
@@ -6,6 +7,7 @@
 #include <kernel/ipc.h>
 #include <kernel/log.h>
 #include <kernel/task.h>
+#include <kernel/user_memory.h>
 #include <libcaprese/syscall.h>
 
 namespace {
@@ -21,6 +23,14 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
   assert(cur_task->next_waiting_task == nullptr);
   assert(cur_task->callee_task == nullptr);
 
+  cur_task->ipc_short_msg[0] = arg0;
+  cur_task->ipc_short_msg[1] = arg1;
+  cur_task->ipc_short_msg[2] = arg2;
+  cur_task->ipc_short_msg[3] = arg3;
+  cur_task->ipc_short_msg[4] = arg4;
+  cur_task->ipc_short_msg[5] = arg5;
+  cur_task->ipc_msg_state    = ipc_msg_state_t::short_size;
+
   {
     std::lock_guard ep_lock(endpoint->lock);
 
@@ -32,18 +42,12 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
       {
         std::lock_guard lock(receiver->lock);
 
-        receiver->msg_buf.cap_part_length  = 0;
-        receiver->msg_buf.data_part_length = 6;
-        receiver->msg_buf.data[0]          = arg0;
-        receiver->msg_buf.data[1]          = arg1;
-        receiver->msg_buf.data[2]          = arg2;
-        receiver->msg_buf.data[3]          = arg3;
-        receiver->msg_buf.data[4]          = arg4;
-        receiver->msg_buf.data[5]          = arg5;
+        ipc_transfer_ipc_msg(receiver, cur_task);
 
         remove_waiting_queue(endpoint->receiver_queue, receiver);
         receiver->state     = task_state_t::ready;
         receiver->ipc_state = ipc_state_t::none;
+        receiver->endpoint  = 0_map;
       }
 
       switch_task(receiver);
@@ -56,33 +60,26 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
       return false;
     }
 
-    cur_task->msg_buf.cap_part_length  = 0;
-    cur_task->msg_buf.data_part_length = 6;
-    cur_task->msg_buf.data[0]          = arg0;
-    cur_task->msg_buf.data[1]          = arg1;
-    cur_task->msg_buf.data[2]          = arg2;
-    cur_task->msg_buf.data[3]          = arg3;
-    cur_task->msg_buf.data[4]          = arg4;
-    cur_task->msg_buf.data[5]          = arg5;
-
-    cur_task->state     = task_state_t::waiting;
-    cur_task->ipc_state = ipc_state_t::sending;
+    cur_task->state      = task_state_t::waiting;
+    cur_task->ipc_state  = ipc_state_t::sending;
+    cur_task->event_type = event_type_t::send;
+    cur_task->endpoint   = endpoint;
     push_waiting_queue(endpoint->sender_queue, cur_task);
   }
 
   resched();
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
+  assert(cur_task->event_type == event_type_t::none);
 
   if (cur_task->ipc_state == ipc_state_t::canceled) {
     errno = SYS_E_CANCELED;
   }
 
-  // The message should be written to receiver->msg_buf in ipc_receive.
   return cur_task->ipc_state == ipc_state_t::none;
 }
 
-bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
+bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint, virt_ptr<message_t> msg) {
   assert(endpoint != nullptr);
 
   map_ptr<task_t> cur_task = get_cls()->current_task;
@@ -90,6 +87,9 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
   assert(cur_task->prev_waiting_task == nullptr);
   assert(cur_task->next_waiting_task == nullptr);
   assert(cur_task->callee_task == nullptr);
+
+  cur_task->ipc_long_msg  = msg;
+  cur_task->ipc_msg_state = ipc_msg_state_t::long_size;
 
   {
     std::unique_lock ep_lock(endpoint->lock);
@@ -102,13 +102,14 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
       {
         std::lock_guard lock(receiver->lock);
 
-        if (!ipc_transfer_msg(receiver, cur_task)) [[unlikely]] {
+        if (!ipc_transfer_ipc_msg(receiver, cur_task)) [[unlikely]] {
           return false;
         }
 
         remove_waiting_queue(endpoint->receiver_queue, receiver);
         receiver->state     = task_state_t::ready;
         receiver->ipc_state = ipc_state_t::none;
+        receiver->endpoint  = 0_map;
       }
 
       ep_lock.unlock();
@@ -123,24 +124,26 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint) {
       return false;
     }
 
-    cur_task->state     = task_state_t::waiting;
-    cur_task->ipc_state = ipc_state_t::sending;
+    cur_task->state      = task_state_t::waiting;
+    cur_task->ipc_state  = ipc_state_t::sending;
+    cur_task->event_type = event_type_t::send;
+    cur_task->endpoint   = endpoint;
     push_waiting_queue(endpoint->sender_queue, cur_task);
   }
 
   resched();
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
+  assert(cur_task->event_type == event_type_t::none);
 
   if (cur_task->ipc_state == ipc_state_t::canceled) {
     errno = SYS_E_CANCELED;
   }
 
-  // The message should be written to receiver->msg_buf in ipc_receive.
   return cur_task->ipc_state == ipc_state_t::none;
 }
 
-bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
+bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint, virt_ptr<message_t> msg) {
   assert(endpoint != nullptr);
 
   map_ptr<task_t> cur_task = get_cls()->current_task;
@@ -148,6 +151,9 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
   assert(cur_task->prev_waiting_task == nullptr);
   assert(cur_task->next_waiting_task == nullptr);
   assert(cur_task->callee_task == nullptr);
+
+  cur_task->ipc_long_msg  = msg;
+  cur_task->ipc_msg_state = ipc_msg_state_t::long_size;
 
   {
     std::unique_lock ep_lock(endpoint->lock);
@@ -159,12 +165,17 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
         std::lock_guard caller_lock(caller->lock);
         assert(caller->state == task_state_t::waiting);
         assert(caller->ipc_state == ipc_state_t::calling);
+        assert(caller->event_type == event_type_t::send);
         assert(caller->prev_waiting_task == nullptr);
         assert(caller->next_waiting_task == nullptr);
         assert(caller->callee_task == cur_task);
-        caller->state       = task_state_t::ready;
-        caller->ipc_state   = ipc_state_t::canceled;
-        caller->callee_task = 0_map;
+        assert(caller->endpoint == endpoint);
+        caller->state         = task_state_t::ready;
+        caller->ipc_state     = ipc_state_t::canceled;
+        caller->event_type    = event_type_t::none;
+        caller->ipc_msg_state = ipc_msg_state_t::empty;
+        caller->callee_task   = 0_map;
+        caller->endpoint      = 0_map;
         push_ready_queue(caller);
       }
 
@@ -181,20 +192,27 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
 
         assert(sender->callee_task == nullptr);
 
-        if (!ipc_transfer_msg(cur_task, sender)) [[unlikely]] {
-          return false;
+        if (sender->event_type == event_type_t::send) {
+          if (!ipc_transfer_ipc_msg(cur_task, sender)) [[unlikely]] {
+            return false;
+          }
+
+          if (sender->ipc_state == ipc_state_t::calling) {
+            assert(sender->state == task_state_t::waiting);
+            assert(sender->event_type == event_type_t::send);
+            sender->callee_task   = cur_task;
+            cur_task->caller_task = sender;
+          } else {
+            sender->state      = task_state_t::ready;
+            sender->ipc_state  = ipc_state_t::none;
+            sender->event_type = event_type_t::none;
+            sender->endpoint   = 0_map;
+          }
+        } else if (sender->event_type == event_type_t::kill) {
+          ipc_transfer_kill_msg(cur_task, sender);
         }
 
         remove_waiting_queue(endpoint->sender_queue, sender);
-
-        if (sender->ipc_state == ipc_state_t::calling) {
-          assert(sender->state == task_state_t::waiting);
-          sender->callee_task   = cur_task;
-          cur_task->caller_task = sender;
-        } else {
-          sender->state     = task_state_t::ready;
-          sender->ipc_state = ipc_state_t::none;
-        }
       }
 
       if (sender->state == task_state_t::ready) {
@@ -213,6 +231,7 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
 
     cur_task->state     = task_state_t::waiting;
     cur_task->ipc_state = ipc_state_t::receiving;
+    cur_task->endpoint  = endpoint;
     push_waiting_queue(endpoint->receiver_queue, cur_task);
   }
 
@@ -224,11 +243,10 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint) {
     errno = SYS_E_CANCELED;
   }
 
-  // The message should be written to cur_task->msg_buf in ipc_send_xxx.
   return cur_task->ipc_state == ipc_state_t::none;
 }
 
-bool ipc_reply(map_ptr<endpoint_t> endpoint) {
+bool ipc_reply(map_ptr<endpoint_t> endpoint, virt_ptr<message_t> msg) {
   std::unique_lock ep_lock(endpoint->lock);
 
   map_ptr<task_t> cur_task = get_cls()->current_task;
@@ -242,17 +260,24 @@ bool ipc_reply(map_ptr<endpoint_t> endpoint) {
   assert(caller->callee_task == cur_task);
   assert(caller->state == task_state_t::waiting);
   assert(caller->ipc_state == ipc_state_t::calling);
+  assert(caller->event_type == event_type_t::send);
+  assert(caller->endpoint == endpoint);
+
+  cur_task->ipc_long_msg  = msg;
+  cur_task->ipc_msg_state = ipc_msg_state_t::long_size;
 
   {
     std::lock_guard caller_lock(caller->lock);
 
-    if (!ipc_transfer_msg(caller, cur_task)) [[unlikely]] {
+    if (!ipc_transfer_ipc_msg(caller, cur_task)) [[unlikely]] {
       return false;
     }
 
     caller->state         = task_state_t::ready;
     caller->ipc_state     = ipc_state_t::none;
+    caller->event_type    = event_type_t::none;
     caller->callee_task   = 0_map;
+    caller->endpoint      = 0_map;
     cur_task->caller_task = 0_map;
 
     push_ready_queue(caller);
@@ -261,13 +286,17 @@ bool ipc_reply(map_ptr<endpoint_t> endpoint) {
   return true;
 }
 
-bool ipc_call(map_ptr<endpoint_t> endpoint) {
+bool ipc_call(map_ptr<endpoint_t> endpoint, virt_ptr<message_t> msg) {
   assert(endpoint != nullptr);
 
   map_ptr<task_t> cur_task = get_cls()->current_task;
 
-  cur_task->state     = task_state_t::waiting;
-  cur_task->ipc_state = ipc_state_t::calling;
+  cur_task->ipc_long_msg  = msg;
+  cur_task->ipc_msg_state = ipc_msg_state_t::long_size;
+  cur_task->state         = task_state_t::waiting;
+  cur_task->ipc_state     = ipc_state_t::calling;
+  cur_task->event_type    = event_type_t::send;
+  cur_task->endpoint      = endpoint;
 
   {
     std::unique_lock ep_lock(endpoint->lock);
@@ -279,7 +308,7 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
 
       std::lock_guard recv_lock(receiver->lock);
 
-      if (!ipc_transfer_msg(receiver, cur_task)) [[unlikely]] {
+      if (!ipc_transfer_ipc_msg(receiver, cur_task)) [[unlikely]] {
         return false;
       }
 
@@ -288,6 +317,7 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
       receiver->state       = task_state_t::ready;
       receiver->ipc_state   = ipc_state_t::none;
       receiver->caller_task = cur_task;
+      receiver->endpoint    = 0_map;
       cur_task->callee_task = receiver;
 
       push_ready_queue(receiver);
@@ -299,6 +329,7 @@ bool ipc_call(map_ptr<endpoint_t> endpoint) {
   resched();
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
+  assert(cur_task->event_type == event_type_t::none);
 
   if (cur_task->ipc_state == ipc_state_t::canceled) {
     errno = SYS_E_CANCELED;
@@ -319,6 +350,7 @@ void ipc_cancel(map_ptr<endpoint_t> endpoint) {
 
     receiver->state     = task_state_t::ready;
     receiver->ipc_state = ipc_state_t::canceled;
+    receiver->endpoint  = 0_map;
     push_ready_queue(receiver);
   }
 
@@ -329,49 +361,185 @@ void ipc_cancel(map_ptr<endpoint_t> endpoint) {
 
     remove_waiting_queue(endpoint->sender_queue, sender);
 
-    sender->state     = task_state_t::ready;
-    sender->ipc_state = ipc_state_t::canceled;
+    sender->ipc_msg_state = ipc_msg_state_t::empty;
+    sender->state         = task_state_t::ready;
+    sender->ipc_state     = ipc_state_t::canceled;
+    sender->event_type    = event_type_t::none;
+    sender->endpoint      = 0_map;
     push_ready_queue(sender);
   }
 }
 
-bool ipc_transfer_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
+void ipc_send_kill_notify(map_ptr<endpoint_t> endpoint, map_ptr<task_t> task) {
+  assert(endpoint != nullptr);
+  assert(task != nullptr);
+  assert(task->state == task_state_t::killed);
+
+  {
+    std::lock_guard ep_lock(endpoint->lock);
+
+    if (endpoint->receiver_queue.head != nullptr) {
+      assert(endpoint->sender_queue.head == nullptr);
+
+      map_ptr<task_t> receiver = endpoint->receiver_queue.head;
+
+      {
+        std::lock_guard lock(receiver->lock);
+
+        ipc_transfer_kill_msg(receiver, task);
+
+        remove_waiting_queue(endpoint->receiver_queue, receiver);
+        receiver->state     = task_state_t::ready;
+        receiver->ipc_state = ipc_state_t::none;
+        receiver->endpoint  = 0_map;
+        push_ready_queue(receiver);
+      }
+    } else {
+      task->ipc_state  = ipc_state_t::sending;
+      task->event_type = event_type_t::kill;
+      task->endpoint   = endpoint;
+      push_waiting_queue(endpoint->sender_queue, task);
+    }
+  }
+
+  resched();
+}
+
+bool ipc_transfer_ipc_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
   assert(dst != nullptr);
   assert(src != nullptr);
 
-  const message_buffer_t& src_msg_buf = src->msg_buf;
-  message_buffer_t&       dst_msg_buf = dst->msg_buf;
+  if (dst->ipc_msg_state != ipc_msg_state_t::long_size) [[unlikely]] {
+    panic("Unexpected ipc msg state: %d", dst->ipc_msg_state);
+  }
 
-  if (src_msg_buf.cap_part_length + src_msg_buf.data_part_length > std::size(src_msg_buf.data)) [[unlikely]] {
-    logd(tag, "Failed to transfer the message. The source message buffer is too large. (cap_part_length=%llu, data_part_length=%llu)", src_msg_buf.cap_part_length, src_msg_buf.data_part_length);
+  message_header header;
+  header.msg_type         = MSG_TYPE_IPC;
+  header.sender_id        = std::bit_cast<uint32_t>(src->tid);
+  header.receiver_id      = std::bit_cast<uint32_t>(dst->tid);
+  header.data_type_map[0] = 0;
+  header.data_type_map[1] = 0;
+
+  switch (src->ipc_msg_state) {
+    case ipc_msg_state_t::empty: {
+      header.payload_length = 0;
+      break;
+    }
+    case ipc_msg_state_t::short_size: {
+      header.payload_length = sizeof(src->ipc_short_msg);
+      break;
+    }
+    case ipc_msg_state_t::long_size: {
+      message_header src_msg_header;
+      if (!read_user_memory(src, src->ipc_long_msg.raw(), make_map_ptr(&src_msg_header), sizeof(message_header))) [[unlikely]] {
+        loge(tag, "Failed to read user memory: tid=%d, addr=%p", src->tid, src->ipc_long_msg);
+        return false;
+      }
+      header.payload_length = src_msg_header.payload_length;
+      break;
+    }
+    default: {
+      panic("Unknown ipc msg state: %d", src->ipc_msg_state);
+    }
+  }
+
+  message_header dst_msg_header;
+  if (!read_user_memory(dst, dst->ipc_long_msg.raw(), make_map_ptr(&dst_msg_header), sizeof(message_header))) [[unlikely]] {
+    loge(tag, "Failed to read user memory: tid=%d, addr=%p", src->tid, src->ipc_long_msg);
     return false;
   }
 
-  for (size_t i = 0; i < src_msg_buf.cap_part_length; ++i) {
-    uintptr_t cap_desc = (src_msg_buf.data[i] << 1) >> 1;
-    bool      delegate = cap_desc != src_msg_buf.data[i];
-
-    map_ptr<cap_slot_t> src_slot = lookup_cap(src, cap_desc);
-    if (src_slot == nullptr) [[unlikely]] {
-      logd(tag, "Failed to transfer the message. Failed to lookup cap from the source buffer. (index=%llu, cap=%llu)", i, src_msg_buf.data[i]);
-      return false;
-    }
-
-    map_ptr<cap_slot_t> dst_slot = delegate ? delegate_cap(dst, src_slot) : transfer_cap(dst, src_slot);
-    if (dst_slot == nullptr) [[unlikely]] {
-      logd(tag, "Failed to transfer the message. Failed to %s cap to the destination buffer.", delegate ? "delegate" : "transfer");
-      return false;
-    }
-
-    dst_msg_buf.data[i] = get_cap_slot_index(dst_slot);
+  if (dst_msg_header.payload_length < header.payload_length) [[unlikely]] {
+    loge(tag, "Failed to send packet: payload too large: tid=%d, payload_length=%d, dst_payload_length=%d", src->tid, header.payload_length, dst_msg_header.payload_length);
+    return false;
   }
 
-  for (size_t i = 0; i < src_msg_buf.data_part_length; ++i) {
-    dst_msg_buf.data[src_msg_buf.cap_part_length + i] = src_msg_buf.data[src_msg_buf.cap_part_length + i];
+  if (!write_user_memory(dst, make_map_ptr(&header), dst->ipc_long_msg.raw(), sizeof(message_header))) [[unlikely]] {
+    loge(tag, "Failed to write user memory: tid=%d, addr=%p", dst->tid, dst->ipc_long_msg);
+    return false;
   }
 
-  dst_msg_buf.cap_part_length  = src_msg_buf.cap_part_length;
-  dst_msg_buf.data_part_length = src_msg_buf.data_part_length;
+  constexpr size_t xlen = 8 * sizeof(header.data_type_map[0]);
+
+  switch (src->ipc_msg_state) {
+    case ipc_msg_state_t::empty:
+      // Do nothing.
+      break;
+    case ipc_msg_state_t::short_size:
+      if (!write_user_memory(dst, make_map_ptr(src->ipc_short_msg), dst->ipc_long_msg.raw() + sizeof(message_header), sizeof(src->ipc_short_msg))) [[unlikely]] {
+        loge(tag, "Failed to write user memory: tid=%d, addr=%p", dst->tid, dst->ipc_long_msg);
+        return false;
+      }
+      break;
+    case ipc_msg_state_t::long_size:
+      if (!forward_user_memory(src, dst, src->ipc_long_msg.raw() + sizeof(message_header), dst->ipc_long_msg.raw() + sizeof(message_header), header.payload_length)) [[unlikely]] {
+        loge(tag, "Failed to forward user memory: tid=%d, src_addr=%p, dst_addr=%p, length=%d", src->tid, src->ipc_long_msg, dst->ipc_long_msg, header.payload_length);
+        return false;
+      }
+
+      for (size_t i = 0; i < std::min(header.payload_length / sizeof(uintptr_t), xlen * std::size(header.data_type_map)); ++i) {
+        if (header.data_type_map[i / xlen] & (1ull << (i % xlen))) [[unlikely]] {
+          uintptr_t value;
+          if (!read_user_memory(src, src->ipc_long_msg.raw() + sizeof(message_header) + sizeof(uintptr_t) * i, make_map_ptr(&value), sizeof(uintptr_t))) [[unlikely]] {
+            loge(tag, "Failed to read user memory: tid=%d, addr=%p", src->tid, src->ipc_long_msg.raw() + sizeof(message_header) + sizeof(uintptr_t) * i);
+            return false;
+          }
+
+          uintptr_t cap_desc = (value << 1) >> 1;
+          bool      delegate = cap_desc != value;
+
+          map_ptr<cap_slot_t> dst_slot;
+          if (delegate) {
+            dst_slot = delegate_cap(dst, lookup_cap(src, cap_desc));
+          } else {
+            dst_slot = transfer_cap(dst, lookup_cap(src, cap_desc));
+          }
+
+          if (dst_slot == nullptr) [[unlikely]] {
+            loge(tag, "Failed to %s cap: tid=%d, cap_desc=%p", delegate ? "delegate" : "transfer", src->tid, cap_desc);
+            return false;
+          }
+
+          uintptr_t dst_cap_desc = get_cap_slot_index(dst_slot);
+          if (!write_user_memory(dst, make_map_ptr(&dst_cap_desc), dst->ipc_long_msg.raw() + sizeof(message_header) + sizeof(uintptr_t) * i, sizeof(uintptr_t))) [[unlikely]] {
+            loge(tag, "Failed to write user memory: tid=%d, addr=%p", dst->tid, dst->ipc_long_msg.raw() + sizeof(message_header) + sizeof(uintptr_t) * i);
+            return false;
+          }
+        }
+      }
+      break;
+    default:
+      panic("Unknown ipc msg state: %d", src->ipc_msg_state);
+  }
+
+  src->ipc_msg_state = ipc_msg_state_t::empty;
+  dst->ipc_msg_state = ipc_msg_state_t::empty;
+
+  return true;
+}
+
+bool ipc_transfer_kill_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
+  assert(dst != nullptr);
+  assert(src != nullptr);
+
+  if (dst->ipc_msg_state != ipc_msg_state_t::long_size) [[unlikely]] {
+    panic("Unexpected ipc msg state: %d", dst->ipc_msg_state);
+  }
+
+  message_header header;
+  header.msg_type         = MSG_TYPE_KILL;
+  header.sender_id        = std::bit_cast<uint32_t>(src->tid);
+  header.receiver_id      = std::bit_cast<uint32_t>(dst->tid);
+  header.payload_length   = 0;
+  header.data_type_map[0] = 0;
+  header.data_type_map[1] = 0;
+
+  if (!write_user_memory(dst, make_map_ptr(&header), dst->ipc_long_msg.raw(), sizeof(message_header))) [[unlikely]] {
+    loge(tag, "Failed to write user memory: tid=%d, addr=%p", dst->tid, dst->ipc_long_msg);
+    return false;
+  }
+
+  dst->ipc_msg_state = ipc_msg_state_t::empty;
 
   return true;
 }

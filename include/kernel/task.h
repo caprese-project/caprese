@@ -49,6 +49,18 @@ enum struct ipc_state_t : uint8_t {
   canceled  = 4,
 };
 
+enum struct event_type_t : uint8_t {
+  none = 0,
+  send = 1,
+  kill = 2,
+};
+
+enum struct ipc_msg_state_t : uint8_t {
+  empty      = 0,
+  short_size = 1,
+  long_size  = 2,
+};
+
 inline const char* task_state_to_str(task_state_t state) {
   switch (state) {
     case task_state_t::unused:
@@ -99,12 +111,21 @@ struct alignas(PAGE_SIZE) task_t {
   map_ptr<cap_slot_t>   free_slots;
   size_t                free_slots_count;
   map_ptr<page_table_t> root_page_table;
-  message_buffer_t      msg_buf;
+  map_ptr<endpoint_t>   endpoint;
+  map_ptr<endpoint_t>   kill_notify;
   recursive_spinlock_t  lock;
-  task_state_t          state;
-  ipc_state_t           ipc_state;
-  int                   exit_status;
-  char                  stack[];
+
+  union {
+    uintptr_t           ipc_short_msg[6];
+    virt_ptr<message_t> ipc_long_msg;
+  };
+
+  task_state_t    state;
+  ipc_state_t     ipc_state;
+  ipc_msg_state_t ipc_msg_state;
+  event_type_t    event_type;
+  int             exit_status;
+  char            stack[];
 };
 
 static_assert(sizeof(task_t) == PAGE_SIZE);
@@ -122,14 +143,13 @@ void switch_task(map_ptr<task_t> task);
 void suspend_task(map_ptr<task_t> task);
 void resume_task(map_ptr<task_t> task);
 
+void set_kill_notify(map_ptr<task_t> task, map_ptr<endpoint_t> ep);
+
 void            push_ready_queue(map_ptr<task_t> task);
 void            remove_ready_queue(map_ptr<task_t> task);
 map_ptr<task_t> pop_ready_task();
 
 [[nodiscard]] map_ptr<task_t> lookup_tid(tid_t tid);
-
-[[nodiscard]] bool read_msg_buf(map_ptr<task_t> task, uintptr_t ptr);
-[[nodiscard]] bool write_msg_buf(map_ptr<task_t> task, uintptr_t ptr);
 
 void resched();
 void yield();
