@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cerrno>
+#include <cstring>
 #include <iterator>
 #include <mutex>
 
@@ -413,34 +414,27 @@ bool ipc_transfer_ipc_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
     panic("Unexpected ipc msg state: %d", dst->ipc_msg_state);
   }
 
-  message_header header;
-  header.msg_type         = MSG_TYPE_IPC;
-  header.sender_id        = std::bit_cast<uint32_t>(src->tid);
-  header.receiver_id      = std::bit_cast<uint32_t>(dst->tid);
-  header.data_type_map[0] = 0;
-  header.data_type_map[1] = 0;
+  message_header src_msg_header;
 
   switch (src->ipc_msg_state) {
-    case ipc_msg_state_t::empty: {
-      header.payload_length = 0;
+    case ipc_msg_state_t::empty:
+      src_msg_header.payload_length   = 0;
+      src_msg_header.data_type_map[0] = 0;
+      src_msg_header.data_type_map[1] = 0;
       break;
-    }
-    case ipc_msg_state_t::short_size: {
-      header.payload_length = sizeof(src->ipc_short_msg);
+    case ipc_msg_state_t::short_size:
+      src_msg_header.payload_length   = sizeof(src->ipc_short_msg);
+      src_msg_header.data_type_map[0] = 0;
+      src_msg_header.data_type_map[1] = 0;
       break;
-    }
-    case ipc_msg_state_t::long_size: {
-      message_header src_msg_header;
+    case ipc_msg_state_t::long_size:
       if (!read_user_memory(src, src->ipc_long_msg.raw(), make_map_ptr(&src_msg_header), sizeof(message_header))) [[unlikely]] {
         loge(tag, "Failed to read user memory: tid=%d, addr=%p", src->tid, src->ipc_long_msg);
         return false;
       }
-      header.payload_length = src_msg_header.payload_length;
       break;
-    }
-    default: {
+    default:
       panic("Unknown ipc msg state: %d", src->ipc_msg_state);
-    }
   }
 
   message_header dst_msg_header;
@@ -449,17 +443,24 @@ bool ipc_transfer_ipc_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
     return false;
   }
 
-  if (dst_msg_header.payload_length < header.payload_length) [[unlikely]] {
-    loge(tag, "Failed to send packet: payload too large: tid=%d, payload_length=%d, dst_payload_length=%d", src->tid, header.payload_length, dst_msg_header.payload_length);
+  if (dst_msg_header.payload_capacity < src_msg_header.payload_length) [[unlikely]] {
+    loge(tag, "Payload capacity is too small: tid=%d, capacity=%d, length=%d", dst->tid, dst_msg_header.payload_capacity, src_msg_header.payload_length);
     return false;
   }
 
-  if (!write_user_memory(dst, make_map_ptr(&header), dst->ipc_long_msg.raw(), sizeof(message_header))) [[unlikely]] {
+  dst_msg_header.msg_type       = MSG_TYPE_IPC;
+  dst_msg_header.sender_id      = std::bit_cast<uint32_t>(src->tid);
+  dst_msg_header.receiver_id    = std::bit_cast<uint32_t>(dst->tid);
+  dst_msg_header.payload_length = src_msg_header.payload_length;
+
+  memcpy(&dst_msg_header.data_type_map, &src_msg_header.data_type_map, sizeof(src_msg_header.data_type_map));
+
+  if (!write_user_memory(dst, make_map_ptr(&dst_msg_header), dst->ipc_long_msg.raw(), sizeof(message_header))) [[unlikely]] {
     loge(tag, "Failed to write user memory: tid=%d, addr=%p", dst->tid, dst->ipc_long_msg);
     return false;
   }
 
-  constexpr size_t xlen = 8 * sizeof(header.data_type_map[0]);
+  constexpr size_t xlen = 8 * sizeof(dst_msg_header.data_type_map[0]);
 
   switch (src->ipc_msg_state) {
     case ipc_msg_state_t::empty:
@@ -472,13 +473,13 @@ bool ipc_transfer_ipc_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
       }
       break;
     case ipc_msg_state_t::long_size:
-      if (!forward_user_memory(src, dst, src->ipc_long_msg.raw() + sizeof(message_header), dst->ipc_long_msg.raw() + sizeof(message_header), header.payload_length)) [[unlikely]] {
-        loge(tag, "Failed to forward user memory: tid=%d, src_addr=%p, dst_addr=%p, length=%d", src->tid, src->ipc_long_msg, dst->ipc_long_msg, header.payload_length);
+      if (!forward_user_memory(src, dst, src->ipc_long_msg.raw() + sizeof(message_header), dst->ipc_long_msg.raw() + sizeof(message_header), dst_msg_header.payload_length)) [[unlikely]] {
+        loge(tag, "Failed to forward user memory: tid=%d, src_addr=%p, dst_addr=%p, length=%d", src->tid, src->ipc_long_msg, dst->ipc_long_msg, dst_msg_header.payload_length);
         return false;
       }
 
-      for (size_t i = 0; i < std::min(header.payload_length / sizeof(uintptr_t), xlen * std::size(header.data_type_map)); ++i) {
-        if (header.data_type_map[i / xlen] & (1ull << (i % xlen))) [[unlikely]] {
+      for (size_t i = 0; i < std::min(dst_msg_header.payload_length / sizeof(uintptr_t), xlen * std::size(dst_msg_header.data_type_map)); ++i) {
+        if (dst_msg_header.data_type_map[i / xlen] & (1ull << (i % xlen))) [[unlikely]] {
           uintptr_t value;
           if (!read_user_memory(src, src->ipc_long_msg.raw() + sizeof(message_header) + sizeof(uintptr_t) * i, make_map_ptr(&value), sizeof(uintptr_t))) [[unlikely]] {
             loge(tag, "Failed to read user memory: tid=%d, addr=%p", src->tid, src->ipc_long_msg.raw() + sizeof(message_header) + sizeof(uintptr_t) * i);
@@ -527,6 +528,11 @@ bool ipc_transfer_kill_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
   }
 
   message_header header;
+  if (!read_user_memory(dst, dst->ipc_long_msg.raw(), make_map_ptr(&header), sizeof(message_header))) [[unlikely]] {
+    loge(tag, "Failed to read user memory: tid=%d, addr=%p", dst->tid, dst->ipc_long_msg);
+    return false;
+  }
+
   header.msg_type         = MSG_TYPE_KILL;
   header.sender_id        = std::bit_cast<uint32_t>(src->tid);
   header.receiver_id      = std::bit_cast<uint32_t>(dst->tid);
