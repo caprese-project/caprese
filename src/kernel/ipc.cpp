@@ -486,13 +486,13 @@ bool ipc_transfer_ipc_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
       }
       break;
     case ipc_msg_state_t::long_size:
-      if (!forward_user_memory(src, dst, src->ipc_long_msg.raw() + sizeof(message_header), dst->ipc_long_msg.raw() + sizeof(message_header), dst_msg_header.payload_length)) [[unlikely]] {
-        loge(tag, "Failed to forward user memory: tid=%d, src_addr=%p, dst_addr=%p, length=%d", src->tid, src->ipc_long_msg, dst->ipc_long_msg, dst_msg_header.payload_length);
+      if (!forward_user_memory(src, dst, src->ipc_long_msg.raw() + sizeof(message_header), dst->ipc_long_msg.raw() + sizeof(message_header), src_msg_header.payload_length)) [[unlikely]] {
+        loge(tag, "Failed to forward user memory: tid=%d, src_addr=%p, dst_addr=%p, length=%d", src->tid, src->ipc_long_msg, dst->ipc_long_msg, src_msg_header.payload_length);
         return false;
       }
 
-      for (size_t i = 0; i < std::min(dst_msg_header.payload_length / sizeof(uintptr_t), xlen * std::size(dst_msg_header.data_type_map)); ++i) {
-        if (dst_msg_header.data_type_map[i / xlen] & (1ull << (i % xlen))) [[unlikely]] {
+      for (size_t i = 0; i < std::min(src_msg_header.payload_length / sizeof(uintptr_t), xlen * std::size(src_msg_header.data_type_map)); ++i) {
+        if (src_msg_header.data_type_map[i / xlen] & (1ull << (i % xlen))) [[unlikely]] {
           uintptr_t value;
           if (!read_user_memory(src, src->ipc_long_msg.raw() + sizeof(message_header) + sizeof(uintptr_t) * i, make_map_ptr(&value), sizeof(uintptr_t))) [[unlikely]] {
             loge(tag, "Failed to read user memory: tid=%d, addr=%p", src->tid, src->ipc_long_msg.raw() + sizeof(message_header) + sizeof(uintptr_t) * i);
@@ -519,6 +519,15 @@ bool ipc_transfer_ipc_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
             loge(tag, "Failed to write user memory: tid=%d, addr=%p", dst->tid, dst->ipc_long_msg.raw() + sizeof(message_header) + sizeof(uintptr_t) * i);
             return false;
           }
+
+          src_msg_header.data_type_map[i / xlen] &= ~(1ull << (i % xlen));
+        }
+      }
+
+      if (memcmp(src_msg_header.data_type_map, dst_msg_header.data_type_map, sizeof(src_msg_header.data_type_map)) != 0) {
+        if (!write_user_memory(src, make_map_ptr(&src_msg_header), src->ipc_long_msg.raw(), sizeof(message_header))) [[unlikely]] {
+          loge(tag, "Failed to write user memory: tid=%d, addr=%p", src->tid, src->ipc_long_msg);
+          return false;
         }
       }
       break;
