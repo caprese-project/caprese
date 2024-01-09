@@ -197,6 +197,8 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint, virt_ptr<message_t
 
         assert(sender->callee_task == nullptr);
 
+        remove_waiting_queue(endpoint->sender_queue, sender);
+
         if (sender->event_type == event_type_t::send) {
           if (!ipc_transfer_ipc_msg(cur_task, sender)) [[unlikely]] {
             return false;
@@ -217,8 +219,6 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint, virt_ptr<message_t
         } else if (sender->event_type == event_type_t::kill) {
           ipc_transfer_kill_msg(cur_task, sender);
         }
-
-        remove_waiting_queue(endpoint->sender_queue, sender);
       }
 
       if (sender->state == task_state_t::ready) {
