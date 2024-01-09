@@ -237,11 +237,11 @@ void kill_task(map_ptr<task_t> task, int exit_status) {
     ipc_send_kill_notify(task->kill_notify, task);
   }
 
+  logd(tag, "Task 0x%x has been killed. status: %d", task->tid, exit_status);
+
   if (task->tid.index == 1) [[unlikely]] {
     panic("The root task has been killed.");
   }
-
-  logd(tag, "Task 0x%x has been killed. status: %d", task->tid, exit_status);
 
   if (task == get_cls()->current_task) [[unlikely]] {
     resched();
