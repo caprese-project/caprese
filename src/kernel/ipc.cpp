@@ -46,9 +46,10 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
         ipc_transfer_ipc_msg(receiver, cur_task);
 
         remove_waiting_queue(endpoint->receiver_queue, receiver);
-        receiver->state     = task_state_t::ready;
-        receiver->ipc_state = ipc_state_t::none;
-        receiver->endpoint  = 0_map;
+        receiver->state         = task_state_t::ready;
+        receiver->ipc_state     = ipc_state_t::none;
+        receiver->ipc_msg_state = ipc_msg_state_t::empty;
+        receiver->endpoint      = 0_map;
       }
 
       switch_task(receiver);
@@ -72,6 +73,7 @@ bool ipc_send_short(bool blocking, map_ptr<endpoint_t> endpoint, uintptr_t arg0,
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
   assert(cur_task->event_type == event_type_t::none);
+  assert(cur_task->ipc_msg_state == ipc_msg_state_t::empty);
 
   if (cur_task->ipc_state == ipc_state_t::canceled) {
     errno = SYS_E_CANCELED;
@@ -108,9 +110,10 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint, virt_ptr<message
         }
 
         remove_waiting_queue(endpoint->receiver_queue, receiver);
-        receiver->state     = task_state_t::ready;
-        receiver->ipc_state = ipc_state_t::none;
-        receiver->endpoint  = 0_map;
+        receiver->state         = task_state_t::ready;
+        receiver->ipc_state     = ipc_state_t::none;
+        receiver->ipc_msg_state = ipc_msg_state_t::empty;
+        receiver->endpoint      = 0_map;
       }
 
       ep_lock.unlock();
@@ -136,6 +139,7 @@ bool ipc_send_long(bool blocking, map_ptr<endpoint_t> endpoint, virt_ptr<message
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
   assert(cur_task->event_type == event_type_t::none);
+  assert(cur_task->ipc_msg_state == ipc_msg_state_t::empty);
 
   if (cur_task->ipc_state == ipc_state_t::canceled) {
     errno = SYS_E_CANCELED;
@@ -204,10 +208,11 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint, virt_ptr<message_t
             sender->callee_task   = cur_task;
             cur_task->caller_task = sender;
           } else {
-            sender->state      = task_state_t::ready;
-            sender->ipc_state  = ipc_state_t::none;
-            sender->event_type = event_type_t::none;
-            sender->endpoint   = 0_map;
+            sender->state         = task_state_t::ready;
+            sender->ipc_state     = ipc_state_t::none;
+            sender->event_type    = event_type_t::none;
+            sender->ipc_msg_state = ipc_msg_state_t::empty;
+            sender->endpoint      = 0_map;
           }
         } else if (sender->event_type == event_type_t::kill) {
           ipc_transfer_kill_msg(cur_task, sender);
@@ -239,6 +244,7 @@ bool ipc_receive(bool blocking, map_ptr<endpoint_t> endpoint, virt_ptr<message_t
   resched();
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
+  assert(cur_task->ipc_msg_state == ipc_msg_state_t::empty);
 
   if (cur_task->ipc_state == ipc_state_t::canceled) {
     errno = SYS_E_CANCELED;
@@ -262,6 +268,7 @@ bool ipc_reply(map_ptr<endpoint_t> endpoint, virt_ptr<message_t> msg) {
   assert(caller->state == task_state_t::waiting);
   assert(caller->ipc_state == ipc_state_t::calling);
   assert(caller->event_type == event_type_t::send);
+  assert(caller->ipc_msg_state == ipc_msg_state_t::long_size);
   assert(caller->endpoint == endpoint);
 
   cur_task->ipc_long_msg  = msg;
@@ -274,12 +281,14 @@ bool ipc_reply(map_ptr<endpoint_t> endpoint, virt_ptr<message_t> msg) {
       return false;
     }
 
-    caller->state         = task_state_t::ready;
-    caller->ipc_state     = ipc_state_t::none;
-    caller->event_type    = event_type_t::none;
-    caller->callee_task   = 0_map;
-    caller->endpoint      = 0_map;
-    cur_task->caller_task = 0_map;
+    caller->state           = task_state_t::ready;
+    caller->ipc_state       = ipc_state_t::none;
+    caller->event_type      = event_type_t::none;
+    caller->ipc_msg_state   = ipc_msg_state_t::empty;
+    caller->callee_task     = 0_map;
+    caller->endpoint        = 0_map;
+    cur_task->caller_task   = 0_map;
+    cur_task->ipc_msg_state = ipc_msg_state_t::empty;
 
     push_ready_queue(caller);
   }
@@ -315,11 +324,12 @@ bool ipc_call(map_ptr<endpoint_t> endpoint, virt_ptr<message_t> msg) {
 
       remove_waiting_queue(endpoint->receiver_queue, receiver);
 
-      receiver->state       = task_state_t::ready;
-      receiver->ipc_state   = ipc_state_t::none;
-      receiver->caller_task = cur_task;
-      receiver->endpoint    = 0_map;
-      cur_task->callee_task = receiver;
+      receiver->state         = task_state_t::ready;
+      receiver->ipc_state     = ipc_state_t::none;
+      receiver->ipc_msg_state = ipc_msg_state_t::empty;
+      receiver->caller_task   = cur_task;
+      receiver->endpoint      = 0_map;
+      cur_task->callee_task   = receiver;
 
       push_ready_queue(receiver);
     } else {
@@ -331,6 +341,7 @@ bool ipc_call(map_ptr<endpoint_t> endpoint, virt_ptr<message_t> msg) {
 
   assert(cur_task->ipc_state == ipc_state_t::none || cur_task->ipc_state == ipc_state_t::canceled);
   assert(cur_task->event_type == event_type_t::none);
+  assert(cur_task->ipc_msg_state == ipc_msg_state_t::empty);
 
   if (cur_task->ipc_state == ipc_state_t::canceled) {
     errno = SYS_E_CANCELED;
@@ -349,9 +360,10 @@ void ipc_cancel(map_ptr<endpoint_t> endpoint) {
 
     remove_waiting_queue(endpoint->receiver_queue, receiver);
 
-    receiver->state     = task_state_t::ready;
-    receiver->ipc_state = ipc_state_t::canceled;
-    receiver->endpoint  = 0_map;
+    receiver->state         = task_state_t::ready;
+    receiver->ipc_state     = ipc_state_t::canceled;
+    receiver->ipc_msg_state = ipc_msg_state_t::empty;
+    receiver->endpoint      = 0_map;
     push_ready_queue(receiver);
   }
 
@@ -362,10 +374,10 @@ void ipc_cancel(map_ptr<endpoint_t> endpoint) {
 
     remove_waiting_queue(endpoint->sender_queue, sender);
 
-    sender->ipc_msg_state = ipc_msg_state_t::empty;
     sender->state         = task_state_t::ready;
     sender->ipc_state     = ipc_state_t::canceled;
     sender->event_type    = event_type_t::none;
+    sender->ipc_msg_state = ipc_msg_state_t::empty;
     sender->endpoint      = 0_map;
     push_ready_queue(sender);
   }
@@ -390,9 +402,10 @@ void ipc_send_kill_notify(map_ptr<endpoint_t> endpoint, map_ptr<task_t> task) {
         ipc_transfer_kill_msg(receiver, task);
 
         remove_waiting_queue(endpoint->receiver_queue, receiver);
-        receiver->state     = task_state_t::ready;
-        receiver->ipc_state = ipc_state_t::none;
-        receiver->endpoint  = 0_map;
+        receiver->state         = task_state_t::ready;
+        receiver->ipc_state     = ipc_state_t::none;
+        receiver->ipc_msg_state = ipc_msg_state_t::empty;
+        receiver->endpoint      = 0_map;
         push_ready_queue(receiver);
       }
     } else {
@@ -512,9 +525,6 @@ bool ipc_transfer_ipc_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
     default:
       panic("Unknown ipc msg state: %d", src->ipc_msg_state);
   }
-
-  src->ipc_msg_state = ipc_msg_state_t::empty;
-  dst->ipc_msg_state = ipc_msg_state_t::empty;
 
   return true;
 }
