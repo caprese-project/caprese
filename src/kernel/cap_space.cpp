@@ -427,8 +427,7 @@ bool revoke_cap(map_ptr<cap_slot_t> slot) {
       cap_slot = cap_slot->next;
     }
 
-    capability_t        cap       = cap_slot->cap;
-    map_ptr<cap_slot_t> next_slot = cap_slot->next;
+    capability_t cap = cap_slot->cap;
 
     while (cap_slot != slot) {
       map_ptr<cap_slot_t> prev_slot = cap_slot->prev;
@@ -439,12 +438,7 @@ bool revoke_cap(map_ptr<cap_slot_t> slot) {
       cap_slot = prev_slot;
     }
 
-    assert(slot->next == nullptr);
-
     slot->cap = cap;
-    if (next_slot != nullptr) {
-      slot->insert_after(next_slot);
-    }
   }
 
   return true;
