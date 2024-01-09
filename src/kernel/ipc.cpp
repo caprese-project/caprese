@@ -457,7 +457,7 @@ bool ipc_transfer_ipc_msg(map_ptr<task_t> dst, map_ptr<task_t> src) {
   }
 
   if (dst_msg_header.payload_capacity < src_msg_header.payload_length) [[unlikely]] {
-    loge(tag, "Payload capacity is too small: tid=%d, capacity=%d, length=%d", dst->tid, dst_msg_header.payload_capacity, src_msg_header.payload_length);
+    loge(tag, "Payload capacity is too small: dst-tid=%d, src-tid=%d, dst-capacity=%d, src-length=%d", dst->tid, src->tid, dst_msg_header.payload_capacity, src_msg_header.payload_length);
     return false;
   }
 
