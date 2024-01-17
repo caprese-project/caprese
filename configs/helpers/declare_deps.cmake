@@ -40,6 +40,7 @@ function(declare_deps)
       PLATFORM_RISCV_XLEN=64
       PLATFORM_RISCV_ISA=rv64gc
       PLATFORM_RISCV_ABI=lp64d
+      FW_TEXT_START=${CONFIG_FW_TEXT_START}
       DEBUG=$<IF:$<CONFIG:Debug>,1,0>
     )
     set(PAYLOAD_PATH platform/generic/firmware/fw_payload.elf)

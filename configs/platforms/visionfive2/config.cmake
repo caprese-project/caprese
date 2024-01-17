@@ -11,5 +11,5 @@ declare_arch(ARCH rv64 MMU sv39)
 
 add_compile_definitions(
   CONFIG_ANSI_ESC_SEQ=1
-  CONFIG_FW_TEXT_START=0x80000000
+  CONFIG_FW_TEXT_START=0x40000000
 )
