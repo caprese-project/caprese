@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 include(configs/helpers/declare_arch.cmake)
 include(configs/helpers/check_config.cmake)

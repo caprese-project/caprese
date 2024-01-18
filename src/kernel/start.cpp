@@ -44,6 +44,19 @@ __init_code [[noreturn]] void early_trap_handler() {
   logf("KERNEL CRITICAL ERROR", "Reached the early trap handler.");
   logf("KERNEL CRITICAL ERROR", "This error indicates a bug or improper behavior in the kernel.");
   logf("KERNEL CRITICAL ERROR", "Detailed information and register dump will follow...");
+
+  uintptr_t scause;
+  uintptr_t sepc;
+  uintptr_t stval;
+
+  asm volatile("csrr %0, scause" : "=r"(scause));
+  asm volatile("csrr %0, sepc" : "=r"(sepc));
+  asm volatile("csrr %0, stval" : "=r"(stval));
+
+  logf("KERNEL CRITICAL ERROR", "scause: %p", scause);
+  logf("KERNEL CRITICAL ERROR", "sepc:   %p", sepc);
+  logf("KERNEL CRITICAL ERROR", "stval:  %p", stval);
+
   panic("Early trap!");
 }
 

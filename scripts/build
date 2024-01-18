@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+import os
+import sys
+import shutil
+
+riscv_platforms = ["qemu-riscv-virt", "visionfive2"]
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--build-type", default="debug", choices=["debug", "release"])
+parser.add_argument("--log-level", default="all", choices=["all", "debug", "info" "warning", "error", "fatal"])
+parser.add_argument("--platform", default="qemu-riscv-virt", choices=["qemu-riscv-virt", "visionfive2"])
+parser.add_argument("--build-tool", default="Ninja", choices=["Ninja", "Unix Makefiles"])
+parser.add_argument("--build-dir", default="build")
+parser.add_argument("--tool-chain", default=None, help="Path to RISC-V toolchain installation directory. If not specified, the script will attempt to find the toolchain in the system path or in the RISCV environment variable.")
+parser.add_argument("--rebuild", action="store_true", help="Rebuild the project from scratch. Attention: This will delete the build directory if it exists.")
+
+args = parser.parse_args()
+
+root_dir  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+build_dir = os.path.join(root_dir, args.build_dir)
+
+if args.tool_chain is None:
+  if args.platform in riscv_platforms:
+    if shutil.which("riscv64-unknown-elf-gcc") is not None:
+      tool_chain = os.path.dirname(shutil.which("riscv64-unknown-elf-gcc"))
+    elif "RISCV" in os.environ:
+      riscv_home = os.environ.get("RISCV")
+      gcc_path   = os.path.join(riscv_home, "bin", "riscv64-unknown-elf-gcc")
+      if os.path.exists(gcc_path):
+        tool_chain = os.path.dirname(gcc_path)
+    else:
+      print("Could not find RISC-V toolchain. Please specify the path to the toolchain using the --tool-chain argument.", file=sys.stderr)
+      exit(1)
+    print(f"Using RISC-V toolchain at '{tool_chain}'.")
+  else:
+    print(f"Unsupported platform '{args.platform}'.", file=sys.stderr)
+    exit(1)
+else:
+  tool_chain = args.tool_chain
+
+if os.path.exists(build_dir) and args.rebuild:
+  if not os.path.isdir(build_dir):
+    print(f"Build directory '{build_dir}' is not a directory.", file=sys.stderr)
+    exit(1)
+
+  shutil.rmtree(build_dir)
+
+if args.build_type == "debug":
+  build_type = "Debug"
+elif args.build_type == "release":
+  build_type = "Release"
+
+if not os.path.exists(build_dir):
+  print(f"Creating build directory '{build_dir}'")
+  command = ["cmake"]
+  command += ["-S", root_dir]
+  command += ["-B", build_dir]
+  command += ["-G", args.build_tool]
+  command += ["--no-warn-unused-cli"]
+  command += [f"-DCMAKE_C_COMPILER:FILEPATH={os.path.join(tool_chain, 'riscv64-unknown-elf-gcc')}"]
+  command += [f"-DCMAKE_CXX_COMPILER:FILEPATH={os.path.join(tool_chain, 'riscv64-unknown-elf-g++')}"]
+  command += [f"-DCMAKE_BUILD_TYPE:STRING={build_type}"]
+  command += [f"-DCONFIG_LOG_LEVEL:STRING={args.log_level}"]
+  command += [f"-DPLATFORM:STRING={args.platform}"]
+  subprocess.run(command, cwd=root_dir)
+
+print(f"Building project in '{build_dir}'")
+subprocess.run(["cmake", "--build", build_dir], cwd=root_dir)
+
+print("Build complete.")
+
+print("")
+if args.platform == "qemu-riscv-virt":
+  print("To run the project, execute the following command:")
+  print("")
+  print("  scripts/simulate <options>")
+  print("")
+  print("Use the --help option to see the available options.")
+elif args.platform == "visionfive2":
+  print("To install the project on the VisionFive2 board, please follow the steps below:")
+  print("")
+  print("  1. Perform the bootloader recovery.")
+  print("  2. Select the recovery option '2: update fw_verif/uboot in flash.'")
+  print(f"  3. Transfer the {build_dir}/caprese.img file.")
+  print("  4. Power off and reset the board's boot mode to Flash mode.")
+  print("  5. Power on the board.")
+  print("")
+  print("For instructions on how to recover the bootloader on the VisionFive2 board, please refer to the following link:")
+  print("")
+  print("  https://doc-en.rvspace.org/VisionFive2/Quick_Start_Guide/VisionFive2_SDK_QSG/recovering_bootloader%20-%20vf2.html")
+  print("")
+  print("The guide provides detailed steps and necessary information for the recovery process.")
+
+print("")
+print("For more information, see the README.md file.")

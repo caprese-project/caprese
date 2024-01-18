@@ -1,5 +1,6 @@
 #include <cstdio>
 
+#include <kernel/address.h>
 #include <kernel/arch/sbi.h>
 
 namespace {
@@ -8,9 +9,7 @@ namespace {
   }
 
   size_t stdio_write(const void* __restrict ptr, size_t size, size_t nmemb, FILE*) {
-    for (size_t i = 0; i < size * nmemb; ++i) {
-      sbi_console_putchar(static_cast<const char*>(ptr)[i]);
-    }
+    sbi_debug_console_write(size * nmemb, map_ptr<char>::from(ptr).as_phys().raw(), 0);
     return size * nmemb;
   }
 
@@ -18,12 +17,14 @@ namespace {
     return EOF;
   }
 
+  char stdio_buf[BUFSIZ];
+
   FILE stdio_file = {
     .__fd         = 0,
-    .__mode       = _IONBF,
+    .__mode       = _IOLBF,
     .__ungetc_buf = static_cast<char>(EOF),
-    .__buf        = nullptr,
-    .__buf_size   = 0,
+    .__buf        = stdio_buf,
+    .__buf_size   = BUFSIZ,
     .__buf_pos    = 0,
     .__read       = stdio_read,
     .__write      = stdio_write,

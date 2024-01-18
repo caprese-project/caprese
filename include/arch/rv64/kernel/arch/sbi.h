@@ -54,7 +54,7 @@ inline sbiret_t sbicall3(unsigned long eid, unsigned long fid, unsigned long arg
   asm volatile("mv a6, %0" : : "r"(fid));
   asm volatile("mv a0, %0" : : "r"(arg0));
   asm volatile("mv a1, %0" : : "r"(arg1));
-  asm volatile("mv a1, %0" : : "r"(arg2));
+  asm volatile("mv a2, %0" : : "r"(arg2));
   asm volatile("ecall");
   asm volatile("mv %0, a0" : "=r"(ret.error));
   asm volatile("mv %0, a1" : "=r"(ret.value));
@@ -105,7 +105,7 @@ inline sbiret_t sbicall6(unsigned long eid, unsigned long fid, unsigned long arg
   asm volatile("mv a2, %0" : : "r"(arg2));
   asm volatile("mv a3, %0" : : "r"(arg3));
   asm volatile("mv a4, %0" : : "r"(arg4));
-  asm volatile("mv a6, %0" : : "r"(arg5));
+  asm volatile("mv a5, %0" : : "r"(arg5));
   asm volatile("ecall");
   asm volatile("mv %0, a0" : "=r"(ret.error));
   asm volatile("mv %0, a1" : "=r"(ret.value));

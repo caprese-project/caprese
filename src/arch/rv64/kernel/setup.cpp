@@ -191,6 +191,11 @@ namespace {
       return;
     }
 
+    if (region.start == nullptr) [[unlikely]] {
+      loge(tag, "Invalid region: %p - %p", region.start, region.end);
+      return;
+    }
+
     if (index < reserved_region_count) {
       region_t dst[2];
       subtract_region(region, reserved_region[index], dst);
@@ -202,6 +207,8 @@ namespace {
 
       return;
     }
+
+    logd(tag, "Creating memory capabilities: %p - %p", region.start, region.end);
 
     uint16_t size_bit = 0;
 
@@ -284,12 +291,16 @@ __init_code void setup_memory_capabilities(map_ptr<boot_info_t> boot_info) {
   };
 
   for_each_dtb_node(boot_info->dtb, [](map_ptr<dtb_node_t> node) {
-    if (strcmp("cpus", node->name) == 0) {
+    if (strcmp("partitions", node->name) == 0) {
       return false;
     }
 
     for_each_dtb_prop(node, [](map_ptr<dtb_node_t> node, map_ptr<dtb_prop_t> prop) {
       if (strcmp(prop->name, "reg") != 0) [[unlikely]] {
+        return true;
+      }
+
+      if (node->size_cells == 0) {
         return true;
       }
 

@@ -41,6 +41,7 @@ function(declare_deps)
       PLATFORM_RISCV_ISA=rv64gc
       PLATFORM_RISCV_ABI=lp64d
       FW_TEXT_START=${CONFIG_FW_TEXT_START}
+      FW_FDT_PATH=${CONFIG_FW_FDT_PATH}
       DEBUG=$<IF:$<CONFIG:Debug>,1,0>
     )
     set(PAYLOAD_PATH platform/generic/firmware/fw_payload.elf)
@@ -74,13 +75,16 @@ function(declare_deps)
     )
     add_dependencies(opensbi caprese_boot_payload)
 
-    if(NOT CONFIG_OUTPUT)
-      set(CONFIG_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/image.elf)
-    endif()
+    add_custom_target(
+      caprese-elf ALL
+      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/external/opensbi/build/${PAYLOAD_PATH} ${CMAKE_CURRENT_BINARY_DIR}/caprese.elf
+      DEPENDS opensbi
+    )
 
-    add_custom_command(
-      TARGET opensbi POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/external/opensbi/build/${PAYLOAD_PATH} ${CONFIG_OUTPUT}
+    add_custom_target(
+      caprese-bin ALL
+      COMMAND ${CMAKE_OBJCOPY} -O binary ${CMAKE_CURRENT_BINARY_DIR}/caprese.elf ${CMAKE_CURRENT_BINARY_DIR}/caprese.bin
+      DEPENDS caprese-elf
     )
   endif()
 endfunction(declare_deps)

@@ -36,8 +36,9 @@ void map_mapped_space(void) {
   page_table_entry_t* page_table = root_page_table;
 
   for (uintptr_t phys = 0; phys < CONFIG_MAPPED_SPACE_SIZE; phys += PAGE_SIZE) {
-    uintptr_t virt    = CONFIG_MAPPED_SPACE_BASE + phys;
-    size_t    index   = (virt >> PAGE_SIZE_BIT) & 0x1ff;
+    uintptr_t virt  = CONFIG_MAPPED_SPACE_BASE + phys;
+    size_t    index = (virt >> PAGE_SIZE_BIT) & 0x1ff;
+
     page_table[index] = {
       .v   = 1,
       .r   = 1,
@@ -45,18 +46,21 @@ void map_mapped_space(void) {
       .x   = 1,
       .u   = 0,
       .g   = 1,
-      .a   = 0,
-      .d   = 0,
+      .a   = 1,
+      .d   = 1,
       .rsv = 0,
       .npn = phys >> 12,
     };
+
+    printf("Mapping %p -> %p\n", phys, virt);
   }
 }
 
 extern "C" [[noreturn]] void start(uintptr_t hartid, uintptr_t dtb) {
   printf("\nBooting on Hart %ld...\n", hartid);
-  printf("Device Tree Blob:      %p\n", reinterpret_cast<void*>(dtb));
-  printf("Payload Start Address: %p\n", _payload_start);
+  printf("Device Tree Blob:               %p\n", reinterpret_cast<void*>(dtb));
+  printf("Payload Start Physical Address: %p\n", _payload_start);
+  printf("Payload Start Virtual Address:  %p\n", CONFIG_MAPPED_SPACE_BASE + _payload_start);
 
   printf("Mapping kernel spaces...\n");
   map_mapped_space();

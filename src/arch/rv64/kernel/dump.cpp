@@ -88,7 +88,7 @@ void dump() {
   uint64_t cycle;
   uint64_t time;
   uint64_t instret;
-  uint64_t hpmcounter[28];
+  uint64_t hpmcounter[29];
 
   asm volatile("csrr %0, fflags" : "=r"(fflags));
   asm volatile("csrr %0, frm" : "=r"(frm));
