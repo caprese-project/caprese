@@ -77,13 +77,13 @@ function(declare_deps)
 
     add_custom_target(
       caprese-elf ALL
-      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/external/opensbi/build/${PAYLOAD_PATH} ${CMAKE_CURRENT_BINARY_DIR}/caprese.elf
+      COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/external/opensbi/build/${PAYLOAD_PATH} ${CMAKE_BINARY_DIR}/caprese.elf
       DEPENDS opensbi
     )
 
     add_custom_target(
       caprese-bin ALL
-      COMMAND ${CMAKE_OBJCOPY} -O binary ${CMAKE_CURRENT_BINARY_DIR}/caprese.elf ${CMAKE_CURRENT_BINARY_DIR}/caprese.bin
+      COMMAND ${CMAKE_OBJCOPY} -O binary ${CMAKE_BINARY_DIR}/caprese.elf ${CMAKE_BINARY_DIR}/caprese.bin
       DEPENDS caprese-elf
     )
   endif()

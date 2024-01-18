@@ -29,7 +29,7 @@ add_custom_target(
 
 add_custom_target(
   caprese-img ALL
-  COMMAND sh "-c" "mkimage -f ${CMAKE_CURRENT_BINARY_DIR}/visionfive2-fit-image.its -A riscv -O u-boot -T firmware ${CMAKE_CURRENT_BINARY_DIR}/caprese.img"
+  COMMAND sh "-c" "mkimage -f ${CMAKE_CURRENT_BINARY_DIR}/visionfive2-fit-image.its -A riscv -O u-boot -T firmware ${CMAKE_BINARY_DIR}/caprese.img"
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS fit-image
   DEPENDS caprese-bin
