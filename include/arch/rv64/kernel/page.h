@@ -92,6 +92,8 @@ struct pte_t {
 
   inline void set_next_page(map_ptr<void> next_page) {
     this->next_page_number = next_page.as_phys().raw() >> PAGE_SIZE_BIT;
+    this->a                = 1;
+    this->d                = 1;
   }
 
   [[nodiscard]] inline map_ptr<void> get_next_page() {

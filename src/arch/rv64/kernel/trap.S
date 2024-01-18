@@ -15,9 +15,12 @@ _return_to_user_mode:
   ld t1, 256(a0) # frame.satp
   la t2, user_trap
   csrw sepc, t0
-  csrw satp, t1
   csrw stvec, t2
-  sd tp, 264(a0)
+  sd tp, 264(a0) # frame.hartid
+
+  sfence.vma zero, zero
+  csrw satp, t1
+  sfence.vma zero, zero
 
   ld ra, 0(a0)
   ld sp, 8(a0)
@@ -50,8 +53,6 @@ _return_to_user_mode:
   ld t5, 232(a0)
   ld t6, 240(a0)
   ld a0, 72(a0)
-
-  sfence.vma zero, zero
 
   sret
 
