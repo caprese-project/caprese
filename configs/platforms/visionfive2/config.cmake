@@ -24,7 +24,7 @@ add_compile_definitions(
 
 add_custom_target(
   fit-image
-  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/visionfive2-fit-image.its ${CMAKE_CURRENT_BINARY_DIR}/visionfive2-fit-image.its
+  COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/visionfive2-fit-image.its ${CONFIG_OUTPUT_DIR}/visionfive2-fit-image.its
 )
 
 add_custom_target(
