@@ -65,10 +65,16 @@ if not os.path.exists(build_dir):
   command += [f"-DCMAKE_BUILD_TYPE:STRING={build_type}"]
   command += [f"-DCONFIG_LOG_LEVEL:STRING={args.log_level}"]
   command += [f"-DPLATFORM:STRING={args.platform}"]
-  subprocess.run(command, cwd=root_dir)
+  result = subprocess.run(command, cwd=root_dir)
+  if result.returncode != 0:
+    print(f"Subprocess failed: {result.returncode}", file=sys.stderr)
+    exit(result.returncode)
 
 print(f"Building project in '{build_dir}'")
-subprocess.run(["cmake", "--build", build_dir], cwd=root_dir)
+result = subprocess.run(["cmake", "--build", build_dir], cwd=root_dir)
+if result.returncode != 0:
+  print(f"Subprocess failed: {result.returncode}", file=sys.stderr)
+  exit(result.returncode)
 
 print("Build complete.")
 
