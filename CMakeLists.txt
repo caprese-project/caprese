@@ -14,6 +14,10 @@ else()
   message(FATAL_ERROR "PLATFORM is not defined.")
 endif(DEFINED PLATFORM)
 
+if (NOT DEFINED CONFIG_OUTPUT_DIR)
+  set(CONFIG_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR})
+endif()
+
 declare_deps()
 
 set(INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/include/arch/${CONFIG_ARCH})
