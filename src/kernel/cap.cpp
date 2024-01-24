@@ -460,7 +460,7 @@ void destroy_virt_page_object(map_ptr<cap_slot_t> slot) {
   }
 }
 
-void destroy_cap_space_object(map_ptr<cap_slot_t> slot) {
+void destroy_cap_space_object([[maybe_unused]] map_ptr<cap_slot_t> slot) {
   assert(slot->is_tail() || !is_same_object(slot, slot->next));
   assert(get_cap_type(slot->cap) == CAP_CAP_SPACE);
 

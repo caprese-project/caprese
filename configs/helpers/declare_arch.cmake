@@ -38,6 +38,7 @@ macro(declare_arch)
       -Werror
       -Wno-format-overflow
       -Wno-attributes
+      -Wno-array-bounds
       -fno-omit-frame-pointer
       -gdwarf-2
       -MD
